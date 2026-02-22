@@ -900,6 +900,20 @@ export function DemoWorkspace({
 
     return extractLatestAssistantSummary(messages);
   }, [messages, structuredInsight]);
+  const assumptionHints = useMemo(() => {
+    if (!structuredInsight) {
+      return [] as string[];
+    }
+
+    const fromEvidence = structuredInsight.evidence
+      .map((item) => item.claim.trim())
+      .filter((item) => item.length > 0);
+    const fromRisks = structuredInsight.risks
+      .map((risk) => `${risk.title}: ${risk.impact}`.trim())
+      .filter((item) => item.length > 0);
+
+    return [...fromEvidence, ...fromRisks].slice(0, 3);
+  }, [structuredInsight]);
   const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
   const planProgress = useMemo(() => {
@@ -1899,102 +1913,157 @@ export function DemoWorkspace({
               <p className="text-xs text-muted-foreground">
                 左列で開始し、ここで編集・再送して出力を固めます。
               </p>
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-2.5">
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold text-primary">LLM回答サマリ（固定表示）</p>
+                  <p className="text-[11px] font-semibold text-primary">結論（TL;DR）</p>
                   <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
                     {isStreaming ? "更新中" : "最新"}
                   </Badge>
                 </div>
-                {latestAssistantSummary ? (
-                  <div className="mt-1.5 space-y-1">
-                    <p className="text-xs font-medium text-foreground">{latestAssistantSummary.summary}</p>
-                    {latestAssistantSummary.bullets.length > 0 ? (
-                      <ul className="space-y-0.5 text-[11px] text-muted-foreground">
-                        {latestAssistantSummary.bullets.map((line, lineIndex) => (
-                          <li key={`${line}-${lineIndex}`}>• {line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+                <div
+                  className={cn(
+                    "mt-2 grid gap-2",
+                    assumptionHints.length > 0
+                      ? "md:grid-cols-[minmax(0,1fr)_280px]"
+                      : "md:grid-cols-1",
+                  )}
+                >
+                  <div className="rounded-md border border-border/60 bg-background px-2.5 py-2">
+                    {latestAssistantSummary ? (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-foreground">
+                          {latestAssistantSummary.summary}
+                        </p>
+                        {latestAssistantSummary.bullets.length > 0 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">
+                        まだ回答がありません。Run Scenarioまたは送信で回答を生成すると、ここに結論を固定表示します。
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    まだ回答がありません。Run Scenarioまたは送信で回答を生成すると、ここに要点を固定表示します。
-                  </p>
-                )}
-                {structuredInsight ? (
-                  <div className="mt-2 grid gap-2 md:grid-cols-3">
-                    <div className="rounded-md border border-border/60 bg-background p-2">
-                      <p className="text-[11px] font-semibold">重要論点</p>
+                  {assumptionHints.length > 0 ? (
+                    <div className="rounded-md border border-border/60 bg-background px-2.5 py-2">
+                      <p className="text-[11px] font-semibold">推論仮定</p>
                       <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                        {structuredInsight.keyPoints.slice(0, 4).map((point) => (
-                          <li key={point}>• {point}</li>
+                        {assumptionHints.map((item, index) => (
+                          <li key={`${item}-${index}`}>• {item}</li>
                         ))}
                       </ul>
                     </div>
-                    <div className="rounded-md border border-border/60 bg-background p-2">
-                      <p className="text-[11px] font-semibold">主要リスク</p>
-                      {structuredInsight.risks.length > 0 ? (
-                        <div className="mt-1 space-y-1">
-                          {structuredInsight.risks.slice(0, 3).map((risk) => (
-                            <div key={risk.title} className="rounded border border-border/60 px-1.5 py-1 text-[10px]">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">{risk.title}</span>
-                                <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
-                                  {risk.severity}
-                                </Badge>
-                              </div>
-                              <p className="mt-0.5 text-muted-foreground">{risk.mitigation}</p>
+                  ) : null}
+                </div>
+
+                <Accordion type="single" collapsible className="mt-2">
+                  <AccordionItem value="details" className="border-b-0">
+                    <AccordionTrigger className="py-1 text-[11px] hover:no-underline">
+                      詳細を表示（論点・リスク・次アクション・推論ログ）
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-2 pt-1">
+                      {structuredInsight ? (
+                        <>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            <div className="rounded-md border border-border/60 bg-background p-2">
+                              <p className="text-[11px] font-semibold">重要論点</p>
+                              <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                                {structuredInsight.keyPoints.slice(0, 6).map((point) => (
+                                  <li key={point}>• {point}</li>
+                                ))}
+                              </ul>
                             </div>
-                          ))}
-                        </div>
+                            <div className="rounded-md border border-border/60 bg-background p-2">
+                              <p className="text-[11px] font-semibold">主要リスク</p>
+                              {structuredInsight.risks.length > 0 ? (
+                                <div className="mt-1 space-y-1">
+                                  {structuredInsight.risks.slice(0, 4).map((risk) => (
+                                    <div
+                                      key={risk.title}
+                                      className="rounded border border-border/60 px-1.5 py-1 text-[10px]"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium">{risk.title}</span>
+                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                                          {risk.severity}
+                                        </Badge>
+                                      </div>
+                                      <p className="mt-0.5 text-muted-foreground">{risk.mitigation}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-[11px] text-muted-foreground">リスク抽出なし</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-border/60 bg-background p-2">
+                            <p className="text-[11px] font-semibold">次アクション</p>
+                            {structuredInsight.actions.length > 0 ? (
+                              <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                                {structuredInsight.actions.slice(0, 5).map((action) => (
+                                  <li key={`${action.task}-${action.owner}`}>
+                                    • {action.task}（{action.owner} / {action.due} / {action.metric}）
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                アクション抽出なし
+                              </p>
+                            )}
+                          </div>
+                          {structuredInsight.evidence.length > 0 ? (
+                            <div className="rounded-md border border-border/60 bg-background p-2">
+                              <p className="text-[11px] font-semibold">根拠と追加確認</p>
+                              <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                                {structuredInsight.evidence.slice(0, 4).map((item, index) => (
+                                  <li key={`${item.claim}-${index}`}>
+                                    • {item.claim} / 次確認: {item.nextCheck}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </>
                       ) : (
-                        <p className="mt-1 text-[11px] text-muted-foreground">リスク抽出なし</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          詳細は最初の回答生成後に表示されます。
+                        </p>
                       )}
-                    </div>
-                    <div className="rounded-md border border-border/60 bg-background p-2">
-                      <p className="text-[11px] font-semibold">次アクション</p>
-                      {structuredInsight.actions.length > 0 ? (
-                        <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                          {structuredInsight.actions.slice(0, 3).map((action) => (
-                            <li key={`${action.task}-${action.owner}`}>
-                              • {action.task}（{action.owner} / {action.due}）
-                            </li>
+
+                      <ChainOfThought defaultOpen={false}>
+                        <ChainOfThoughtHeader>Agent Worklog（CoT）</ChainOfThoughtHeader>
+                        <ChainOfThoughtContent>
+                          {worklogSteps.map((step) => (
+                            <ChainOfThoughtStep
+                              key={step.id}
+                              label={step.label}
+                              description={step.description}
+                              status={step.status}
+                            >
+                              <ChainOfThoughtSearchResults>
+                                {step.tags.map((tag) => (
+                                  <ChainOfThoughtSearchResult key={`${step.id}-${tag}`}>
+                                    {tag}
+                                  </ChainOfThoughtSearchResult>
+                                ))}
+                              </ChainOfThoughtSearchResults>
+                            </ChainOfThoughtStep>
                           ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-1 text-[11px] text-muted-foreground">アクション抽出なし</p>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                        </ChainOfThoughtContent>
+                      </ChainOfThought>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
               {meetingPrerequisiteBlocked ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
                   会議レビューは Step 1 の議事録入力が必須です（20文字以上）。
                 </div>
               ) : null}
-              <ChainOfThought defaultOpen={viewMode === "guided"}>
-                <ChainOfThoughtHeader>Agent Worklog（CoT）</ChainOfThoughtHeader>
-                <ChainOfThoughtContent>
-                  {worklogSteps.map((step) => (
-                    <ChainOfThoughtStep
-                      key={step.id}
-                      label={step.label}
-                      description={step.description}
-                      status={step.status}
-                    >
-                      <ChainOfThoughtSearchResults>
-                        {step.tags.map((tag) => (
-                          <ChainOfThoughtSearchResult key={`${step.id}-${tag}`}>
-                            {tag}
-                          </ChainOfThoughtSearchResult>
-                        ))}
-                      </ChainOfThoughtSearchResults>
-                    </ChainOfThoughtStep>
-                  ))}
-                </ChainOfThoughtContent>
-              </ChainOfThought>
             </CardHeader>
 
             <Conversation className={cn("bg-muted/20", viewMode === "guided" ? "h-[420px]" : "h-[540px]")}>
