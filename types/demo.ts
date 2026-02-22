@@ -1,22 +1,54 @@
 export type DemoMode = "mock" | "live";
 
-export interface DailyReportDraft {
-  weather: string;
-  workSummary: string;
-  workers: number;
-  machines: string[];
-  output: string;
-  safetyNotes: string[];
-  tomorrowPlan: string[];
+export interface SalesOutreachDraft {
+  account: string;
+  objective: string;
+  talkTrack: string[];
+  followUpTasks: string[];
 }
 
-export interface PhotoLedgerItem {
-  fileId: string;
-  date: string;
-  section: string;
-  processTag: string;
-  locationTag: string;
-  caption: string;
+export interface SalesAccountInsight {
+  orgLogin: string;
+  displayName: string;
+  website: string;
+  followers: number;
+  publicRepos: number;
+  topRepositories: Array<{
+    name: string;
+    stars: number;
+    language: string;
+    updatedAt: string;
+    url: string;
+  }>;
+}
+
+export interface RecruitingJobPosting {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  remote: boolean;
+  tags: string[];
+  url: string;
+  publishedAt: string;
+}
+
+export interface CandidateBrief {
+  candidateId: string;
+  role: string;
+  highlights: string[];
+  concerns: string[];
+  recommendation: "strong_yes" | "yes" | "hold" | "no";
+}
+
+export interface ResearchSignal {
+  id: string;
+  source: "hn" | "github";
+  title: string;
+  summary: string;
+  url: string;
+  score: number;
+  publishedAt: string;
 }
 
 export interface WorkflowNode {
@@ -34,34 +66,6 @@ export interface WorkflowEdge {
 export interface WorkflowGraph {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
-}
-
-export interface OperationEvent {
-  line: string;
-  status: string;
-  details: string;
-  updatedAt: string;
-  sourceUrl: string;
-}
-
-export interface AnnouncementDraft {
-  web: string;
-  stationDisplay: string;
-  voiceScript: string;
-  languages: string[];
-}
-
-export interface DatasetCandidate {
-  title: string;
-  org: string;
-  landingUrl: string;
-  apiHint: string;
-}
-
-export interface StatSeries {
-  statsDataId: string;
-  dimensions: string[];
-  data: Array<{ label: string; value: number }>;
 }
 
 export interface Evidence {

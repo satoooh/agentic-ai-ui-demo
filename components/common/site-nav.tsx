@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Home" },
-  { href: "/construction", label: "建設" },
-  { href: "/transport", label: "公共交通" },
-  { href: "/gov-insight", label: "官公庁データ活用" },
+  { href: "/sales", label: "営業" },
+  { href: "/recruiting", label: "採用" },
+  { href: "/research", label: "リサーチ" },
   { href: "/settings", label: "Settings" },
 ];
 

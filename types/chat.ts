@@ -1,7 +1,7 @@
 import type { UIMessage } from "ai";
 import type { DemoMode, WorkflowGraph } from "@/types/demo";
 
-export type DemoId = "construction" | "transport" | "gov-insight";
+export type DemoId = "sales" | "recruiting" | "research";
 
 export type ModelProvider = "openai" | "gemini";
 

@@ -11,16 +11,10 @@ const rows = [
     description: "mock | live の実行モード",
   },
   {
-    key: "ODPT_TOKEN",
+    key: "GITHUB_TOKEN",
     required: false,
-    value: env.ODPT_TOKEN ? "*** configured ***" : "(unset)",
-    description: "公共交通デモの live 接続トークン",
-  },
-  {
-    key: "ESTAT_APP_ID",
-    required: false,
-    value: env.ESTAT_APP_ID ? "*** configured ***" : "(unset)",
-    description: "官公庁データデモの e-Stat appId",
+    value: env.GITHUB_TOKEN ? "*** configured ***" : "(unset)",
+    description: "営業/リサーチデモのGitHub APIレート上限緩和に利用",
   },
   {
     key: "OPENAI_API_KEY",
@@ -73,7 +67,7 @@ export default function SettingsPage() {
           <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
             <p className="font-medium">運用メモ</p>
             <p className="mt-1 text-muted-foreground">
-              `DEMO_MODE=mock` を既定にし、`ODPT_TOKEN` と `ESTAT_APP_ID` は必要時のみ live 化してください。
+              `DEMO_MODE=mock` を既定にし、`GITHUB_TOKEN` は live 取得のレート上限対策として必要時のみ設定してください。
             </p>
           </div>
         </CardContent>

@@ -10,8 +10,7 @@ export const env = {
   OPENAI_MODEL: process.env.OPENAI_MODEL ?? "gpt-5.1",
   GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
   GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-  ODPT_TOKEN: process.env.ODPT_TOKEN,
-  ESTAT_APP_ID: process.env.ESTAT_APP_ID,
+  GITHUB_TOKEN: process.env.GITHUB_TOKEN,
 } as const;
 
 export const isLiveMode = env.DEMO_MODE === "live";

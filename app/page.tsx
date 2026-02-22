@@ -13,25 +13,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const demos = [
   {
-    href: "/construction",
-    title: "建設: Construction SiteOps Copilot",
-    summary: "Voice + Attachments + Workflow(Canvas) で現場入力から日報/台帳/段取りまでを通す。",
-    focus: ["SpeechInput", "Transcription", "Artifact", "FileTree", "Canvas", "Confirmation"],
-    value: "現場入力から提出までの作業往復を短縮",
+    href: "/sales",
+    title: "営業: Sales Enablement Copilot",
+    summary: "アカウント調査 → 提案骨子 → 送付承認までを1画面で通し、営業の初動を高速化。",
+    focus: ["Queue", "Plan", "Artifact", "Confirmation", "Workflow", "OpenInChat"],
+    value: "提案初稿と承認フローのリードタイム短縮",
   },
   {
-    href: "/transport",
-    title: "公共交通: Transport Control Desk",
-    summary: "運行監視(Queue) → 文面生成(Message分岐) → 放送(TTS) → 掲出(WebPreview)を一気通貫で確認。",
-    focus: ["Queue", "Tool", "Message", "VoiceSelector", "AudioPlayer", "JSXPreview"],
-    value: "遅延発生時の公表オペレーションを標準化",
+    href: "/recruiting",
+    title: "採用: Recruiting Ops Copilot",
+    summary: "候補者要約 → 面接調整 → オファー承認の定型業務を、進捗可視化付きで効率化。",
+    focus: ["SpeechInput", "Conversation", "Task", "Artifact", "Approval", "Checkpoint"],
+    value: "採用進行の停滞と調整コストを削減",
   },
   {
-    href: "/gov-insight",
-    title: "官公庁データ活用: Gov Data Insight Studio",
-    summary: "探索(ChainOfThought) → 根拠付きレポート → コネクタIDE(擬似実行) → 承認配布を通して体験。",
-    focus: ["Sources", "InlineCitation", "Artifact", "Terminal", "TestResults", "StackTrace"],
-    value: "根拠付きレポート作成と配布前確認を高速化",
+    href: "/research",
+    title: "リサーチ: IT Research Agent Studio",
+    summary: "外部シグナル収集 → 根拠付き要約 → コネクタIDE検証 → 配布承認の一連を実演。",
+    focus: ["Sources", "InlineCitation", "Terminal", "TestResults", "StackTrace", "Commit"],
+    value: "調査メモを意思決定用アウトプットへ即変換",
   },
 ];
 
@@ -84,7 +84,7 @@ export default function HomePage() {
 
             <div className="flex flex-wrap gap-2">
               <Button asChild>
-                <Link href="/construction">
+                <Link href="/sales">
                   デモをすぐ開始
                   <ArrowRightIcon className="size-4" />
                 </Link>
@@ -119,14 +119,14 @@ export default function HomePage() {
               </ol>
               <div className="grid gap-2 pt-1 sm:grid-cols-2">
                 <Button asChild size="sm" variant="secondary">
-                  <Link href="/transport">
-                    公共交通を開く
+                  <Link href="/recruiting">
+                    採用デモを開く
                     <ArrowRightIcon className="size-3.5" />
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="secondary">
-                  <Link href="/gov-insight">
-                    官公庁データを開く
+                  <Link href="/research">
+                    リサーチデモを開く
                     <ArrowRightIcon className="size-3.5" />
                   </Link>
                 </Button>
