@@ -1,4 +1,5 @@
 import { CodeLabPanel } from "@/components/demos/code-lab-panel";
+import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { GovSourcePanel } from "@/components/demos/gov-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
@@ -104,7 +105,42 @@ export default function GovInsightDemoPage() {
         url: evidence.url,
         quote: evidence.quote,
       }))}
-      topPanel={<GovSourcePanel />}
+      topPanel={
+        <div className="space-y-4">
+          <DemoScriptPanel
+            title="官公庁データ活用: 探索から配布承認まで"
+            summary="e-Gov/e-Statの探索結果を根拠付きレポート化し、配布フローまで接続。"
+            durationSec={60}
+            steps={[
+              {
+                id: "gov-script-1",
+                at: "00:00",
+                cue: "Discover",
+                value: "データ候補と統計系列を取得して比較",
+              },
+              {
+                id: "gov-script-2",
+                at: "00:18",
+                cue: "Evidence",
+                value: "Sources/InlineCitation付きでサマリ生成",
+              },
+              {
+                id: "gov-script-3",
+                at: "00:35",
+                cue: "Code",
+                value: "Connector IDEで失敗→修正→再実行を提示",
+              },
+              {
+                id: "gov-script-4",
+                at: "00:50",
+                cue: "Approval",
+                value: "レポート配布前に承認と監査を実施",
+              },
+            ]}
+          />
+          <GovSourcePanel />
+        </div>
+      }
       bottomPanel={
         <div className="space-y-4">
           <CodeLabPanel

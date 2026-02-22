@@ -1,3 +1,4 @@
+import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
@@ -84,6 +85,39 @@ export default function ConstructionDemoPage() {
           updatedAt: new Date().toISOString(),
         },
       ]}
+      topPanel={
+        <DemoScriptPanel
+          title="建設: 現場入力から提出承認まで"
+          summary="音声メモと写真を起点に、日報生成と提出承認までを1分で体験する。"
+          durationSec={60}
+          steps={[
+            {
+              id: "construction-script-1",
+              at: "00:00",
+              cue: "Input",
+              value: "音声入力と写真添付で現場情報を投入",
+            },
+            {
+              id: "construction-script-2",
+              at: "00:15",
+              cue: "Progress",
+              value: "Queue/Planで安全と段取りを可視化",
+            },
+            {
+              id: "construction-script-3",
+              at: "00:35",
+              cue: "Artifact",
+              value: "日報JSONと写真台帳を成果物として提示",
+            },
+            {
+              id: "construction-script-4",
+              at: "00:50",
+              cue: "Approval",
+              value: "提出操作はConfirmationで承認必須",
+            },
+          ]}
+        />
+      }
       enableVoice
       bottomPanel={
         <WorkflowEditor

@@ -1,3 +1,4 @@
+import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { TransportSourcePanel } from "@/components/demos/transport-source-panel";
 import { mockAnnouncementDraft, mockOperationEvents } from "@/lib/mock/transport";
@@ -80,7 +81,42 @@ export default function TransportDemoPage() {
       ]}
       enableVoice
       enableTts
-      topPanel={<TransportSourcePanel />}
+      topPanel={
+        <div className="space-y-4">
+          <DemoScriptPanel
+            title="公共交通: 遅延発生時の監視から公表"
+            summary="運行情報の把握から案内文公開までの標準オペレーションを再現。"
+            durationSec={55}
+            steps={[
+              {
+                id: "transport-script-1",
+                at: "00:00",
+                cue: "Monitor",
+                value: "Queueで遅延イベントを検知し影響範囲を把握",
+              },
+              {
+                id: "transport-script-2",
+                at: "00:15",
+                cue: "Generate",
+                value: "掲出文/放送文/CS回答を同時生成して比較",
+              },
+              {
+                id: "transport-script-3",
+                at: "00:35",
+                cue: "Preview",
+                value: "HTML成果物とTTSで公開前の品質を確認",
+              },
+              {
+                id: "transport-script-4",
+                at: "00:45",
+                cue: "Approval",
+                value: "公開操作を承認し、監査ログへ記録",
+              },
+            ]}
+          />
+          <TransportSourcePanel />
+        </div>
+      }
     />
   );
 }
