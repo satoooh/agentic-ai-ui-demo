@@ -6,6 +6,7 @@ import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
   mockMeetingReview,
   mockMeetingSignals,
+  mockMeetingTranscriptSamples,
   mockMeetingTranscript,
   mockMeetingWorkflow,
 } from "@/lib/mock/meeting";
@@ -66,6 +67,23 @@ export default function MeetingDemoPage() {
           name: "meeting-signals.json",
           kind: "json",
           content: JSON.stringify(mockMeetingSignals, null, 2),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: "meeting-transcript-samples",
+          name: "meeting-transcript-samples.md",
+          kind: "markdown",
+          content:
+            "# サンプル発言録（ダミー）\n\n" +
+            mockMeetingTranscriptSamples
+              .map(
+                (sample, index) =>
+                  `## ${index + 1}. ${sample.title}\n` +
+                  `- 会議タイプ: ${sample.meetingProfileId}\n` +
+                  `- メモ: ${sample.note}\n` +
+                  `- 冒頭抜粋: ${sample.dirtyTranscript.split("\n")[0]}`,
+              )
+              .join("\n\n"),
           updatedAt: new Date().toISOString(),
         },
       ]}

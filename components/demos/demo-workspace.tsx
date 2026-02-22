@@ -87,6 +87,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { mockMeetingTranscriptSamples } from "@/lib/mock/meeting";
 import { getDefaultModel, MODEL_OPTIONS } from "@/lib/models";
 import type {
   ApprovalRequest,
@@ -488,6 +489,9 @@ export function DemoWorkspace({
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
   const [meetingProfileId, setMeetingProfileId] = useState(MEETING_PROFILES[0].id);
+  const [selectedMeetingSampleId, setSelectedMeetingSampleId] = useState(
+    mockMeetingTranscriptSamples[0]?.id ?? "",
+  );
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
@@ -675,6 +679,29 @@ export function DemoWorkspace({
     () => MEETING_OUTPUT_TEMPLATES[selectedMeetingProfile.id],
     [selectedMeetingProfile.id],
   );
+  const meetingSamples = useMemo(
+    () =>
+      mockMeetingTranscriptSamples.filter(
+        (sample) => sample.meetingProfileId === selectedMeetingProfile.id,
+      ),
+    [selectedMeetingProfile.id],
+  );
+  const selectedMeetingSample = useMemo(
+    () =>
+      meetingSamples.find((sample) => sample.id === selectedMeetingSampleId) ??
+      meetingSamples[0] ??
+      null,
+    [meetingSamples, selectedMeetingSampleId],
+  );
+  useEffect(() => {
+    if (meetingSamples.length === 0) {
+      return;
+    }
+
+    if (!meetingSamples.some((sample) => sample.id === selectedMeetingSampleId)) {
+      setSelectedMeetingSampleId(meetingSamples[0].id);
+    }
+  }, [meetingSamples, selectedMeetingSampleId]);
   const activeSuggestions = useMemo(
     () => (demo === "meeting" ? getMeetingSuggestions(selectedMeetingProfile) : suggestions),
     [demo, selectedMeetingProfile, suggestions],
@@ -842,14 +869,18 @@ export function DemoWorkspace({
     setAttachmentNames([]);
   };
 
-  const runDevilsAdvocate = async () => {
+  const runDevilsAdvocate = async (options?: {
+    meetingLogOverride?: string;
+    notesOverride?: string;
+    statusNote?: string;
+  }) => {
     if (isStreaming) {
       return;
     }
 
     const transcript = buildConversationTranscript(messages);
-    const meetingLog = meetingTranscript.trim();
-    const notes = draft.trim();
+    const meetingLog = (options?.meetingLogOverride ?? meetingTranscript).trim();
+    const notes = (options?.notesOverride ?? draft).trim();
 
     const basePrompt =
       "あなたは悪魔の代弁者エージェントです。以下の会話ログを読み、" +
@@ -882,7 +913,33 @@ export function DemoWorkspace({
       },
     );
 
-    setLoopStatus("悪魔の代弁者レビューを実行しました。");
+    setLoopStatus(options?.statusNote ?? "悪魔の代弁者レビューを実行しました。");
+  };
+
+  const loadMeetingSample = (sampleId?: string) => {
+    const sample =
+      meetingSamples.find((item) => item.id === (sampleId ?? selectedMeetingSample?.id)) ??
+      selectedMeetingSample;
+    if (!sample) {
+      return;
+    }
+
+    setMeetingTranscript(sample.dirtyTranscript);
+    setDraft(sample.note);
+    setLoopStatus(`サンプル「${sample.title}」を読み込みました。`);
+  };
+
+  const runMeetingSample = async () => {
+    if (!selectedMeetingSample || isStreaming) {
+      return;
+    }
+
+    setMeetingTranscript(selectedMeetingSample.dirtyTranscript);
+    await runDevilsAdvocate({
+      meetingLogOverride: selectedMeetingSample.dirtyTranscript,
+      notesOverride: selectedMeetingSample.note,
+      statusNote: `サンプル「${selectedMeetingSample.title}」で反証レビューを実行しました。`,
+    });
   };
 
   const runAutonomousLoop = async () => {
@@ -1682,6 +1739,47 @@ export function DemoWorkspace({
                     <p className="text-xs font-semibold">3-step 会議レビュー</p>
                     <div className="mt-2 space-y-3 text-[11px]">
                       <div className="space-y-1.5">
+                        <p className="text-muted-foreground">0. 汚れた発言録サンプル（ダミー）</p>
+                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                          <Select
+                            value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
+                            onValueChange={setSelectedMeetingSampleId}
+                          >
+                            <SelectTrigger className="h-8 bg-background">
+                              <SelectValue placeholder="サンプル発言録を選択" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {meetingSamples.map((sample) => (
+                                <SelectItem key={sample.id} value={sample.id}>
+                                  {sample.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => loadMeetingSample()}
+                            disabled={!selectedMeetingSample || isStreaming}
+                          >
+                            読み込み
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void runMeetingSample()}
+                            disabled={!selectedMeetingSample || isStreaming}
+                          >
+                            サンプル出力
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          タイムスタンプゆれ・口語・未確定メモを含む擬似議事録です。
+                        </p>
+                      </div>
+                      <div className="space-y-1.5">
                         <p className="text-muted-foreground">1. 会議タイプを選択</p>
                         <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
                           <SelectTrigger className="h-8 bg-background">
@@ -1821,6 +1919,41 @@ export function DemoWorkspace({
                           </p>
                         </div>
                         <Badge variant="outline">devil&apos;s advocate</Badge>
+                      </div>
+                      <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                        <Select
+                          value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
+                          onValueChange={setSelectedMeetingSampleId}
+                        >
+                          <SelectTrigger className="h-8 bg-background">
+                            <SelectValue placeholder="サンプル発言録を選択" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {meetingSamples.map((sample) => (
+                              <SelectItem key={sample.id} value={sample.id}>
+                                {sample.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => loadMeetingSample()}
+                          disabled={!selectedMeetingSample || isStreaming}
+                        >
+                          読み込み
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void runMeetingSample()}
+                          disabled={!selectedMeetingSample || isStreaming}
+                        >
+                          サンプル出力
+                        </Button>
                       </div>
                       <Textarea
                         value={meetingTranscript}
