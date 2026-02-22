@@ -9,6 +9,7 @@ import type {
   ToolEvent,
 } from "@/types/chat";
 import { mockCandidateBrief, mockRecruitingJobs } from "@/lib/mock/recruiting";
+import { mockMeetingReview, mockMeetingTranscript } from "@/lib/mock/meeting";
 import { mockResearchConnectorProject, mockResearchEvidence, mockResearchSignals } from "@/lib/mock/research";
 import { mockSalesAccountInsight, mockSalesOutreachDraft } from "@/lib/mock/sales";
 
@@ -72,6 +73,8 @@ function buildDevilsAdvocateReply(demo: DemoId): MockReply {
       ? "sales-devils-advocate.md"
       : demo === "recruiting"
         ? "recruiting-devils-advocate.md"
+        : demo === "meeting"
+          ? "meeting-devils-advocate.md"
         : "research-devils-advocate.md";
 
   return {
@@ -325,6 +328,84 @@ function buildRecruitingReply(text: string): MockReply {
   };
 }
 
+function buildMeetingReply(text: string): MockReply {
+  const normalizedText = text.trim();
+  const meetingSummary =
+    normalizedText.length > 0
+      ? normalizedText
+      : `${mockMeetingTranscript.title}: ${mockMeetingTranscript.excerpt}`;
+
+  return {
+    message:
+      "会議ログから前提・反証・次アクションを更新しました。悪魔の代弁者レビューの結果を基に意思決定を修正してください。",
+    approval: { required: false, action: "", reason: "" },
+    queue: [
+      {
+        id: "meeting-alert-1",
+        title: "前提検証が不足",
+        description: "意思決定前提の裏取りが完了していません。",
+        severity: "critical",
+        timestamp: now(),
+      },
+      {
+        id: "meeting-alert-2",
+        title: "担当未確定タスク",
+        description: "次回までのアクションに担当未設定の項目があります。",
+        severity: "warning",
+        timestamp: now(),
+      },
+    ],
+    plan: [
+      { id: "m-plan-1", title: "議事録の要点抽出", status: "done" },
+      { id: "m-plan-2", title: "前提と意思決定の整理", status: "done" },
+      { id: "m-plan-3", title: "悪魔の代弁者レビュー", status: "doing" },
+      { id: "m-plan-4", title: "次回までのタスク生成", status: "todo" },
+    ],
+    tasks: mockMeetingReview.nextActions.map((action, index) => ({
+      id: `m-task-${index}`,
+      label: action,
+      done: false,
+    })),
+    tools: getCommonToolEvents("meeting-red-team-agent"),
+    artifacts: [
+      {
+        id: "meeting-minutes",
+        name: "meeting-minutes.md",
+        kind: "markdown",
+        content:
+          `# 会議ログ要約\n\n${meetingSummary}\n\n` +
+          "## 決定事項\n- 採用と営業の優先順位を週次で再評価\n\n" +
+          "## 保留事項\n- どの施策を今月実行するかの閾値定義",
+        updatedAt: now(),
+      },
+      {
+        id: "meeting-review",
+        name: "meeting-review.json",
+        kind: "json",
+        content: JSON.stringify(mockMeetingReview, null, 2),
+        updatedAt: now(),
+      },
+      {
+        id: "meeting-next-actions",
+        name: "meeting-next-actions.md",
+        kind: "markdown",
+        content:
+          "# Next Actions\n\n" +
+          mockMeetingReview.nextActions.map((action, index) => `${index + 1}. ${action}`).join("\n"),
+        updatedAt: now(),
+      },
+    ],
+    citations: [
+      {
+        id: "meeting-decision-checklist",
+        title: "Decision Review Checklist",
+        url: "https://hbr.org/2006/01/before-you-make-that-big-decision",
+        quote: "意思決定前に反対意見を意図的に取り込むと質が向上する。",
+      },
+    ],
+  };
+}
+
 function buildResearchReply(text: string): MockReply {
   const normalized = text.toLowerCase();
   const targetCompany = normalized.includes("sony")
@@ -448,6 +529,9 @@ export function buildMockReply(input: BuildReplyInput): MockReply {
   }
   if (input.demo === "recruiting") {
     return buildRecruitingReply(input.text);
+  }
+  if (input.demo === "meeting") {
+    return buildMeetingReply(input.text);
   }
   return buildResearchReply(input.text);
 }

@@ -15,7 +15,7 @@ export const maxDuration = 30;
 
 const requestSchema = z.object({
   messages: z.array(z.unknown()).optional(),
-  demo: z.enum(["sales", "recruiting", "research"]).default("sales"),
+  demo: z.enum(["sales", "recruiting", "meeting", "research"]).default("sales"),
   provider: z.enum(["openai", "gemini"]).default("openai"),
   model: z.string().optional(),
   modeOverride: z.enum(["mock", "live"]).optional(),

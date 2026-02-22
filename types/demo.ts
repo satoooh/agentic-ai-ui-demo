@@ -61,6 +61,17 @@ export interface CorporateResearchSnapshot {
   notes: string[];
 }
 
+export interface MeetingSignal {
+  id: string;
+  source: "hn" | "mock";
+  title: string;
+  summary: string;
+  url: string;
+  points: number;
+  comments: number;
+  publishedAt: string;
+}
+
 export interface WorkflowNode {
   id: string;
   label: string;

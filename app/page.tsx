@@ -13,6 +13,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const demos = [
   {
+    href: "/meeting",
+    title: "会議レビュー: Devil's Advocate Copilot",
+    summary: "議事録入力 → 前提抽出 → 反証レビュー → 次アクション確定を自律ループ化。",
+    focus: ["Conversation", "Queue", "Plan", "Artifact", "Checkpoint", "Sources"],
+    value: "会議後の意思決定品質と実行速度を向上",
+  },
+  {
     href: "/sales",
     title: "営業: Sales Agentic Loop",
     summary: "アカウント収集 → 提案生成 → 悪魔の代弁者レビュー → 次アクション生成を1画面で反復。",
@@ -36,10 +43,10 @@ const demos = [
 ];
 
 const quickStartSteps = [
-  "任意のデモを開き、左列の Run Scenario を押す",
-  "中央 Conversation で入力文を編集し、自律ループ実行または悪魔の代弁者を押す",
-  "右列 Execution（必要に応じて Full表示）で進捗・ツール・監査を確認する",
-  "下段 Artifacts で成果物を preview/copy/download する",
+  "まず「会議レビュー」デモを開き、Meeting Setupで会議タイプを選ぶ",
+  "会議ログを貼り付け、悪魔の代弁者を実行する",
+  "自律ループ実行で反証→修正→次アクション生成まで進める",
+  "Artifacts から会議サマリと次アクションをコピー/共有する",
 ];
 
 export default function HomePage() {
@@ -61,7 +68,7 @@ export default function HomePage() {
                 Japan Vertical Agentic Demo Lab
               </h1>
               <p className="mt-2 max-w-4xl text-sm text-muted-foreground sm:text-base">
-                「入力 → 収集 → 合成 → 反復」を業務フローとして再現するデモ環境です。既定は
+                「会議ログ入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。既定は
                 <code className="mx-1">mock</code>で確実に動作し、環境変数を設定すれば
                 <code className="mx-1">live</code>連携へ段階移行できます。
               </p>
@@ -84,7 +91,7 @@ export default function HomePage() {
 
             <div className="flex flex-wrap gap-2">
               <Button asChild>
-                <Link href="/sales">
+                <Link href="/meeting">
                   デモをすぐ開始
                   <ArrowRightIcon className="size-4" />
                 </Link>
@@ -119,14 +126,14 @@ export default function HomePage() {
               </ol>
               <div className="grid gap-2 pt-1 sm:grid-cols-2">
                 <Button asChild size="sm" variant="secondary">
-                  <Link href="/recruiting">
-                    採用デモを開く
+                  <Link href="/meeting">
+                    会議レビューを開く
                     <ArrowRightIcon className="size-3.5" />
                   </Link>
                 </Button>
                 <Button asChild size="sm" variant="secondary">
                   <Link href="/research">
-                    リサーチデモを開く
+                    企業調査デモを開く
                     <ArrowRightIcon className="size-3.5" />
                   </Link>
                 </Button>
@@ -136,7 +143,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {demos.map((demo) => (
           <SectionCard key={demo.href} title={demo.title} description={demo.summary}>
             <div className="rounded-lg border border-border/70 bg-muted/20 p-2 text-xs">

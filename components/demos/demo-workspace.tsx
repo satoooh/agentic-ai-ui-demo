@@ -146,6 +146,45 @@ interface RuntimeInfo {
   hasGeminiKey: boolean;
 }
 
+interface MeetingProfile {
+  id: string;
+  label: string;
+  objective: string;
+  participants: string;
+  expectedOutput: string;
+}
+
+const MEETING_PROFILES: MeetingProfile[] = [
+  {
+    id: "sales-weekly",
+    label: "営業週次",
+    objective: "案件の進捗、失注リスク、次回打ち手を確定する",
+    participants: "営業責任者, AE, CS",
+    expectedOutput: "優先案件リスト、リスク対策、次回アクション",
+  },
+  {
+    id: "hiring-sync",
+    label: "採用進捗",
+    objective: "採用歩留まりを確認し、詰まりを解消する",
+    participants: "採用責任者, Recruiter, Hiring Manager",
+    expectedOutput: "ボトルネック分析、面接改善、次探索条件",
+  },
+  {
+    id: "product-planning",
+    label: "プロダクト計画",
+    objective: "次スプリントの優先順位とリスクを整理する",
+    participants: "PM, Tech Lead, Designer",
+    expectedOutput: "実行順序、依存関係、意思決定メモ",
+  },
+  {
+    id: "exec-review",
+    label: "経営レビュー",
+    objective: "重要意思決定の前提を検証し、判断材料を固める",
+    participants: "CEO, 事業責任者, 経営企画",
+    expectedOutput: "判断前提、反証シナリオ、検証タスク",
+  },
+];
+
 interface DemoWorkspaceProps {
   demo: DemoId;
   title: string;
@@ -285,6 +324,15 @@ function getAutonomousLoopPrompts(demo: DemoId, goal: string): string[] {
     ];
   }
 
+  if (demo === "meeting") {
+    const baseGoal = normalizedGoal || "会議の結論の妥当性を検証したい";
+    return [
+      `会議レビュー対象:\n${baseGoal}\n決定事項と保留事項を整理し、判断前提を3つ抽出してください。`,
+      "悪魔の代弁者として、前提が崩れる失敗シナリオを2つ挙げ、意思決定の修正案を作成してください。",
+      "修正案を反映した次回会議までのアクション（担当/期限/検証データ）を箇条書きで出してください。",
+    ];
+  }
+
   const baseGoal = normalizedGoal || "企業の公開情報を使って意思決定に使える示唆を得たい";
   return [
     `調査ゴール: ${baseGoal}\n公開IR/ニュースから事実ベースの示唆を3点に要約してください。`,
@@ -313,6 +361,7 @@ export function DemoWorkspace({
   const [chatModeOverride, setChatModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
+  const [meetingProfileId, setMeetingProfileId] = useState(MEETING_PROFILES[0].id);
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
@@ -492,6 +541,10 @@ export function DemoWorkspace({
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0],
     [artifacts, selectedArtifactId],
   );
+  const selectedMeetingProfile = useMemo(
+    () => MEETING_PROFILES.find((profile) => profile.id === meetingProfileId) ?? MEETING_PROFILES[0],
+    [meetingProfileId],
+  );
 
   const contextStats = useMemo(() => {
     const userText = messages
@@ -592,6 +645,30 @@ export function DemoWorkspace({
 
   const isStreaming = status === "streaming" || status === "submitted";
 
+  const withDemoContext = useCallback(
+    (rawText: string) => {
+      const trimmed = rawText.trim();
+      if (!trimmed) {
+        return "";
+      }
+
+      if (demo !== "meeting") {
+        return trimmed;
+      }
+
+      const contextBlock =
+        "会議設定:\n" +
+        `- 会議タイプ: ${selectedMeetingProfile.label}\n` +
+        `- 目的: ${selectedMeetingProfile.objective}\n` +
+        `- 参加者: ${selectedMeetingProfile.participants}\n` +
+        `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
+        "上記設定を必ず前提にして、日本語で簡潔に回答してください。";
+
+      return `${contextBlock}\n\nユーザー依頼:\n${trimmed}`;
+    },
+    [demo, selectedMeetingProfile],
+  );
+
   const send = async () => {
     const trimmed = draft.trim();
     if (!trimmed) {
@@ -601,9 +678,13 @@ export function DemoWorkspace({
     const finalText = attachmentNames.length
       ? `${trimmed}\n\n添付ファイル: ${attachmentNames.join(", ")}`
       : trimmed;
+    const contextualText = withDemoContext(finalText);
+    if (!contextualText) {
+      return;
+    }
 
     await sendMessage(
-      { text: finalText },
+      { text: contextualText },
       {
         body: {
           demo,
@@ -641,9 +722,13 @@ export function DemoWorkspace({
       notes ? `追加メモ:\n${notes}` : "",
       "出力形式:\n1. 反証ポイント(3件)\n2. 失敗シナリオ(2件)\n3. 追加検証クエリ(3件)",
     ].filter(Boolean);
+    const contextualPrompt = withDemoContext(promptSections.join("\n\n"));
+    if (!contextualPrompt) {
+      return;
+    }
 
     await sendMessage(
-      { text: promptSections.join("\n\n") },
+      { text: contextualPrompt },
       {
         body: {
           demo,
@@ -668,7 +753,9 @@ export function DemoWorkspace({
     setLoopStatus("自律ループを開始しました。");
 
     try {
-      const prompts = getAutonomousLoopPrompts(demo, draft);
+      const loopSeed =
+        demo === "meeting" && meetingTranscript.trim().length > 0 ? meetingTranscript : draft;
+      const prompts = getAutonomousLoopPrompts(demo, loopSeed);
       for (const [index, prompt] of prompts.entries()) {
         if (autoLoopAbortRef.current) {
           setLoopStatus("自律ループを停止しました。");
@@ -677,7 +764,7 @@ export function DemoWorkspace({
 
         setLoopStatus(`自律ループ実行中 (${index + 1}/${prompts.length})`);
         await sendMessage(
-          { text: prompt },
+          { text: withDemoContext(prompt) },
           {
             body: {
               demo,
@@ -749,7 +836,7 @@ export function DemoWorkspace({
         }));
 
         await sendMessage(
-          { text: step.prompt },
+          { text: withDemoContext(step.prompt) },
           {
             body: {
               demo,
@@ -1439,49 +1526,87 @@ export function DemoWorkspace({
                 ))}
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
-                    </p>
+              {demo === "meeting" ? (
+                <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold">Meeting Setup</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        会議タイプを選ぶと、以降の回答はその会議目的に沿って生成されます。
+                      </p>
+                    </div>
+                    <Badge variant="outline">meeting profile</Badge>
                   </div>
-                  <Badge variant="outline">devil&apos;s advocate</Badge>
+                  <div className="mt-2 grid gap-2 md:grid-cols-[220px_1fr]">
+                    <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
+                      <SelectTrigger className="w-full bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MEETING_PROFILES.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
+                      <p>目的: {selectedMeetingProfile.objective}</p>
+                      <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
+                    </div>
+                  </div>
                 </div>
-                <Textarea
-                  value={meetingTranscript}
-                  onChange={(event) => setMeetingTranscript(event.target.value)}
-                  placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
-                  className="mt-2 min-h-24 bg-background"
-                />
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void runDevilsAdvocate()}
-                    disabled={isStreaming}
-                  >
-                    議事録で反証実行
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setMeetingTranscript("")}
-                    disabled={isStreaming || meetingTranscript.length === 0}
-                  >
-                    クリア
-                  </Button>
+              ) : null}
+
+              {demo === "meeting" ? (
+                <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
+                      </p>
+                    </div>
+                    <Badge variant="outline">devil&apos;s advocate</Badge>
+                  </div>
+                  <Textarea
+                    value={meetingTranscript}
+                    onChange={(event) => setMeetingTranscript(event.target.value)}
+                    placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
+                    className="mt-2 min-h-24 bg-background"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void runDevilsAdvocate()}
+                      disabled={isStreaming}
+                    >
+                      議事録で反証実行
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setMeetingTranscript("")}
+                      disabled={isStreaming || meetingTranscript.length === 0}
+                    >
+                      クリア
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <Textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleDraftKeyDown}
-                placeholder="メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
+                placeholder={
+                  demo === "meeting"
+                    ? "会議の論点や確認したい内容を入力（Cmd/Ctrl + Enter で送信）"
+                    : "メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
+                }
                 className="min-h-24 resize-y"
               />
 

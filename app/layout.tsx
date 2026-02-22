@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 export const metadata: Metadata = {
   title: "Japan Vertical Agentic Demo Lab",
   description:
-    "営業 / 採用 / ITリサーチの3領域で AI Elements を使ったエージェンティックUIデモを検証するプロジェクト",
+    "会議レビューを中心に、営業 / 採用 / ITリサーチへ展開できるエージェンティックUIデモを検証するプロジェクト",
 };
 
 export default function RootLayout({
