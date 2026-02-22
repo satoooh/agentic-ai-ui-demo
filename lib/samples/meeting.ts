@@ -14,6 +14,73 @@ export interface MeetingTranscriptSample {
   dirtyTranscript: string;
 }
 
+function buildLongSalesWeeklyTranscript(): string {
+  const speakers = [
+    "佐藤(営業Mgr)",
+    "高橋(AE)",
+    "山本(CS)",
+    "中村(RevOps)",
+    "伊藤(インサイド)",
+    "鈴木(PM)",
+  ];
+  const agendaBlocks = [
+    "A社PoCの進捗共有: 法務レビュー遅延・競合値下げ噂・予算再承認の有無を確認しないまま提案を進めると失注率が上がるので、今週中に検証項目を固定したい。",
+    "B社既存深耕: 追加提案でARRを伸ばせる一方、CS稼働が逼迫して初期オンボーディング品質が落ちる懸念があるため、受注条件を段階導入前提で定義する必要がある。",
+    "C社新規案件: 意思決定者が複数いて評価軸が揃っていない。営業資料は先行しているが導入後運用像が曖昧で、デモの訴求点が分散しているので論点統一が必要。",
+    "Q2全体方針: 既存顧客アップセルを優先しつつ新規開拓を維持する計画。ただし現場稼働が限界に近く、優先順位を誤ると案件速度が落ちるため切り捨て基準の明文化が必要。",
+    "今週アクションレビュー: owner未記入タスクと期限曖昧タスクが積み上がり、意思決定が次週へ持ち越される。実行可能性の低い指示を削って再計画する必要がある。",
+    "見積と値引き条件: 競争環境を理由に値引きを急ぐ声があるが、値引きだけでは失注理由を潰せない。導入プロセスの不安解消をセットにしないと勝率が改善しにくい。",
+  ];
+  const noiseBlocks = [
+    "えっと、前回メモだと担当が曖昧で、誰が顧客確認するか途中で止まってました。",
+    "この点、社内Slackで別スレが立っていて情報が分散しています。まとめ直し要です。",
+    "正直、数字は追えてるけど背景文脈が弱く、判断が人依存になってる感があります。",
+    "いったん今の案で進めると、来週にやり直しが発生する確率が高いです。",
+    "すみません、ここは仮説ベースで話してます。確定データはまだ取り切れていません。",
+    "話が前後してますが、優先順位を固定しないと同じ議論を繰り返します。",
+  ];
+  const evidenceBlocks = [
+    "参考数字: 先週の商談化率31%、提案化率44%、受注率18%。A社の稟議通過が2営業日遅れると月次見込みが約8%下振れする試算です。",
+    "参考数字: B社の問い合わせ件数は先月比+22%。CS一次回答が24時間を超えると継続提案の反応率が落ちる傾向が出ています。",
+    "参考数字: C社の意思決定会議は隔週で、次回は金曜。事前論点メモが48時間前に揃わないと決裁見送りになりやすいです。",
+    "参考数字: 失注理由トップ3は『導入負荷不安』『社内合意不足』『費用対効果未説明』。単純な価格調整では改善が限定的でした。",
+    "参考数字: 競合比較で機能差は優位ですが、運用定着の成功事例提示が不足。導入90日プランを提示した案件は継続率が高いです。",
+    "参考数字: owner明記タスクは完了率が約2.1倍。期限のみ設定タスクは週跨ぎで棚上げされる割合が高いです。",
+  ];
+  const actionBlocks = [
+    "次アクション案: 高橋がA社法務に確認項目5件を送付、佐藤が決裁者向け1枚サマリ更新、山本が導入後負荷の試算表を明日18時までに提出。",
+    "次アクション案: 中村が案件優先度をS/A/Bで再ランク、伊藤が失注要因ヒアリングを3件実施、鈴木がデモ導線の不要要素を削除。",
+    "次アクション案: 既存提案の対象条件を『利用部門2以上・運用担当明確』に限定し、過剰カスタム依頼は今週は受けない方針を仮置き。",
+    "次アクション案: 競合値下げ情報は一次情報取得まで営業トークに反映しない。確認担当と期限を固定して、未確認情報の拡散を止める。",
+    "次アクション案: 会議ログを次回からテンプレ化し、決定事項/保留事項/前提条件/検証方法を必須欄にする。owner空欄のまま終了しない。",
+    "次アクション案: 今週金曜までに『提案しない案件』を明示し、現場負荷と受注確度のバランスを取る。理由は定量で残す。",
+  ];
+
+  const lines: string[] = [];
+  for (let i = 0; i < 110; i += 1) {
+    const elapsedSec = i * 3 + (i % 4);
+    const minute = 2 + Math.floor(elapsedSec / 60);
+    const second = elapsedSec % 60;
+    const speaker = speakers[i % speakers.length];
+    const agenda = agendaBlocks[i % agendaBlocks.length];
+    const noise = noiseBlocks[i % noiseBlocks.length];
+    const evidence = evidenceBlocks[i % evidenceBlocks.length];
+    const action = actionBlocks[i % actionBlocks.length];
+    const marker = i % 7 === 0 ? "TODO未確定" : i % 5 === 0 ? "要再確認" : "仮置き";
+
+    lines.push(
+      `[10:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}] ${speaker}: ${agenda} ${noise} ${evidence} ${action} (${marker})`,
+    );
+  }
+
+  lines.push(
+    "[10:11:54] 佐藤(営業Mgr): ここまでの議論を確定します。A社を最優先、B社は条件付き継続、C社は論点整理後に提案再開。次回会議までに前提崩壊シナリオを3件準備し、検証データを添えて再レビューします。",
+  );
+  return lines.join("\n");
+}
+
+const longSalesWeeklyTranscript = buildLongSalesWeeklyTranscript();
+
 export const sampleMeetingTranscript = {
   title: "営業・採用横断の週次オペレーション会議",
   participants: ["営業責任者", "採用責任者", "PM", "経営企画"],
@@ -82,6 +149,13 @@ export const sampleMeetingWorkflow: WorkflowGraph = {
 };
 
 export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
+  {
+    id: "meeting-sample-sales-q2-long-10min",
+    meetingProfileId: "sales-weekly",
+    title: "営業週次: 10分ロング議事録（約3万字）",
+    note: `長尺ログ（約${longSalesWeeklyTranscript.length.toLocaleString("ja-JP")}文字）で、前提崩壊リスクと実行順序を整理したい。`,
+    dirtyTranscript: longSalesWeeklyTranscript,
+  },
   {
     id: "meeting-sample-sales-q2",
     meetingProfileId: "sales-weekly",
