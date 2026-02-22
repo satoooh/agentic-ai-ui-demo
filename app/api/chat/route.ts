@@ -6,6 +6,10 @@ import {
   streamText,
 } from "ai";
 import { z } from "zod";
+import { getMeetingSignals } from "@/lib/connectors/meeting-signal";
+import { getRecruitingMarketJobs } from "@/lib/connectors/recruiting-market";
+import { getResearchSignals } from "@/lib/connectors/research-signal";
+import { getSalesAccountInsight } from "@/lib/connectors/sales-account";
 import { resolveLanguageModel } from "@/lib/models";
 import type { DemoId, DemoUIMessage, ModelProvider } from "@/types/chat";
 
@@ -71,6 +75,222 @@ const structuredInsightSchema = z.object({
     .min(3)
     .max(6),
 });
+
+const microAgentInsightSchema = z.object({
+  summary: z.string().min(1).max(220),
+  keyFindings: z.array(z.string().min(1).max(140)).min(2).max(4),
+  riskNote: z.string().min(1).max(180),
+  nextAction: z.string().min(1).max(160),
+});
+
+type OperationType = "default" | "devils-advocate" | "autonomous-loop" | "scenario";
+type MicroAgentRole = "observer" | "skeptic" | "operator";
+
+const MICRO_AGENT_BRANCHES: Array<{
+  role: MicroAgentRole;
+  label: string;
+  instruction: string;
+}> = [
+  {
+    role: "observer",
+    label: "Observer",
+    instruction:
+      "事実の棚卸しを担当し、欠落している前提や追加確認が必要なデータを先に列挙してください。",
+  },
+  {
+    role: "skeptic",
+    label: "Skeptic",
+    instruction:
+      "悪魔の代弁者として、前提崩壊シナリオと失敗時の影響を短く明示してください。",
+  },
+  {
+    role: "operator",
+    label: "Operator",
+    instruction:
+      "実行責任者として、今日動ける次アクションを優先順位つきで具体化してください。",
+  },
+];
+
+interface ConnectorContext {
+  label: string;
+  summary: string;
+  promptContext: string;
+  citations: Array<{
+    title: string;
+    url: string;
+    quote?: string;
+  }>;
+}
+
+interface ResolvedMicroAgentInsight {
+  role: MicroAgentRole;
+  label: string;
+  result: z.infer<typeof microAgentInsightSchema>;
+}
+
+function createStreamId(prefix: string) {
+  return `${prefix}-${Date.now()}-${crypto.randomUUID()}`;
+}
+
+function compactText(value: string, maxLength = 120): string {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  if (singleLine.length <= maxLength) {
+    return singleLine;
+  }
+  return `${singleLine.slice(0, maxLength)}…`;
+}
+
+function truncateForPrompt(value: string, maxLength = 2000): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`;
+}
+
+function inferSalesOrg(latestText: string): string | undefined {
+  const githubMatch = latestText.match(/github\.com\/([A-Za-z0-9-]+)/i);
+  if (githubMatch?.[1]) {
+    return githubMatch[1];
+  }
+
+  const labelMatch = latestText.match(
+    /(?:org|organization|company|企業|会社)\s*[:：=]\s*([A-Za-z0-9-]{2,40})/i,
+  );
+  if (labelMatch?.[1]) {
+    return labelMatch[1];
+  }
+
+  return undefined;
+}
+
+function inferTickerOrQuery(latestText: string, fallback: string): string {
+  const ticker = latestText.match(/\b[A-Z]{2,5}\b/)?.[0];
+  if (ticker) {
+    return ticker;
+  }
+
+  const compact = compactText(latestText, 60);
+  if (compact.length >= 2) {
+    return compact;
+  }
+
+  return fallback;
+}
+
+async function resolveConnectorContext(input: {
+  demo: DemoId;
+  latestText: string;
+  meetingProfileId?: string;
+}): Promise<ConnectorContext> {
+  if (input.demo === "sales") {
+    const insight = await getSalesAccountInsight({
+      org: inferSalesOrg(input.latestText),
+    });
+
+    const topRepos = insight.insight.topRepositories.slice(0, 3);
+    const promptContext = [
+      `[Sales Connector] org=${insight.insight.orgLogin}`,
+      `displayName=${insight.insight.displayName}`,
+      `followers=${insight.insight.followers}, publicRepos=${insight.insight.publicRepos}`,
+      ...topRepos.map(
+        (repo, index) =>
+          `repo${index + 1}: ${repo.name} / stars=${repo.stars} / lang=${repo.language} / updated=${repo.updatedAt}`,
+      ),
+      `note=${insight.note}`,
+    ].join("\n");
+
+    return {
+      label: "sales-account-connector",
+      summary: insight.note,
+      promptContext,
+      citations: topRepos.map((repo) => ({
+        title: `${insight.insight.displayName}: ${repo.name}`,
+        url: repo.url,
+        quote: `stars ${repo.stars} / ${repo.language}`,
+      })),
+    };
+  }
+
+  if (input.demo === "recruiting") {
+    const query = inferTickerOrQuery(input.latestText, "engineer");
+    const jobs = await getRecruitingMarketJobs({ query });
+    const topJobs = jobs.jobs.slice(0, 5);
+    const promptContext = [
+      `[Recruiting Connector] query=${query}`,
+      ...topJobs.map(
+        (job, index) =>
+          `job${index + 1}: ${job.title} / ${job.company} / ${job.location} / remote=${job.remote}`,
+      ),
+      `note=${jobs.note}`,
+    ].join("\n");
+
+    return {
+      label: "recruiting-market-connector",
+      summary: jobs.note,
+      promptContext,
+      citations: topJobs.map((job) => ({
+        title: `${job.company}: ${job.title}`,
+        url: job.url,
+        quote: `${job.location}${job.remote ? " / remote" : ""}`,
+      })),
+    };
+  }
+
+  if (input.demo === "meeting") {
+    const profileHint =
+      input.meetingProfileId?.replaceAll("-", " ") ?? "meeting review";
+    const query = compactText(`${profileHint} ${input.latestText}`, 60);
+    const signals = await getMeetingSignals({ query });
+    const topSignals = signals.signals.slice(0, 4);
+    const promptContext = [
+      `[Meeting Connector] query=${query}`,
+      ...topSignals.map(
+        (signal, index) =>
+          `signal${index + 1}: ${signal.title} / points=${signal.points} / comments=${signal.comments}`,
+      ),
+      `note=${signals.note}`,
+    ].join("\n");
+
+    return {
+      label: "meeting-signal-connector",
+      summary: signals.note,
+      promptContext,
+      citations: topSignals.map((signal) => ({
+        title: signal.title,
+        url: signal.url,
+        quote: signal.summary,
+      })),
+    };
+  }
+
+  const query = inferTickerOrQuery(input.latestText, "Microsoft");
+  const research = await getResearchSignals({ query });
+  const topSignals = research.signals.slice(0, 6);
+  const sourceNote = research.sourceStatuses
+    .map((status) => `${status.source}:${status.mode}/${status.count}`)
+    .join(" | ");
+  const promptContext = [
+    `[Research Connector] query=${query}`,
+    `sources=${sourceNote}`,
+    ...topSignals.map(
+      (signal, index) =>
+        `signal${index + 1}: ${signal.source} / ${signal.kind} / ${signal.title} / score=${signal.score}`,
+    ),
+    `note=${research.note}`,
+  ].join("\n");
+
+  return {
+    label: "research-signal-connector",
+    summary: research.note,
+    promptContext,
+    citations: topSignals.map((signal) => ({
+      title: `${signal.source.toUpperCase()} ${signal.title}`,
+      url: signal.url,
+      quote: signal.summary,
+    })),
+  };
+}
 
 function extractLatestText(messages: DemoUIMessage[]): string {
   const latest = messages.at(-1);
@@ -167,11 +387,13 @@ function buildStructuredArtifactMarkdown(
 
 function buildStructuredExtractionPrompt(input: {
   demo: DemoId;
-  operation?: "default" | "devils-advocate" | "autonomous-loop" | "scenario";
+  operation?: OperationType;
   latestUserText: string;
   assistantMarkdown: string;
   meetingContext?: string;
   meetingLog?: string;
+  connectorContext?: string;
+  microAgentInsights?: ResolvedMicroAgentInsight[];
 }): string {
   const operationNote =
     input.operation === "devils-advocate"
@@ -186,6 +408,20 @@ function buildStructuredExtractionPrompt(input: {
     ? `\n\n会議コンテキスト:\n${input.meetingContext}`
     : "";
   const meetingLogBlock = input.meetingLog ? `\n\n会議ログ:\n${input.meetingLog}` : "";
+  const connectorBlock = input.connectorContext
+    ? `\n\n収集した外部コンテキスト:\n${input.connectorContext}`
+    : "";
+  const microAgentBlock =
+    input.microAgentInsights && input.microAgentInsights.length > 0
+      ? `\n\n並列マイクロエージェント結果:\n${input.microAgentInsights
+          .map(
+            (insight) =>
+              `- [${insight.label}] ${insight.result.summary}\n  findings: ${insight.result.keyFindings.join(
+                " / ",
+              )}\n  risk: ${insight.result.riskNote}\n  action: ${insight.result.nextAction}`,
+          )
+          .join("\n")}`
+      : "";
 
   return [
     `デモ種別: ${input.demo}`,
@@ -201,14 +437,15 @@ function buildStructuredExtractionPrompt(input: {
     input.assistantMarkdown,
     "",
     "上記から、重複を避けて構造化してください。曖昧なら「未定」と明示してください。",
-  ].join("\n") + meetingContextBlock + meetingLogBlock;
+  ].join("\n") + meetingContextBlock + meetingLogBlock + connectorBlock + microAgentBlock;
 }
 
 function buildSystemPrompt(input: {
   demo: DemoId;
-  operation?: "default" | "devils-advocate" | "autonomous-loop" | "scenario";
+  operation?: OperationType;
   meetingContext?: string;
   meetingLog?: string;
+  connectorContext?: string;
 }): string {
   const common =
     "あなたは業務オペレーション向けのAIアシスタントです。日本語で簡潔に、読みやすい構造で回答してください。";
@@ -237,8 +474,58 @@ function buildSystemPrompt(input: {
     input.demo === "meeting" && input.meetingLog
       ? `\n\n会議ログ（参照用）:\n${input.meetingLog}`
       : "";
+  const connectorBlock = input.connectorContext
+    ? `\n\n外部ツールで取得したファクト:\n${input.connectorContext}`
+    : "";
 
-  return [common, readableFormat, op].join("\n\n") + meetingContextBlock + meetingLogBlock;
+  return [common, readableFormat, op].join("\n\n") + meetingContextBlock + meetingLogBlock + connectorBlock;
+}
+
+function buildMicroAgentPrompt(input: {
+  branch: (typeof MICRO_AGENT_BRANCHES)[number];
+  demo: DemoId;
+  operation?: OperationType;
+  latestUserText: string;
+  assistantMarkdown: string;
+  connectorContext?: string;
+}) {
+  const connectorBlock = input.connectorContext
+    ? `\n\n外部コンテキスト:\n${truncateForPrompt(input.connectorContext, 1200)}`
+    : "";
+
+  return [
+    `あなたは ${input.branch.label} です。`,
+    input.branch.instruction,
+    `デモ種別: ${input.demo}`,
+    `操作種別: ${input.operation ?? "default"}`,
+    "",
+    "ユーザー直近入力:",
+    truncateForPrompt(input.latestUserText, 700),
+    "",
+    "アシスタント最終出力:",
+    truncateForPrompt(input.assistantMarkdown, 1600),
+    "",
+    "上記から、あなたの担当観点で結論を圧縮してください。",
+  ].join("\n") + connectorBlock;
+}
+
+function buildMicroAgentArtifactMarkdown(
+  insights: ResolvedMicroAgentInsight[],
+): string {
+  const lines: string[] = ["# Agentic Orchestration", ""];
+
+  for (const insight of insights) {
+    lines.push(
+      `## ${insight.label}`,
+      `- Summary: ${insight.result.summary}`,
+      `- Findings: ${insight.result.keyFindings.join(" / ")}`,
+      `- Risk: ${insight.result.riskNote}`,
+      `- Next: ${insight.result.nextAction}`,
+      "",
+    );
+  }
+
+  return lines.join("\n").trim();
 }
 
 export async function POST(request: Request) {
@@ -307,14 +594,99 @@ export async function POST(request: Request) {
     );
   }
 
+  const operation: OperationType = parsed.data.operation ?? "default";
+
   const stream = createUIMessageStream<DemoUIMessage>({
     execute: async ({ writer }) => {
-      const startedAtIso = new Date().toISOString();
+      let connectorContext: ConnectorContext | null = null;
+      const connectorStartedIso = new Date().toISOString();
+      const connectorRunningId = createStreamId("tool-connector");
       writer.write({
         type: "data-tool",
-        id: `tool-model-${Date.now()}`,
+        id: connectorRunningId,
         data: {
-          id: `tool-model-${Date.now()}`,
+          id: connectorRunningId,
+          name: "connector-fetch",
+          status: "running",
+          detail: "外部データソースを確認しています。",
+          timestamp: connectorStartedIso,
+        },
+        transient: true,
+      });
+
+      try {
+        connectorContext = await resolveConnectorContext({
+          demo: parsed.data.demo,
+          latestText,
+          meetingProfileId: parsed.data.meetingProfileId,
+        });
+
+        const connectorDoneId = createStreamId("tool-connector-done");
+        writer.write({
+          type: "data-tool",
+          id: connectorDoneId,
+          data: {
+            id: connectorDoneId,
+            name: connectorContext.label,
+            status: "success",
+            detail: connectorContext.summary,
+            timestamp: new Date().toISOString(),
+          },
+          transient: true,
+        });
+
+        writer.write({
+          type: "data-queue",
+          id: createStreamId("queue-connector"),
+          data: {
+            id: `queue-${parsed.data.demo}-connector`,
+            title: "外部データ取得",
+            description: connectorContext.summary,
+            severity: "info",
+            timestamp: new Date().toLocaleTimeString("ja-JP"),
+          },
+          transient: true,
+        });
+
+        for (const [index, citation] of connectorContext.citations.slice(0, 4).entries()) {
+          writer.write({
+            type: "data-citation",
+            id: createStreamId("citation-connector"),
+            data: {
+              id: `citation-${parsed.data.demo}-connector-${index + 1}`,
+              title: citation.title,
+              url: citation.url,
+              quote: citation.quote,
+            },
+            transient: true,
+          });
+        }
+      } catch (connectorError) {
+        const connectorErrorId = createStreamId("tool-connector-error");
+        writer.write({
+          type: "data-tool",
+          id: connectorErrorId,
+          data: {
+            id: connectorErrorId,
+            name: "connector-fetch",
+            status: "error",
+            detail:
+              connectorError instanceof Error
+                ? `外部データ取得に失敗: ${connectorError.message}`
+                : "外部データ取得に失敗しました。",
+            timestamp: new Date().toISOString(),
+          },
+          transient: true,
+        });
+      }
+
+      const startedAtIso = new Date().toISOString();
+      const modelRunningId = createStreamId("tool-model");
+      writer.write({
+        type: "data-tool",
+        id: modelRunningId,
+        data: {
+          id: modelRunningId,
           name: "model-call",
           status: "running",
           detail: `${resolvedProvider}/${modelResult.resolvedModel} で推論を開始しました。${
@@ -329,9 +701,10 @@ export async function POST(request: Request) {
         model: modelResult.model,
         system: buildSystemPrompt({
           demo: parsed.data.demo,
-          operation: parsed.data.operation,
+          operation,
           meetingContext: parsed.data.meetingContext,
           meetingLog,
+          connectorContext: connectorContext?.promptContext,
         }),
         messages: await convertToModelMessages(messages),
       });
@@ -340,25 +713,27 @@ export async function POST(request: Request) {
 
       const assistantMarkdown = (await result.text).trim();
       const modelFinishedIso = new Date().toISOString();
+      const modelDoneId = createStreamId("tool-model-done");
       writer.write({
         type: "data-tool",
-        id: `tool-model-done-${Date.now()}`,
+        id: modelDoneId,
         data: {
-          id: `tool-model-done-${Date.now()}`,
+          id: modelDoneId,
           name: "model-call",
           status: "success",
-          detail: "推論が完了しました。構造化サマリを生成します。",
+          detail: "推論が完了しました。並列エージェントでレビューを実行します。",
           timestamp: modelFinishedIso,
         },
         transient: true,
       });
 
       if (!assistantMarkdown) {
+        const structuredEmptyId = createStreamId("tool-structured-empty");
         writer.write({
           type: "data-tool",
-          id: `tool-structured-empty-${Date.now()}`,
+          id: structuredEmptyId,
           data: {
-            id: `tool-structured-empty-${Date.now()}`,
+            id: structuredEmptyId,
             name: "structured-output",
             status: "error",
             detail: "モデル出力が空のため構造化をスキップしました。",
@@ -369,14 +744,137 @@ export async function POST(request: Request) {
         return;
       }
 
+      const orchestrationRunId = createStreamId("tool-orchestration");
       writer.write({
         type: "data-tool",
-        id: `tool-structured-${Date.now()}`,
+        id: orchestrationRunId,
         data: {
-          id: `tool-structured-${Date.now()}`,
+          id: orchestrationRunId,
+          name: "multi-agent-orchestration",
+          status: "running",
+          detail: "Observer / Skeptic / Operator を並列実行しています。",
+          timestamp: new Date().toISOString(),
+        },
+        transient: true,
+      });
+
+      const microAgentSettled = await Promise.all(
+        MICRO_AGENT_BRANCHES.map(async (branch) => {
+          const branchId = createStreamId(`tool-branch-${branch.role}`);
+          writer.write({
+            type: "data-tool",
+            id: branchId,
+            data: {
+              id: branchId,
+              name: `branch-${branch.role}`,
+              status: "running",
+              detail: `${branch.label} が観点別レビューを実行しています。`,
+              timestamp: new Date().toISOString(),
+            },
+            transient: true,
+          });
+
+          try {
+            const branchResult = await generateObject({
+              model: modelResult.model,
+              schema: microAgentInsightSchema,
+              prompt: buildMicroAgentPrompt({
+                branch,
+                demo: parsed.data.demo,
+                operation,
+                latestUserText: latestText,
+                assistantMarkdown,
+                connectorContext: connectorContext?.promptContext,
+              }),
+              temperature: 0,
+            });
+
+            const branchDoneId = createStreamId(`tool-branch-${branch.role}-done`);
+            writer.write({
+              type: "data-tool",
+              id: branchDoneId,
+              data: {
+                id: branchDoneId,
+                name: `branch-${branch.role}`,
+                status: "success",
+                detail: `${branch.label}: ${branchResult.object.summary}`,
+                timestamp: new Date().toISOString(),
+              },
+              transient: true,
+            });
+
+            return {
+              role: branch.role,
+              label: branch.label,
+              result: branchResult.object,
+            } satisfies ResolvedMicroAgentInsight;
+          } catch (branchError) {
+            const branchErrorId = createStreamId(`tool-branch-${branch.role}-error`);
+            writer.write({
+              type: "data-tool",
+              id: branchErrorId,
+              data: {
+                id: branchErrorId,
+                name: `branch-${branch.role}`,
+                status: "error",
+                detail:
+                  branchError instanceof Error
+                    ? `${branch.label} が失敗: ${branchError.message}`
+                    : `${branch.label} が失敗しました。`,
+                timestamp: new Date().toISOString(),
+              },
+              transient: true,
+            });
+            return null;
+          }
+        }),
+      );
+
+      const microAgentInsights = microAgentSettled.filter(
+        (insight): insight is ResolvedMicroAgentInsight => insight !== null,
+      );
+
+      if (microAgentInsights.length > 0) {
+        writer.write({
+          type: "data-artifact",
+          id: createStreamId("artifact-orchestration"),
+          data: {
+            id: `orchestration-summary-${parsed.data.demo}`,
+            name: "orchestration-summary.md",
+            kind: "markdown",
+            content: buildMicroAgentArtifactMarkdown(microAgentInsights),
+            updatedAt: new Date().toISOString(),
+          },
+          transient: true,
+        });
+      }
+
+      const orchestrationDoneId = createStreamId("tool-orchestration-done");
+      writer.write({
+        type: "data-tool",
+        id: orchestrationDoneId,
+        data: {
+          id: orchestrationDoneId,
+          name: "multi-agent-orchestration",
+          status: microAgentInsights.length > 0 ? "success" : "error",
+          detail:
+            microAgentInsights.length > 0
+              ? `並列レビュー完了（${microAgentInsights.length}/${MICRO_AGENT_BRANCHES.length}）`
+              : "並列レビューが失敗しました。",
+          timestamp: new Date().toISOString(),
+        },
+        transient: true,
+      });
+
+      const structuredRunningId = createStreamId("tool-structured");
+      writer.write({
+        type: "data-tool",
+        id: structuredRunningId,
+        data: {
+          id: structuredRunningId,
           name: "structured-output",
           status: "running",
-          detail: "要点/リスク/次アクション/作業ログを抽出しています。",
+          detail: "並列レビューを集約して、要点/リスク/次アクションを抽出しています。",
           timestamp: new Date().toISOString(),
         },
         transient: true,
@@ -388,11 +886,13 @@ export async function POST(request: Request) {
           schema: structuredInsightSchema,
           prompt: buildStructuredExtractionPrompt({
             demo: parsed.data.demo,
-            operation: parsed.data.operation,
+            operation,
             latestUserText: latestText,
             assistantMarkdown,
             meetingContext: parsed.data.meetingContext,
             meetingLog,
+            connectorContext: connectorContext?.promptContext,
+            microAgentInsights,
           }),
           temperature: 0,
         });
@@ -402,14 +902,14 @@ export async function POST(request: Request) {
 
         writer.write({
           type: "data-structured",
-          id: `structured-${Date.now()}`,
+          id: createStreamId("structured"),
           data: structuredData,
           transient: true,
         });
 
         writer.write({
           type: "data-plan",
-          id: `plan-${Date.now()}`,
+          id: createStreamId("plan"),
           data: {
             steps: toPlanSteps(structuredData.worklog),
           },
@@ -418,7 +918,7 @@ export async function POST(request: Request) {
 
         writer.write({
           type: "data-task",
-          id: `task-${Date.now()}`,
+          id: createStreamId("task"),
           data: {
             items: toTaskItems(structuredData.actions),
           },
@@ -427,7 +927,7 @@ export async function POST(request: Request) {
 
         writer.write({
           type: "data-artifact",
-          id: `artifact-structured-${Date.now()}`,
+          id: createStreamId("artifact-structured"),
           data: {
             id: `llm-structured-summary-${parsed.data.demo}`,
             name: "llm-structured-summary.md",
@@ -438,24 +938,27 @@ export async function POST(request: Request) {
           transient: true,
         });
 
+        const structuredDoneId = createStreamId("tool-structured-done");
         writer.write({
           type: "data-tool",
-          id: `tool-structured-done-${Date.now()}`,
+          id: structuredDoneId,
           data: {
-            id: `tool-structured-done-${Date.now()}`,
+            id: structuredDoneId,
             name: "structured-output",
             status: "success",
-            detail: "構造化サマリを更新しました。固定サマリ/CoT/Artifacts を確認してください。",
+            detail:
+              "構造化サマリを更新しました。TL;DR / Agent Worklog / Artifacts を確認してください。",
             timestamp: nowIso,
           },
           transient: true,
         });
       } catch (structuredError) {
+        const structuredErrorId = createStreamId("tool-structured-error");
         writer.write({
           type: "data-tool",
-          id: `tool-structured-error-${Date.now()}`,
+          id: structuredErrorId,
           data: {
-            id: `tool-structured-error-${Date.now()}`,
+            id: structuredErrorId,
             name: "structured-output",
             status: "error",
             detail:

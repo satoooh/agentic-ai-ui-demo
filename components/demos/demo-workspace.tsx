@@ -31,6 +31,11 @@ import {
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
 import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import {
   Context as ContextMeter,
   ContextContent,
   ContextContentBody,
@@ -79,6 +84,13 @@ import {
   TaskItem as TaskEntry,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -472,6 +484,26 @@ function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
   }
 
   return "bg-slate-200 text-slate-700";
+}
+
+function toToolUiState(status: ToolEvent["status"]) {
+  if (status === "success") {
+    return "output-available" as const;
+  }
+
+  if (status === "error") {
+    return "output-error" as const;
+  }
+
+  return "input-available" as const;
+}
+
+function compactUiText(value: string, maxLength = 84): string {
+  const singleLine = value.replace(/\s+/g, " ").trim();
+  if (singleLine.length <= maxLength) {
+    return singleLine;
+  }
+  return `${singleLine.slice(0, maxLength)}…`;
 }
 
 function getAgentLaneStyle(state: "todo" | "doing" | "done") {
@@ -1084,42 +1116,115 @@ export function DemoWorkspace({
       tags: ["workflow", stage.done ? "done" : "waiting"],
     }));
   }, [completedGateCount, plan, stageGates, structuredInsight, tools]);
-  const agenticLanes = useMemo<AgenticLane[]>(
-    () => [
+  const isStreaming = status === "streaming" || status === "submitted";
+  const latestToolEvents = useMemo(() => tools.slice(0, 10), [tools]);
+  const runningToolCount = useMemo(
+    () => tools.filter((tool) => tool.status === "running").length,
+    [tools],
+  );
+  const connectorCompleted = useMemo(
+    () =>
+      tools.some(
+        (tool) =>
+          tool.status === "success" &&
+          (tool.name.includes("connector") || tool.name === "connector-fetch"),
+      ),
+    [tools],
+  );
+  const microAgentProgress = useMemo(() => {
+    const branchEvents = tools.filter((tool) => tool.name.startsWith("branch-"));
+    const branchDone = branchEvents.filter((tool) => tool.status === "success").length;
+    const branchRunning = branchEvents.filter((tool) => tool.status === "running").length;
+    const branchError = branchEvents.filter((tool) => tool.status === "error").length;
+    return {
+      total: branchEvents.length,
+      done: branchDone,
+      running: branchRunning,
+      error: branchError,
+    };
+  }, [tools]);
+  const reasoningTraceMarkdown = useMemo(() => {
+    const lines: string[] = [
+      "### 観測",
+      connectorCompleted
+        ? "- 外部コネクタで公開データを取得済み。"
+        : "- 外部コネクタの結果待ち、または未取得。",
+      "",
+      "### 推論",
+      ...worklogSteps.slice(0, 3).map((step) => `- ${step.label}: ${compactUiText(step.description, 92)}`),
+      "",
+      "### 実行ログ",
+      ...latestToolEvents
+        .slice(0, 5)
+        .map((tool) => `- ${tool.name} [${tool.status}] ${compactUiText(tool.detail, 92)}`),
+    ];
+
+    if (structuredInsight?.summary) {
+      lines.push("", `### 集約`, `- ${compactUiText(structuredInsight.summary, 120)}`);
+    }
+
+    return lines.join("\n");
+  }, [connectorCompleted, latestToolEvents, structuredInsight?.summary, worklogSteps]);
+  const agenticLanes = useMemo<AgenticLane[]>(() => {
+    const observeState: AgenticLane["state"] =
+      demo === "meeting"
+        ? meetingTranscriptConfirmed
+          ? "done"
+          : runningToolCount > 0
+            ? "doing"
+            : "todo"
+        : connectorCompleted
+          ? "done"
+          : runningToolCount > 0
+            ? "doing"
+            : "todo";
+
+    const reasonState: AgenticLane["state"] = structuredInsight
+      ? "done"
+      : isStreaming || microAgentProgress.running > 0
+        ? "doing"
+        : "todo";
+
+    const doneTasks = tasks.filter((task) => task.done).length;
+    const actState: AgenticLane["state"] =
+      tasks.length === 0
+        ? microAgentProgress.done > 0
+          ? "doing"
+          : "todo"
+        : doneTasks === tasks.length
+          ? "done"
+          : doneTasks > 0 || microAgentProgress.running > 0
+            ? "doing"
+            : "todo";
+
+    return [
       {
         id: "observe",
         label: "観測",
-        state: meetingTranscriptConfirmed ? "done" : "todo",
-        detail: meetingTranscriptConfirmed ? "議事録確定" : "議事録待ち",
+        state: observeState,
+        detail:
+          demo === "meeting"
+            ? meetingTranscriptConfirmed
+              ? "議事録確定"
+              : "議事録待ち"
+            : connectorCompleted
+              ? "外部データ取得済み"
+              : "データ収集中",
       },
       {
         id: "reason",
         label: "推論",
-        state:
-          structuredInsight
-            ? "done"
-            : status === "streaming" || status === "submitted"
-              ? "doing"
-              : "todo",
-        detail:
-          structuredInsight
-            ? "構造化済み"
-            : status === "streaming" || status === "submitted"
-              ? "解析中"
-              : "未実行",
+        state: reasonState,
+        detail: structuredInsight ? "構造化済み" : isStreaming ? "解析中" : "未実行",
       },
       {
         id: "act",
         label: "実行",
-        state:
-          tasks.length === 0
-            ? "todo"
-            : tasks.every((task) => task.done)
-              ? "done"
-              : tasks.some((task) => task.done)
-                ? "doing"
-                : "todo",
-        detail: `${tasks.filter((task) => task.done).length}/${tasks.length || 0} tasks`,
+        state: actState,
+        detail:
+          tasks.length > 0
+            ? `${doneTasks}/${tasks.length} tasks`
+            : `${microAgentProgress.done} branch done`,
       },
       {
         id: "intervene",
@@ -1127,17 +1232,19 @@ export function DemoWorkspace({
         state: approval?.required ? "doing" : "done",
         detail: approval?.required ? "承認待ち" : "自動継続",
       },
-    ],
-    [
-      approval?.required,
-      meetingTranscriptConfirmed,
-      status,
-      structuredInsight,
-      tasks,
-    ],
-  );
-
-  const isStreaming = status === "streaming" || status === "submitted";
+    ];
+  }, [
+    approval?.required,
+    connectorCompleted,
+    demo,
+    isStreaming,
+    meetingTranscriptConfirmed,
+    microAgentProgress.done,
+    microAgentProgress.running,
+    runningToolCount,
+    structuredInsight,
+    tasks,
+  ]);
 
   const withDemoContext = useCallback((rawText: string) => rawText.trim(), []);
 
@@ -2064,6 +2171,38 @@ export function DemoWorkspace({
                   </div>
                 ))}
               </div>
+              <div className="rounded-md border border-border/70 bg-background/80 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold">Agent Runtime</p>
+                  <Badge variant={runningToolCount > 0 ? "default" : "outline"} className="text-[10px]">
+                    {runningToolCount > 0 ? `${runningToolCount} running` : "idle"}
+                  </Badge>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {latestToolEvents.slice(0, 6).map((tool) => (
+                    <div
+                      key={tool.id}
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-[10px]",
+                        getStatusBadgeStyle(tool.status),
+                      )}
+                    >
+                      {tool.name}: {compactUiText(tool.detail, 36)}
+                    </div>
+                  ))}
+                  {latestToolEvents.length === 0 ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      送信するとツール実行ログがここに表示されます。
+                    </p>
+                  ) : null}
+                </div>
+                {microAgentProgress.total > 0 ? (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    branch: success {microAgentProgress.done} / running {microAgentProgress.running} / error{" "}
+                    {microAgentProgress.error}
+                  </p>
+                ) : null}
+              </div>
               <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] font-semibold text-primary">結論（TL;DR）</p>
@@ -2209,6 +2348,18 @@ export function DemoWorkspace({
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
+                <Reasoning
+                  className="mt-2 rounded-md border border-border/60 bg-background px-2.5 py-2"
+                  defaultOpen={false}
+                  isStreaming={isStreaming}
+                >
+                  <ReasoningTrigger className="text-[11px]">
+                    Agent Working Trace（推論・実行ログ）
+                  </ReasoningTrigger>
+                  <ReasoningContent className="text-[11px] leading-6">
+                    {reasoningTraceMarkdown}
+                  </ReasoningContent>
+                </Reasoning>
               </div>
               {meetingPrerequisiteBlocked ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
@@ -3035,16 +3186,37 @@ export function DemoWorkspace({
                 <CardContent className="px-4">
                   <ScrollArea className="h-[320px]">
                     <div className="space-y-2 pr-2 text-xs">
-                      {tools.map((tool) => (
-                        <div key={tool.id} className="rounded-md border bg-muted/30 p-2">
-                          <div className="flex items-center justify-between">
-                            <p className="font-semibold">{tool.name}</p>
-                            <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(tool.status)}`}>
-                              {tool.status}
-                            </span>
-                          </div>
-                          <p className="mt-1 text-muted-foreground">{tool.detail}</p>
-                        </div>
+                      {latestToolEvents.map((tool) => (
+                        <Tool
+                          key={tool.id}
+                          className="mb-0 border-border/70 bg-muted/20"
+                          defaultOpen={tool.status === "running"}
+                        >
+                          <ToolHeader
+                            type="dynamic-tool"
+                            state={toToolUiState(tool.status)}
+                            toolName={tool.name}
+                            title={tool.name}
+                          />
+                          <ToolContent className="space-y-2 p-3">
+                            <ToolInput
+                              input={{
+                                timestamp: tool.timestamp,
+                              }}
+                            />
+                            <ToolOutput
+                              output={
+                                tool.status === "error"
+                                  ? undefined
+                                  : {
+                                      detail: tool.detail,
+                                      timestamp: tool.timestamp,
+                                    }
+                              }
+                              errorText={tool.status === "error" ? tool.detail : undefined}
+                            />
+                          </ToolContent>
+                        </Tool>
                       ))}
                       {tools.length === 0 ? <p className="text-muted-foreground">ログなし</p> : null}
                     </div>
