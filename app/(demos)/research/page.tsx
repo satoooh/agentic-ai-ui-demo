@@ -22,6 +22,7 @@ export default function ResearchDemoPage() {
         "MSFTの最新10-K/10-Qの示唆を営業提案向けに抽出して",
         "SONYの企業プロフィールをWikidataで補完して",
         "この結果を使って競合比較の探索クエリを自動提案して",
+        "ここまでの内容で悪魔の代弁者レビューを実行して",
       ]}
       scenarios={[
         {
@@ -221,7 +222,7 @@ export default function ResearchDemoPage() {
           <WorkflowEditor
             storageKey="workflow:research"
             initialGraph={mockResearchWorkflow}
-            title="Canvas Workflow: 企業調査ブリーフ配布"
+            title="Canvas Workflow: 企業調査反復オペレーション"
           />
         </div>
       }

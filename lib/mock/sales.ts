@@ -45,9 +45,9 @@ export const mockSalesOutreachDraft: SalesOutreachDraft = {
 export const mockSalesWorkflow: WorkflowGraph = {
   nodes: [
     { id: "s1", label: "アカウント調査", owner: "AE", status: "done" },
-    { id: "s2", label: "提案骨子作成", owner: "Sales Ops", status: "doing" },
-    { id: "s3", label: "提案レビュー", owner: "Manager", status: "todo" },
-    { id: "s4", label: "送付承認", owner: "Approver", status: "todo" },
+    { id: "s2", label: "提案骨子作成", owner: "Sales Ops", status: "done" },
+    { id: "s3", label: "反証シミュレーション", owner: "Agent", status: "doing" },
+    { id: "s4", label: "次アクション生成", owner: "AE", status: "todo" },
   ],
   edges: [
     { from: "s1", to: "s2" },

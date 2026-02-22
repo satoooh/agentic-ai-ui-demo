@@ -48,9 +48,9 @@ export const mockCandidateBrief: CandidateBrief = {
 export const mockRecruitingWorkflow: WorkflowGraph = {
   nodes: [
     { id: "r1", label: "候補者スクリーニング", owner: "Recruiter", status: "done" },
-    { id: "r2", label: "面接調整", owner: "Coordinator", status: "doing" },
-    { id: "r3", label: "評価集約", owner: "Hiring Manager", status: "todo" },
-    { id: "r4", label: "オファー承認", owner: "HRBP", status: "todo" },
+    { id: "r2", label: "面接調整", owner: "Coordinator", status: "done" },
+    { id: "r3", label: "懸念シミュレーション", owner: "Agent", status: "doing" },
+    { id: "r4", label: "次探索条件生成", owner: "Recruiter", status: "todo" },
   ],
   edges: [
     { from: "r1", to: "r2" },

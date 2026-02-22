@@ -32,16 +32,16 @@ export interface MockReply {
 const now = () => new Date().toISOString();
 
 function resolveApprovalAction(text: string): string | null {
-  if (text.includes("送信") || text.includes("提案送付")) {
+  if (text.includes("本番送信") || text.includes("本番送付")) {
     return "営業提案の外部送付";
   }
-  if (text.includes("オファー") || text.includes("内定")) {
+  if (text.includes("本番オファー") || text.includes("本番内定")) {
     return "オファー通知";
   }
-  if (text.includes("配布") || text.includes("共有")) {
+  if (text.includes("本番配布") || text.includes("本番共有")) {
     return "リサーチレポート配布";
   }
-  if (text.includes("公開")) {
+  if (text.includes("本番公開")) {
     return "外部公開";
   }
   return null;
@@ -64,6 +64,63 @@ function getCommonToolEvents(name: string): ToolEvent[] {
       timestamp: now(),
     },
   ];
+}
+
+function buildDevilsAdvocateReply(demo: DemoId): MockReply {
+  const artifactName =
+    demo === "sales"
+      ? "sales-devils-advocate.md"
+      : demo === "recruiting"
+        ? "recruiting-devils-advocate.md"
+        : "research-devils-advocate.md";
+
+  return {
+    message:
+      "悪魔の代弁者として、前提の穴と失敗シナリオを抽出しました。追加検証クエリを次ループへ投入してください。",
+    approval: { required: false, action: "", reason: "" },
+    queue: [
+      {
+        id: `${demo}-devil-queue-1`,
+        title: "反証ポイント検証",
+        description: "抽出した反証ポイントを次ループで検証してください。",
+        severity: "warning",
+        timestamp: now(),
+      },
+    ],
+    plan: [
+      { id: `${demo}-devil-plan-1`, title: "前提の分解", status: "done" },
+      { id: `${demo}-devil-plan-2`, title: "失敗シナリオ抽出", status: "done" },
+      { id: `${demo}-devil-plan-3`, title: "追加検証クエリ生成", status: "doing" },
+    ],
+    tasks: [
+      { id: `${demo}-devil-task-1`, label: "反証ポイントの優先順位付け", done: false },
+      { id: `${demo}-devil-task-2`, label: "失敗シナリオの事実確認", done: false },
+      { id: `${demo}-devil-task-3`, label: "追加検証クエリの実行", done: false },
+    ],
+    tools: getCommonToolEvents("devils-advocate-agent"),
+    artifacts: [
+      {
+        id: `${demo}-devils-advocate`,
+        name: artifactName,
+        kind: "markdown",
+        content:
+          "# Devil's Advocate Review\n\n" +
+          "## 1. 反証ポイント\n" +
+          "- 重要前提が公開情報で裏取りされていない\n" +
+          "- 過去データの延長線を前提にし過ぎている\n" +
+          "- 代替シナリオ（競合/市場変化）の比較が不足\n\n" +
+          "## 2. 失敗シナリオ\n" +
+          "- KPI未達でも意思決定が進み、後戻りコストが増大\n" +
+          "- 短期シグナルに引っ張られて長期判断を誤る\n\n" +
+          "## 3. 追加検証クエリ\n" +
+          "- `counter evidence for current hypothesis`\n" +
+          "- `what assumptions break under downside scenario`\n" +
+          "- `alternative strategy benchmarks from similar cases`",
+        updatedAt: now(),
+      },
+    ],
+    citations: [],
+  };
 }
 
 function buildApprovalReply(action: string): MockReply {
@@ -100,33 +157,36 @@ function buildSalesReply(text: string): MockReply {
   };
 
   return {
-    message: "営業向けのアカウント調査結果を反映し、提案骨子と次アクションを更新しました。",
+    message:
+      "営業向けのアカウント調査結果を反映し、提案骨子・反証ポイント・次ループ用クエリを更新しました。",
     approval: { required: false, action: "", reason: "" },
     queue: [
       {
         id: "sales-alert-1",
-        title: "提案送付前レビュー",
-        description: "顧客業界向けの導入効果数値を追記すると成約率改善が見込めます。",
+        title: "反証シミュレーション未実施",
+        description: "提案の弱点を先に洗い出すと商談初回の精度が上がります。",
         severity: "warning",
         timestamp: now(),
       },
       {
         id: "sales-alert-2",
-        title: "次回MTG調整",
-        description: "決裁者同席の30分枠を提案してください。",
+        title: "次ループ候補",
+        description: "競合企業のシグナル収集クエリを追加してください。",
         severity: "info",
         timestamp: now(),
       },
     ],
     plan: [
       { id: "s-plan-1", title: "アカウント情報収集", status: "done" },
-      { id: "s-plan-2", title: "提案骨子作成", status: "doing" },
-      { id: "s-plan-3", title: "送付承認", status: "todo" },
+      { id: "s-plan-2", title: "提案骨子作成", status: "done" },
+      { id: "s-plan-3", title: "反証シミュレーション", status: "doing" },
+      { id: "s-plan-4", title: "次ループクエリ生成", status: "todo" },
     ],
     tasks: [
       { id: "s-task-1", label: "顧客課題の優先度確認", done: false },
       { id: "s-task-2", label: "提案資料の数値根拠追記", done: false },
-      { id: "s-task-3", label: "送付承認の取得", done: false },
+      { id: "s-task-3", label: "反証ポイントの検証", done: false },
+      { id: "s-task-4", label: "次ループクエリ生成", done: false },
     ],
     tools: getCommonToolEvents("sales-playbook-agent"),
     artifacts: [
@@ -151,7 +211,18 @@ function buildSalesReply(text: string): MockReply {
         content:
           "# 提案メール案\n\n" +
           `対象: ${mockSalesAccountInsight.displayName}\n\n` +
-          "先日のヒアリング内容をもとに、開発生産性と採用効率を同時に改善する導入プランを整理しました。`Run Scenario` 後、差分を追記して送付承認へ進んでください。",
+          "先日のヒアリング内容をもとに、開発生産性と採用効率を同時に改善する導入プランを整理しました。反証ポイントを踏まえて改善ループを回してください。",
+        updatedAt: now(),
+      },
+      {
+        id: "sales-next-queries",
+        name: "next-loop-queries.md",
+        kind: "markdown",
+        content:
+          "# Next Loop Queries\n\n" +
+          "- `compare ${mockSalesAccountInsight.orgLogin} with competitor adoption signal`\n" +
+          "- `estimate ROI objection scenarios in first meeting`\n" +
+          "- `find strongest proof points for adoption timeline`",
         updatedAt: now(),
       },
     ],
@@ -172,7 +243,8 @@ function buildRecruitingReply(text: string): MockReply {
     : mockCandidateBrief.recommendation;
 
   return {
-    message: "採用オペレーション向けに候補者サマリ、面接計画、通知文面を更新しました。",
+    message:
+      "採用オペレーション向けに候補者サマリ、面接計画、懸念シミュレーション、次探索条件を更新しました。",
     approval: { required: false, action: "", reason: "" },
     queue: [
       {
@@ -184,21 +256,23 @@ function buildRecruitingReply(text: string): MockReply {
       },
       {
         id: "recruiting-alert-2",
-        title: "評価未提出",
-        description: "2名の面接官が評価フォーム未提出です。",
+        title: "評価観点のズレ",
+        description: "面接官ごとに観点が異なるため質問セットの統一が必要です。",
         severity: "warning",
         timestamp: now(),
       },
     ],
     plan: [
       { id: "r-plan-1", title: "候補者情報整理", status: "done" },
-      { id: "r-plan-2", title: "面接官アサイン", status: "doing" },
-      { id: "r-plan-3", title: "オファー承認", status: "todo" },
+      { id: "r-plan-2", title: "面接官アサイン", status: "done" },
+      { id: "r-plan-3", title: "懸念シミュレーション", status: "doing" },
+      { id: "r-plan-4", title: "次探索条件生成", status: "todo" },
     ],
     tasks: [
       { id: "r-task-1", label: "候補者評価の回収", done: false },
       { id: "r-task-2", label: "次面接日程の確定", done: false },
-      { id: "r-task-3", label: "オファー条件の承認", done: false },
+      { id: "r-task-3", label: "懸念点への質問追加", done: false },
+      { id: "r-task-4", label: "次探索条件の定義", done: false },
     ],
     tools: getCommonToolEvents("recruiting-ops-agent"),
     artifacts: [
@@ -226,6 +300,17 @@ function buildRecruitingReply(text: string): MockReply {
           "- Panel B: チームフィット（30分）\n" +
           "- Hiring Manager: 最終判断（30分）\n\n" +
           `補足: ${text.trim() || "採用要件に合わせて質問項目を調整してください。"}`,
+        updatedAt: now(),
+      },
+      {
+        id: "recruiting-next-queries",
+        name: "next-candidate-queries.md",
+        kind: "markdown",
+        content:
+          "# Next Candidate Query Ideas\n\n" +
+          "- `frontend engineer design system b2b saas leadership`\n" +
+          "- `typescript performance optimization large scale products`\n" +
+          "- `hiring signal in remote japan market for senior frontend`",
         updatedAt: now(),
       },
     ],
@@ -265,7 +350,7 @@ function buildResearchReply(text: string): MockReply {
       {
         id: "research-alert-1",
         title: "提出書類リンク確認",
-        description: "配布前にIR提出書類のリンク有効性と提出日を再確認してください。",
+        description: "結果提示前にIR提出書類のリンク有効性と提出日を再確認してください。",
         severity: "warning",
         timestamp: now(),
       },
@@ -349,6 +434,10 @@ function buildResearchReply(text: string): MockReply {
 }
 
 export function buildMockReply(input: BuildReplyInput): MockReply {
+  if (input.text.includes("悪魔の代弁者")) {
+    return buildDevilsAdvocateReply(input.demo);
+  }
+
   const action = resolveApprovalAction(input.text);
   if (action && !input.approved) {
     return buildApprovalReply(action);

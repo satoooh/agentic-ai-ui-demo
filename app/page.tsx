@@ -14,22 +14,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const demos = [
   {
     href: "/sales",
-    title: "営業: Sales Enablement Copilot",
-    summary: "アカウント調査 → 提案骨子 → 送付承認までを1画面で通し、営業の初動を高速化。",
-    focus: ["Queue", "Plan", "Artifact", "Confirmation", "Workflow", "OpenInChat"],
-    value: "提案初稿と承認フローのリードタイム短縮",
+    title: "営業: Sales Agentic Loop",
+    summary: "アカウント収集 → 提案生成 → 反証探索 → 次アクション生成を1画面で反復。",
+    focus: ["Queue", "Plan", "Tool", "Artifact", "Workflow", "OpenInChat"],
+    value: "提案の初稿作成と改善ループを短縮",
   },
   {
     href: "/recruiting",
-    title: "採用: Recruiting Ops Copilot",
-    summary: "候補者要約 → 面接調整 → オファー承認の定型業務を、進捗可視化付きで効率化。",
-    focus: ["SpeechInput", "Conversation", "Task", "Artifact", "Approval", "Checkpoint"],
-    value: "採用進行の停滞と調整コストを削減",
+    title: "採用: Recruiting Agentic Loop",
+    summary: "候補者要約 → 面接設計 → 懸念シミュレーション → 次探索生成を反復。",
+    focus: ["SpeechInput", "Conversation", "Task", "Artifact", "Tool", "Checkpoint"],
+    value: "採用進行の停滞と再探索コストを削減",
   },
   {
     href: "/research",
     title: "企業調査: Public Intelligence Studio",
-    summary: "企業指定 → IR書類収集（SEC）→ 公開情報分析（GDELT/Wikidata）→ 配布承認の一連を実演。",
+    summary: "目的入力 → SEC/GDELT/Wikidata収集 → 根拠付き分析 → 次探索提案を実演。",
     focus: ["Sources", "InlineCitation", "Terminal", "TestResults", "StackTrace", "Commit"],
     value: "初回企業調査を根拠付きアウトプットへ即変換",
   },
@@ -38,7 +38,7 @@ const demos = [
 const quickStartSteps = [
   "任意のデモを開き、左列の Run Scenario を押す",
   "中央 Conversation で入力文を編集し再送する",
-  "右列 Execution/Audit で進捗・承認履歴を確認する",
+  "右列 Execution/Ops/Audit で進捗・ツール・介入履歴を確認する",
   "下段 Artifacts で成果物を preview/copy/download する",
 ];
 
@@ -61,7 +61,7 @@ export default function HomePage() {
                 Japan Vertical Agentic Demo Lab
               </h1>
               <p className="mt-2 max-w-4xl text-sm text-muted-foreground sm:text-base">
-                「入力 → 進捗 → 成果物 → 承認」を業務フローとして再現するデモ環境です。既定は
+                「入力 → 収集 → 合成 → 反復」を業務フローとして再現するデモ環境です。既定は
                 <code className="mx-1">mock</code>で確実に動作し、環境変数を設定すれば
                 <code className="mx-1">live</code>連携へ段階移行できます。
               </p>

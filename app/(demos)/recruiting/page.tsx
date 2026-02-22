@@ -1,3 +1,4 @@
+import { AgenticHighlightsPanel } from "@/components/demos/agentic-highlights-panel";
 import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { RecruitingSourcePanel } from "@/components/demos/recruiting-source-panel";
@@ -12,20 +13,22 @@ export default function RecruitingDemoPage() {
   return (
     <DemoWorkspace
       demo="recruiting"
-      title="採用デモ: Recruiting Ops Copilot"
-      subtitle="候補者スクリーニング → 面接調整 → オファー承認までを採用業務の実運用に近い形で確認する。"
+      title="採用デモ: Recruiting Agentic Loop"
+      subtitle="要件入力 → 候補者要約 → 面接設計 → 懸念シミュレーション → 次探索生成までを、採用の自律ループとして実演する。"
       suggestions={[
         "候補者サマリを面接官向けに整形して",
         "一次面接の日程調整メッセージを作成",
-        "オファー通知の承認フローを開始して",
+        "見送りリスクを下げる追加探索条件を提案して",
+        "評価の偏りを減らす質問セットを作成して",
+        "ここまでの議論で悪魔の代弁者レビューを実行して",
       ]}
       scenarios={[
         {
-          id: "recruiting-fast-lane",
-          title: "候補者進行の通しデモ",
-          description: "スクリーニングから承認までを短時間で再現。",
+          id: "recruiting-agentic-loop",
+          title: "採用自律ループ",
+          description: "候補者分析→面接設計→懸念検証→次探索までを短時間で再現。",
           outcome: "採用進行の停滞を削減",
-          targetDurationSec: 60,
+          targetDurationSec: 70,
           steps: [
             {
               id: "recruiting-step-1",
@@ -39,14 +42,13 @@ export default function RecruitingDemoPage() {
             },
             {
               id: "recruiting-step-3",
-              label: "オファー要求",
-              prompt: "この候補者にオファー通知を送信してください。",
+              label: "懸念シミュレーション",
+              prompt: "採用後ミスマッチになり得る観点を3つ挙げ、面接質問に反映してください。",
             },
             {
               id: "recruiting-step-4",
-              label: "オファー承認",
-              prompt: "オファー通知を承認します。",
-              approved: true,
+              label: "次探索生成",
+              prompt: "次に探索すべき候補者条件と検索クエリを3つ生成してください。",
             },
           ],
         },
@@ -61,8 +63,8 @@ export default function RecruitingDemoPage() {
         },
         {
           id: "recruiting-queue-2",
-          title: "評価未提出",
-          description: "前回面接の評価入力が1件未完了です。",
+          title: "評価基準のズレ",
+          description: "面接官間で評価観点が揃っていません。質問セットを更新してください。",
           severity: "warning",
           timestamp: new Date().toISOString(),
         },
@@ -75,7 +77,8 @@ export default function RecruitingDemoPage() {
       initialTasks={[
         { id: "recruiting-task-1", label: "評価フォーム回収", done: false },
         { id: "recruiting-task-2", label: "面接日程の確定", done: false },
-        { id: "recruiting-task-3", label: "オファー承認取得", done: false },
+        { id: "recruiting-task-3", label: "懸念点への質問追加", done: false },
+        { id: "recruiting-task-4", label: "次探索クエリ生成", done: false },
       ]}
       initialArtifacts={[
         {
@@ -96,9 +99,9 @@ export default function RecruitingDemoPage() {
       topPanel={
         <div className="space-y-4">
           <DemoScriptPanel
-            title="採用: 候補者進行と承認"
-            summary="採用担当が日々行う情報整理と調整業務をエージェントUIで短縮。"
-            durationSec={60}
+            title="採用: 自律スクリーニングループ"
+            summary="候補者評価を1回で終わらせず、懸念検証と次探索を反復する。"
+            durationSec={70}
             steps={[
               {
                 id: "recruiting-script-1",
@@ -115,14 +118,42 @@ export default function RecruitingDemoPage() {
               {
                 id: "recruiting-script-3",
                 at: "00:40",
-                cue: "Evidence",
-                value: "採用市況データを参照し、採用優先度を見直し",
+                cue: "Challenge",
+                value: "採用ミスマッチの懸念をシミュレーション",
               },
               {
                 id: "recruiting-script-4",
-                at: "00:50",
-                cue: "Approval",
-                value: "オファー通知はConfirmationで承認",
+                at: "00:56",
+                cue: "Iterate",
+                value: "次に探索すべき候補者条件を生成",
+              },
+            ]}
+          />
+          <AgenticHighlightsPanel
+            title="Recruiting Loop Highlights"
+            badge="candidate iteration"
+            summary="採用は候補者評価で終わらせず、懸念シミュレーションと再探索を自動で回します。"
+            steps={[
+              {
+                id: "recruit-loop-1",
+                label: "候補者情報を要約し評価観点を揃える",
+                description: "強み/懸念を同じ枠組みで整理",
+                status: "complete",
+                tags: ["candidate brief", "skills", "concerns"],
+              },
+              {
+                id: "recruit-loop-2",
+                label: "面接質問を生成し懸念を検証",
+                description: "ミスマッチ要因を面接前に可視化",
+                status: "active",
+                tags: ["interview plan", "risk check", "question set"],
+              },
+              {
+                id: "recruit-loop-3",
+                label: "次探索条件を生成して再検索",
+                description: "不足スキルを埋める条件で探索を継続",
+                status: "pending",
+                tags: ["next candidate query", "market signal", "pipeline update"],
               },
             ]}
           />
@@ -134,7 +165,7 @@ export default function RecruitingDemoPage() {
         <WorkflowEditor
           storageKey="workflow:recruiting"
           initialGraph={mockRecruitingWorkflow}
-          title="Canvas Workflow: 採用進行オペレーション"
+          title="Canvas Workflow: 採用反復オペレーション"
         />
       }
     />

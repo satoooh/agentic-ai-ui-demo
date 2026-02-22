@@ -63,7 +63,7 @@ export const mockResearchWorkflow: WorkflowGraph = {
     { id: "q2", label: "IR書類取得（SEC）", owner: "Agent", status: "doing" },
     { id: "q3", label: "公開ニュース収集（GDELT）", owner: "Agent", status: "todo" },
     { id: "q4", label: "企業属性補完（Wikidata）", owner: "Agent", status: "todo" },
-    { id: "q5", label: "示唆抽出と配布承認", owner: "Team Lead", status: "todo" },
+    { id: "q5", label: "示唆抽出と次探索生成", owner: "Team Lead", status: "todo" },
   ],
   edges: [
     { from: "q1", to: "q2" },

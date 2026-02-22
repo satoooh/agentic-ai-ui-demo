@@ -1,7 +1,7 @@
 # Japan Vertical Agentic Demo Lab
 
 営業・採用・企業調査（IR/公開情報）の3領域を対象に、AI ElementsベースのエージェンティックUIを体験できるデモプロジェクトです。  
-狙いは「モデル性能の誇示」ではなく、`入力 → 進捗 → 成果物 → 承認` の業務導線を短時間で伝えることです。
+狙いは「モデル性能の誇示」ではなく、`入力 → 収集 → 合成 → 反復` の自律ループを短時間で伝えることです。
 
 ## セットアップ
 
@@ -25,16 +25,16 @@ npm run dev
 ## 主要ルート
 
 - `/` : デモ一覧とQuick Start
-- `/sales` : 営業デモ（提案作成・承認）
-- `/recruiting` : 採用デモ（候補者進行・承認）
-- `/research` : 企業調査デモ（IR収集・公開情報分析・配布）
+- `/sales` : 営業デモ（提案生成・反証・次ループ）
+- `/recruiting` : 採用デモ（候補者評価・懸念検証・再探索）
+- `/research` : 企業調査デモ（IR収集・公開情報分析・次探索）
 - `/settings` : 環境変数状態
 
 ## デモの見どころ
 
-- 営業: アカウント調査→提案骨子→外部送付承認
-- 採用: 候補者要約→面接調整→オファー承認
-- 企業調査: SEC/GDELT/Wikidata収集→根拠付きブリーフ→配布承認
+- 営業: アカウント調査→提案骨子→反証探索→次アクション
+- 採用: 候補者要約→面接設計→懸念シミュレーション→次探索
+- 企業調査: SEC/GDELT/Wikidata収集→根拠付き分析→次探索
 
 全デモで `Run Scenario` を起点に、操作導線を即再現できます。
 
@@ -56,6 +56,8 @@ npm run dev
 - `GITHUB_TOKEN`（任意、GitHub APIレート上限対策）
 - `SEC_USER_AGENT`（任意、SEC/GDELT/Wikidata呼び出し時に使用）
 - `DATABASE_URL` / `DATABASE_AUTH_TOKEN`
+
+各デモ画面の `Model & Context` で `chat mode: live` を選ぶと、`DEMO_MODE=mock` でも live 推論を個別に試せます。
 
 ## 参照ドキュメント
 
