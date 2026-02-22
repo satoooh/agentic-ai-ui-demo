@@ -53,6 +53,17 @@ const configuredCount = rows.filter((row) => row.value !== "(unset)").length;
 export default function SettingsPage() {
   return (
     <div className="space-y-4">
+      {env.DEMO_MODE === "mock" ? (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">現在は DEMO_MODE=mock です</p>
+          <p className="mt-1">
+            API Keyを設定していても、chat は mock 応答になります。live推論を試す場合は
+            <code className="mx-1">DEMO_MODE=live</code>に切り替えるか、各デモの
+            <code className="mx-1">chat mode: live</code>を選択してください。
+          </p>
+        </div>
+      ) : null}
+
       <Card className="border-border/75">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">

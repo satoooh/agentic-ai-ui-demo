@@ -18,6 +18,7 @@ const requestSchema = z.object({
   demo: z.enum(["sales", "recruiting", "research"]).default("sales"),
   provider: z.enum(["openai", "gemini"]).default("openai"),
   model: z.string().optional(),
+  modeOverride: z.enum(["mock", "live"]).optional(),
   approved: z.boolean().optional(),
 });
 
@@ -138,7 +139,8 @@ export async function POST(request: Request) {
 
   const stream = createUIMessageStream<DemoUIMessage>({
     execute: async ({ writer }) => {
-      const inLiveMode = env.DEMO_MODE === "live";
+      const mode = parsed.data.modeOverride ?? env.DEMO_MODE;
+      const inLiveMode = mode === "live";
 
       if (!inLiveMode) {
         writeMockReply({
@@ -201,7 +203,7 @@ export async function POST(request: Request) {
               id: `tool-model-done-${Date.now()}`,
               name: "model-call",
               status: "success",
-              detail: "推論が完了しました。必要に応じて承認または成果物保存を実行してください。",
+              detail: "推論が完了しました。成果物の更新内容を確認し、次のループへ進めてください。",
               timestamp: new Date().toISOString(),
             },
             transient: true,

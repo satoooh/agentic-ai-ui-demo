@@ -177,6 +177,21 @@ function getMessageText(message: DemoUIMessage): string {
     .trim();
 }
 
+function buildConversationTranscript(messages: DemoUIMessage[]): string {
+  return messages
+    .map((message) => {
+      const text = getMessageText(message);
+      if (!text) {
+        return "";
+      }
+      const role = message.role === "user" ? "User" : "Assistant";
+      return `${role}: ${text}`;
+    })
+    .filter(Boolean)
+    .slice(-12)
+    .join("\n");
+}
+
 function estimateTokenCount(text: string): number {
   return Math.ceil(text.length / 4);
 }
@@ -259,6 +274,7 @@ export function DemoWorkspace({
   topPanel,
   bottomPanel,
 }: DemoWorkspaceProps) {
+  const [chatModeOverride, setChatModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
   const [draft, setDraft] = useState("");
@@ -512,6 +528,7 @@ export function DemoWorkspace({
           demo,
           provider,
           model,
+          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
           approved: false,
         },
       },
@@ -519,6 +536,38 @@ export function DemoWorkspace({
 
     setDraft("");
     setAttachmentNames([]);
+  };
+
+  const runDevilsAdvocate = async () => {
+    if (isStreaming) {
+      return;
+    }
+
+    const transcript = buildConversationTranscript(messages);
+    const notes = draft.trim();
+
+    const basePrompt =
+      "あなたは悪魔の代弁者エージェントです。以下の会話ログを読み、" +
+      "前提の穴・反証シナリオ・失敗時の影響・追加で取るべき検証データを、日本語で簡潔に出してください。";
+    const promptSections = [
+      basePrompt,
+      transcript ? `会話ログ:\n${transcript}` : "会話ログ: (まだ会話がないため、現在のタスク前提から反証を出すこと)",
+      notes ? `追加メモ:\n${notes}` : "",
+      "出力形式:\n1. 反証ポイント(3件)\n2. 失敗シナリオ(2件)\n3. 追加検証クエリ(3件)",
+    ].filter(Boolean);
+
+    await sendMessage(
+      { text: promptSections.join("\n\n") },
+      {
+        body: {
+          demo,
+          provider,
+          model,
+          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+          approved: false,
+        },
+      },
+    );
   };
 
   const runScenario = async (scenario: DemoScenario) => {
@@ -561,6 +610,7 @@ export function DemoWorkspace({
               demo,
               provider,
               model,
+              ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
               approved: step.approved ?? false,
             },
           },
@@ -640,6 +690,7 @@ export function DemoWorkspace({
           demo,
           provider,
           model,
+          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
           approved: true,
         },
       },
@@ -1204,6 +1255,14 @@ export function DemoWorkspace({
                   <Button type="button" onClick={() => void send()} disabled={isStreaming}>
                     送信
                   </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void runDevilsAdvocate()}
+                    disabled={isStreaming}
+                  >
+                    悪魔の代弁者
+                  </Button>
                   <Button type="button" variant="outline" onClick={stop}>
                     停止
                   </Button>
@@ -1287,6 +1346,28 @@ export function DemoWorkspace({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Select
+                  value={chatModeOverride}
+                  onValueChange={(value) =>
+                    setChatModeOverride(value as "auto" | "mock" | "live")
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">chat mode: auto</SelectItem>
+                    <SelectItem value="mock">chat mode: mock</SelectItem>
+                    <SelectItem value="live">chat mode: live</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
+                  {chatModeOverride === "auto"
+                    ? "auto はサーバーの DEMO_MODE に従います"
+                    : `${chatModeOverride} を強制中`}
+                </div>
               </div>
 
               <ContextMeter
