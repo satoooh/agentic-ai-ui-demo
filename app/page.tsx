@@ -53,8 +53,9 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-card/95 p-6 shadow-sm sm:p-7">
-        <div className="absolute -right-8 -top-10 size-44 rounded-full bg-chart-2/10 blur-2xl" aria-hidden />
-        <div className="absolute -left-14 -bottom-20 size-60 rounded-full bg-chart-1/10 blur-3xl" aria-hidden />
+        <div className="absolute -right-8 -top-10 size-44 rounded-full bg-chart-2/18 blur-2xl" aria-hidden />
+        <div className="absolute -left-14 -bottom-20 size-60 rounded-full bg-chart-1/16 blur-3xl" aria-hidden />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-chart-2/[0.08]" aria-hidden />
 
         <div className="relative grid gap-5 xl:grid-cols-[1.25fr_1fr]">
           <div className="space-y-4">
@@ -75,13 +76,13 @@ export default function HomePage() {
             </div>
 
             <div className="grid gap-3 text-sm md:grid-cols-2">
-              <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+              <div className="rounded-xl border border-border/70 bg-background/84 p-3 shadow-[0_1px_0_0_rgb(255_255_255/0.5)_inset]">
                 <p className="font-medium">画面設計の方針</p>
                 <p className="mt-1 text-muted-foreground">
                   説明より操作優先。低優先情報は後段へ寄せ、主要導線を常に見える位置に固定。
                 </p>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+              <div className="rounded-xl border border-border/70 bg-background/84 p-3 shadow-[0_1px_0_0_rgb(255_255_255/0.5)_inset]">
                 <p className="font-medium">実装ベース</p>
                 <p className="mt-1 text-muted-foreground">
                   shadcn/ui + AI Elements を統一採用。各デモで Chat / Workflow / Voice / Code を主役化。
@@ -105,7 +106,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Card className="h-fit border-border/70 bg-background/75">
+          <Card className="h-fit border-border/70 bg-background/82 shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <PlayCircleIcon className="size-4 text-primary" />

@@ -5,46 +5,49 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --color-bg: #f4f7fb;
+  --color-bg: #eef4ff;
   --color-text: #111827;
   --radius: 0.625rem;
-  --background: oklch(0.985 0.004 250.11);
-  --foreground: oklch(0.258 0.029 264.02);
-  --card: oklch(0.996 0.002 250.11);
-  --card-foreground: oklch(0.258 0.029 264.02);
-  --popover: oklch(0.998 0.001 250.11);
-  --popover-foreground: oklch(0.258 0.029 264.02);
-  --primary: oklch(0.332 0.078 262.4);
-  --primary-foreground: oklch(0.992 0.003 247.98);
-  --secondary: oklch(0.963 0.01 252.12);
-  --secondary-foreground: oklch(0.258 0.029 264.02);
-  --muted: oklch(0.966 0.009 252.12);
-  --muted-foreground: oklch(0.49 0.04 258.94);
-  --accent: oklch(0.949 0.018 250.12);
-  --accent-foreground: oklch(0.302 0.045 262.65);
+  --background: oklch(0.985 0.006 251.4);
+  --foreground: oklch(0.254 0.032 263.2);
+  --card: oklch(0.995 0.004 252.1);
+  --card-foreground: oklch(0.254 0.032 263.2);
+  --popover: oklch(0.998 0.002 251.4);
+  --popover-foreground: oklch(0.254 0.032 263.2);
+  --primary: oklch(0.43 0.152 260.2);
+  --primary-foreground: oklch(0.985 0.008 248.4);
+  --secondary: oklch(0.958 0.018 243.6);
+  --secondary-foreground: oklch(0.292 0.044 262.7);
+  --muted: oklch(0.962 0.014 245.2);
+  --muted-foreground: oklch(0.464 0.04 258.8);
+  --accent: oklch(0.944 0.032 223.8);
+  --accent-foreground: oklch(0.308 0.052 255.2);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.908 0.012 255.74);
-  --input: oklch(0.908 0.012 255.74);
-  --ring: oklch(0.612 0.102 260.49);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.992 0.003 250.11);
-  --sidebar-foreground: oklch(0.258 0.029 264.02);
-  --sidebar-primary: oklch(0.332 0.078 262.4);
-  --sidebar-primary-foreground: oklch(0.992 0.003 247.98);
-  --sidebar-accent: oklch(0.963 0.01 252.12);
-  --sidebar-accent-foreground: oklch(0.258 0.029 264.02);
-  --sidebar-border: oklch(0.908 0.012 255.74);
-  --sidebar-ring: oklch(0.612 0.102 260.49);
+  --border: oklch(0.895 0.016 252.9);
+  --input: oklch(0.895 0.016 252.9);
+  --ring: oklch(0.64 0.14 257.4);
+  --chart-1: oklch(0.63 0.198 261.3);
+  --chart-2: oklch(0.72 0.146 210.4);
+  --chart-3: oklch(0.57 0.104 283.7);
+  --chart-4: oklch(0.8 0.152 142.5);
+  --chart-5: oklch(0.74 0.17 68.9);
+  --sidebar: oklch(0.992 0.004 251.2);
+  --sidebar-foreground: oklch(0.254 0.032 263.2);
+  --sidebar-primary: oklch(0.43 0.152 260.2);
+  --sidebar-primary-foreground: oklch(0.985 0.008 248.4);
+  --sidebar-accent: oklch(0.958 0.018 243.6);
+  --sidebar-accent-foreground: oklch(0.254 0.032 263.2);
+  --sidebar-border: oklch(0.895 0.016 252.9);
+  --sidebar-ring: oklch(0.64 0.14 257.4);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(180deg, #f8fafc 0%, #f5f7fa 52%, #f2f5f9 100%);
+  background:
+    radial-gradient(1100px 520px at -8% -14%, rgb(59 130 246 / 16%), transparent 58%),
+    radial-gradient(920px 420px at 110% -6%, rgb(34 211 238 / 15%), transparent 52%),
+    linear-gradient(180deg, #f8fbff 0%, #f3f8ff 50%, #edf3fc 100%);
   color: var(--color-text);
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
 }
@@ -134,7 +137,7 @@ pre {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
   }
   a {
     @apply text-inherit no-underline;
