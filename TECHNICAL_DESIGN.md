@@ -5,12 +5,12 @@
 ```text
 app/
   (demos)/
-    construction/page.tsx
-    transport/page.tsx
-    gov-insight/page.tsx
+    sales/page.tsx
+    recruiting/page.tsx
+    research/page.tsx
   settings/page.tsx
   api/chat/route.ts
-  api/connectors/{odpt,estat,egov}/route.ts
+  api/connectors/{sales-account,recruiting-market,research-signal}/route.ts
   api/sessions/route.ts
   api/sessions/[id]/route.ts
   api/voice/{tts,transcribe}/route.ts
@@ -20,11 +20,15 @@ components/
     section-card.tsx
   demos/
     demo-workspace.tsx
+    demo-script-panel.tsx
+    sales-source-panel.tsx
+    recruiting-source-panel.tsx
+    research-source-panel.tsx
     workflow-editor.tsx
     code-lab-panel.tsx
 lib/
   env.ts
-  db/{client,schema}.ts
+  db/{client,schema,repository}.ts
   connectors/
   mock/
 types/
@@ -34,21 +38,23 @@ types/
 
 ## 2. データモデル（主要）
 
-- `DailyReportDraft`
-- `PhotoLedgerItem`
-- `WorkflowGraph`
-- `OperationEvent`
-- `AnnouncementDraft`
-- `DatasetCandidate`
-- `StatSeries`
+- `SalesAccountInsight`
+- `SalesOutreachDraft`
+- `RecruitingJobPosting`
+- `CandidateBrief`
+- `ResearchSignal`
 - `Evidence`
 - `GeneratedConnectorProject`
+- `WorkflowGraph`
 
 ## 3. API契約（現行）
 
 - chat: `{ messages?, demo, provider, model, approved? }`
 - tts: `{ text, voice? }`
-- connectors: GETで `mode` と `note` を含む
+- connectors:
+  - `/api/connectors/sales-account?mode=&org=`
+  - `/api/connectors/recruiting-market?mode=&query=`
+  - `/api/connectors/research-signal?mode=&query=`
 - sessions:
   - `POST /api/sessions` で現在状態を保存
   - `GET /api/sessions?demo=...` で一覧
@@ -56,17 +62,17 @@ types/
 
 ## 4. 承認フロー設計
 
-- mock段階では `/api/chat` が `requiresApproval=true` を返す
-- UI側は Confirmation コンポーネントにこの値を接続
-- live段階では tool approval（2段階）へ移行
+- `/api/chat` が承認対象操作で `approval.required=true` を返す
+- UI は Confirmation モーダルで停止・承認を実施
+- 承認後に `approved: true` で再送して処理を継続
 
 ## 5. 拡張ポイント
 
 - `lib/connectors/*.ts`
-  - ODPT/e-Stat/e-Gov の live 実装
+  - 企業CRM/ATS/Notionなど社内APIの追加接続
 - `lib/db/*.ts`
-  - DemoSession / Artifact 永続化を Drizzle + libsql で実装
+  - セッション検索条件や監査ログ保存の拡張
 - `app/api/voice/*`
-  - STT/TTS プロバイダ置換
-- `MessageRenderer`（未実装）
-  - UIMessage parts と AI Elements の対応付け
+  - STT/TTSプロバイダ実装への置換
+- `MessageRenderer`（将来）
+  - UIMessage parts と AI Elements の対応を明確化
