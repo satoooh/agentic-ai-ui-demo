@@ -684,7 +684,7 @@ export function DemoWorkspace({
     [demo, selectedMeetingProfile, scenarios],
   );
   const displayedSuggestions = useMemo(
-    () => (viewMode === "guided" ? activeSuggestions.slice(0, 3) : activeSuggestions),
+    () => (viewMode === "guided" ? activeSuggestions.slice(0, 2) : activeSuggestions),
     [activeSuggestions, viewMode],
   );
 
@@ -1369,8 +1369,8 @@ export function DemoWorkspace({
               <Badge variant={isStreaming ? "default" : "secondary"}>
                 {isStreaming ? "streaming" : "ready"}
               </Badge>
-              <Badge variant="outline">queue {queue.length}</Badge>
-              <Badge variant="outline">artifacts {artifacts.length}</Badge>
+              {viewMode === "full" ? <Badge variant="outline">queue {queue.length}</Badge> : null}
+              {viewMode === "full" ? <Badge variant="outline">artifacts {artifacts.length}</Badge> : null}
             </div>
           </div>
 
@@ -1391,25 +1391,19 @@ export function DemoWorkspace({
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {stageGates.map((stage) => (
-                <Badge key={stage.id} variant={stage.done ? "default" : "outline"}>
-                  {stage.label}: {stage.done ? "done" : "waiting"}
-                </Badge>
-              ))}
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="space-y-2.5 px-5 py-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              Stage completion: {completedGateCount}/{stageGates.length}
+              {viewMode === "full"
+                ? `Stage completion: ${completedGateCount}/${stageGates.length}`
+                : "現在の進捗"}
             </span>
             <span>{gateProgress}%</span>
           </div>
-          <Progress value={gateProgress} />
+          {viewMode === "full" ? <Progress value={gateProgress} /> : null}
           {viewMode === "full" ? (
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">plan {planProgress}%</Badge>
@@ -1665,77 +1659,126 @@ export function DemoWorkspace({
             </Conversation>
 
             <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
-              <div className="flex flex-wrap gap-2">
-                {displayedSuggestions.map((suggestion) => (
-                  <Button
-                    key={suggestion}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applySuggestion(suggestion)}
-                    className="bg-background"
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
-              </div>
+              {viewMode === "full" || demo !== "meeting" ? (
+                <div className="flex flex-wrap gap-2">
+                  {displayedSuggestions.map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applySuggestion(suggestion)}
+                      className="bg-background"
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
 
               {demo === "meeting" ? (
-                <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold">Meeting Setup</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        会議タイプを選ぶと、以降の回答はその会議目的に沿って生成されます。
-                      </p>
-                    </div>
-                    <Badge variant="outline">meeting profile</Badge>
-                  </div>
-                  <div className="mt-2 grid gap-2 md:grid-cols-[220px_1fr]">
-                    <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
-                      <SelectTrigger className="w-full bg-background">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MEETING_PROFILES.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            {profile.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {viewMode === "full" ? (
-                      <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
-                        <p>目的: {selectedMeetingProfile.objective}</p>
-                        <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
-                        <p className="mt-1">期待成果: {selectedMeetingProfile.expectedOutput}</p>
+                viewMode === "guided" ? (
+                  <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
+                    <p className="text-xs font-semibold">3-step 会議レビュー</p>
+                    <div className="mt-2 space-y-3 text-[11px]">
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground">1. 会議タイプを選択</p>
+                        <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
+                          <SelectTrigger className="h-8 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MEETING_PROFILES.map((profile) => (
+                              <SelectItem key={profile.id} value={profile.id}>
+                                {profile.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    ) : (
-                      <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
-                        <p>主要論点:</p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {selectedMeetingProfile.keyTopics.slice(0, 3).map((topic) => (
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground">2. 議事録を貼り付け（任意）</p>
+                        <Textarea
+                          value={meetingTranscript}
+                          onChange={(event) => setMeetingTranscript(event.target.value)}
+                          placeholder="議事録を貼ると悪魔の代弁者レビューを実行できます"
+                          className="min-h-20 bg-background"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-muted-foreground">3. 実行</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={applyMeetingTemplate}
+                            disabled={isStreaming}
+                          >
+                            テンプレ挿入
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
+                            disabled={Boolean(runningScenarioId)}
+                          >
+                            会議タイプ実行
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void runDevilsAdvocate()}
+                            disabled={isStreaming}
+                          >
+                            反証レビュー
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold">Meeting Setup</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            会議タイプを選ぶと、以降の回答はその会議目的に沿って生成されます。
+                          </p>
+                        </div>
+                        <Badge variant="outline">meeting profile</Badge>
+                      </div>
+                      <div className="mt-2 grid gap-2 md:grid-cols-[220px_1fr]">
+                        <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
+                          <SelectTrigger className="w-full bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MEETING_PROFILES.map((profile) => (
+                              <SelectItem key={profile.id} value={profile.id}>
+                                {profile.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
+                          <p>目的: {selectedMeetingProfile.objective}</p>
+                          <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
+                          <p className="mt-1">期待成果: {selectedMeetingProfile.expectedOutput}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px]">
+                        <p className="font-medium">この会議タイプの出力フォーマット</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {selectedMeetingProfile.keyTopics.map((topic) => (
                             <Badge key={topic} variant="outline" className="text-[10px]">
                               {topic}
                             </Badge>
                           ))}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-2 rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px]">
-                    <p className="font-medium">
-                      {viewMode === "full" ? "この会議タイプの出力フォーマット" : "出力テンプレート"}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {selectedMeetingProfile.keyTopics.map((topic) => (
-                        <Badge key={topic} variant="outline" className="text-[10px]">
-                          {topic}
-                        </Badge>
-                      ))}
-                    </div>
-                    {viewMode === "full" ? (
-                      <>
                         <ol className="mt-1 space-y-0.5 text-muted-foreground">
                           {selectedMeetingOutputTemplate.sections.map((section, index) => (
                             <li key={section}>
@@ -1746,74 +1789,68 @@ export function DemoWorkspace({
                         <p className="mt-1 text-muted-foreground">
                           次アクション表: {selectedMeetingOutputTemplate.actionColumns.join(" / ")}
                         </p>
-                      </>
-                    ) : (
-                      <p className="mt-1 text-muted-foreground">
-                        まずテンプレート挿入、次にこの会議タイプを実行すると最短で開始できます。
-                      </p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={applyMeetingTemplate}
-                        disabled={isStreaming}
-                      >
-                        テンプレートを挿入
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
-                        disabled={Boolean(runningScenarioId)}
-                      >
-                        この会議タイプを実行
-                      </Button>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={applyMeetingTemplate}
+                            disabled={isStreaming}
+                          >
+                            テンプレートを挿入
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
+                            disabled={Boolean(runningScenarioId)}
+                          >
+                            この会議タイプを実行
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  </div>
-              ) : null}
 
-              {demo === "meeting" ? (
-                <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
-                      </p>
+                    <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
+                          </p>
+                        </div>
+                        <Badge variant="outline">devil&apos;s advocate</Badge>
+                      </div>
+                      <Textarea
+                        value={meetingTranscript}
+                        onChange={(event) => setMeetingTranscript(event.target.value)}
+                        placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
+                        className="mt-2 min-h-24 bg-background"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void runDevilsAdvocate()}
+                          disabled={isStreaming}
+                        >
+                          議事録で反証実行
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setMeetingTranscript("")}
+                          disabled={isStreaming || meetingTranscript.length === 0}
+                        >
+                          クリア
+                        </Button>
+                      </div>
                     </div>
-                    <Badge variant="outline">devil&apos;s advocate</Badge>
-                  </div>
-                  <Textarea
-                    value={meetingTranscript}
-                    onChange={(event) => setMeetingTranscript(event.target.value)}
-                    placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
-                    className="mt-2 min-h-24 bg-background"
-                  />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => void runDevilsAdvocate()}
-                      disabled={isStreaming}
-                    >
-                      議事録で反証実行
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setMeetingTranscript("")}
-                      disabled={isStreaming || meetingTranscript.length === 0}
-                    >
-                      クリア
-                    </Button>
-                  </div>
-                </div>
+                  </>
+                )
               ) : null}
 
               <Textarea
@@ -1889,14 +1926,16 @@ export function DemoWorkspace({
                   >
                     {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void runDevilsAdvocate()}
-                    disabled={isStreaming}
-                  >
-                    悪魔の代弁者
-                  </Button>
+                  {demo !== "meeting" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void runDevilsAdvocate()}
+                      disabled={isStreaming}
+                    >
+                      悪魔の代弁者
+                    </Button>
+                  ) : null}
                   {isStreaming || isAutoLoopRunning ? (
                     <Button
                       type="button"
@@ -2347,19 +2386,22 @@ export function DemoWorkspace({
         </section>
       ) : (
         <section className="space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {artifacts.slice(0, 4).map((artifact) => (
-              <Button
-                key={artifact.id}
-                type="button"
-                variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedArtifactId(artifact.id)}
-              >
-                {artifact.name}
-              </Button>
-            ))}
-          </div>
+          {artifacts.length > 0 ? (
+            <div className="max-w-xs">
+              <Select value={selectedArtifact?.id ?? artifacts[0]?.id ?? ""} onValueChange={setSelectedArtifactId}>
+                <SelectTrigger className="h-8 bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {artifacts.map((artifact) => (
+                    <SelectItem key={artifact.id} value={artifact.id}>
+                      {artifact.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <ArtifactPanel>
             <ArtifactHeader>
               <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
