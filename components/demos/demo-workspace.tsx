@@ -102,6 +102,7 @@ import type {
   ToolEvent,
 } from "@/types/chat";
 import type { WorkflowGraph } from "@/types/demo";
+import { cn } from "@/lib/utils";
 
 interface Checkpoint {
   id: string;
@@ -900,33 +901,42 @@ export function DemoWorkspace({
   }, [loadSessions]);
 
   return (
-    <div className="space-y-5">
-      <header className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-700 p-6 text-white">
+    <div className="space-y-4">
+      <header className="overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm">
+        <div className="border-b border-border/70 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-200">{subtitle}</p>
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+              <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
             </div>
-            <Badge variant="secondary" className="bg-white/15 text-white shadow-none">
-              {isStreaming ? "streaming" : "ready"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={isStreaming ? "default" : "secondary"}>
+                {isStreaming ? "streaming" : "ready"}
+              </Badge>
+              <Badge variant="outline">queue {queue.length}</Badge>
+              <Badge variant="outline">artifacts {artifacts.length}</Badge>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {stageGates.map((stage) => (
               <div
                 key={stage.id}
-                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs backdrop-blur-sm"
+                className={cn(
+                  "rounded-lg border px-3 py-2 text-xs",
+                  stage.done
+                    ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+                    : "border-border/70 bg-background/80 text-muted-foreground",
+                )}
               >
-                <p className="text-[11px] uppercase tracking-wide text-white/80">{stage.label}</p>
+                <p className="text-[11px] uppercase tracking-wide">{stage.label}</p>
                 <p className="mt-1 font-semibold">{stage.done ? "done" : "waiting"}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="space-y-3 border-t bg-muted/25 px-4 py-3">
+        <div className="space-y-2.5 px-5 py-3">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               Stage completion: {completedGateCount}/{stageGates.length}
@@ -935,17 +945,15 @@ export function DemoWorkspace({
           </div>
           <Progress value={gateProgress} />
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">queue {queue.length}</Badge>
             <Badge variant="outline">plan {planProgress}%</Badge>
             <Badge variant="outline">task {taskProgress}%</Badge>
-            <Badge variant="outline">artifacts {artifacts.length}</Badge>
             <Badge variant="outline">approval {approvalLogs.length}</Badge>
           </div>
         </div>
       </header>
 
       {topPanel ? (
-        <Card className="py-0">
+        <Card className="border-border/70 py-0">
           <Accordion type="single" collapsible>
             <AccordionItem value="guide" className="border-b-0">
               <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
@@ -959,10 +967,10 @@ export function DemoWorkspace({
         </Card>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
         <aside className="space-y-4">
-          <Card className="overflow-hidden py-0">
-            <CardHeader className="border-b bg-muted/20 px-4 py-3">
+          <Card className="overflow-hidden border-border/70 py-0">
+            <CardHeader className="border-b border-border/70 bg-muted/20 px-4 py-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm">Queue</CardTitle>
                 <div className="flex gap-1 text-xs">
@@ -974,7 +982,7 @@ export function DemoWorkspace({
             </CardHeader>
             <CardContent className="p-0">
               <QueuePanel className="border-none p-0 shadow-none">
-                <QueueList className="mt-0 p-3 [&>div]:max-h-[320px]">
+                <QueueList className="mt-0 p-3 [&>div]:max-h-[260px]">
                   {queue.map((item) => (
                     <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
                       <div className="flex items-center gap-2">
@@ -994,15 +1002,15 @@ export function DemoWorkspace({
           </Card>
 
           {scenarios.length > 0 ? (
-            <Card className="gap-3 py-4">
+            <Card className="gap-3 border-border/70 py-4">
               <CardHeader className="px-4">
                 <CardTitle className="text-sm">1-click Demo Scenario</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 px-4">
-                <ScrollArea className="h-[300px] pr-2">
+                <ScrollArea className="h-[350px] pr-2">
                   <div className="space-y-2">
                     {scenarios.map((scenario) => (
-                      <div key={scenario.id} className="rounded-lg border bg-background p-2">
+                      <div key={scenario.id} className="rounded-lg border border-border/70 bg-background p-2.5">
                         <p className="text-xs font-semibold">{scenario.title}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">{scenario.description}</p>
                         <Progress
@@ -1032,13 +1040,7 @@ export function DemoWorkspace({
                             );
                           })}
                         </ul>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="mt-2 w-full"
-                          onClick={() => void runScenario(scenario)}
-                          disabled={Boolean(runningScenarioId)}
-                        >
+                        <Button type="button" size="sm" className="mt-2 w-full" onClick={() => void runScenario(scenario)} disabled={Boolean(runningScenarioId)}>
                           {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
                         </Button>
                         {scenarioDurations[scenario.id] ? (
@@ -1070,68 +1072,35 @@ export function DemoWorkspace({
               </CardContent>
             </Card>
           ) : null}
-
-          <Card className="gap-3 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Saved Sessions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-4">
-              <Button type="button" className="w-full" onClick={saveSession}>
-                セッション保存
-              </Button>
-              {sessionStatus ? <p className="text-xs text-muted-foreground">{sessionStatus}</p> : null}
-              {sessions.length > 0 ? (
-                <ScrollArea className="h-[170px]">
-                  <div className="space-y-2 pr-2">
-                    {sessions.map((session) => (
-                      <div key={session.id} className="rounded-lg border p-2 text-xs">
-                        <p className="font-semibold">{session.title}</p>
-                        <p className="text-muted-foreground">
-                          {session.modelProvider} / {session.modelId}
-                        </p>
-                        <p className="text-muted-foreground">{session.updatedAt}</p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="mt-1 w-full"
-                          onClick={() => void restoreSession(session.id)}
-                        >
-                          復元
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              ) : (
-                <p className="text-xs text-muted-foreground">保存済みセッションなし</p>
-              )}
-            </CardContent>
-          </Card>
         </aside>
 
         <section className="space-y-4">
-          <Card className="gap-0 overflow-hidden py-0">
-            <CardHeader className="flex items-center justify-between border-b px-4 py-3">
-              <CardTitle className="text-sm">Conversation</CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant={isStreaming ? "default" : "secondary"}>
-                  {isStreaming ? "streaming..." : "ready"}
-                </Badge>
-                <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
-                  <OpenInTrigger />
-                  <OpenInContent>
-                    <OpenInLabel>Open in</OpenInLabel>
-                    <OpenInSeparator />
-                    <OpenInChatGPT />
-                    <OpenInClaude />
-                    <OpenInv0 />
-                  </OpenInContent>
-                </OpenIn>
+          <Card className="gap-0 overflow-hidden border-border/70 py-0">
+            <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm">Conversation</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant={isStreaming ? "default" : "secondary"}>
+                    {isStreaming ? "streaming..." : "ready"}
+                  </Badge>
+                  <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
+                    <OpenInTrigger />
+                    <OpenInContent>
+                      <OpenInLabel>Open in</OpenInLabel>
+                      <OpenInSeparator />
+                      <OpenInChatGPT />
+                      <OpenInClaude />
+                      <OpenInv0 />
+                    </OpenInContent>
+                  </OpenIn>
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                最短導線: 左列の Run Scenario で入力を生成し、ここで内容を編集して再送します。
+              </p>
             </CardHeader>
 
-            <Conversation className="h-[460px] bg-muted/25">
+            <Conversation className="h-[500px] bg-muted/20">
               <ConversationContent className="gap-4 p-4">
                 {messages.length === 0 ? (
                   <ConversationEmptyState
@@ -1189,7 +1158,7 @@ export function DemoWorkspace({
               <ConversationScrollButton />
             </Conversation>
 
-            <CardContent className="space-y-3 border-t bg-background p-4">
+            <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((suggestion) => (
                   <Button
@@ -1198,6 +1167,7 @@ export function DemoWorkspace({
                     size="sm"
                     variant="outline"
                     onClick={() => applySuggestion(suggestion)}
+                    className="bg-background"
                   >
                     {suggestion}
                   </Button>
@@ -1209,7 +1179,7 @@ export function DemoWorkspace({
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleDraftKeyDown}
                 placeholder="メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
-                className="min-h-28 resize-y"
+                className="min-h-24 resize-y"
               />
 
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1283,8 +1253,8 @@ export function DemoWorkspace({
           </Card>
         </section>
 
-        <aside className="space-y-4">
-          <Card className="gap-3 py-4">
+        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <Card className="gap-3 border-border/70 py-4">
             <CardHeader className="px-4">
               <CardTitle className="text-sm">Model & Context</CardTitle>
             </CardHeader>
@@ -1350,7 +1320,7 @@ export function DemoWorkspace({
           </Card>
 
           <Tabs defaultValue="execution">
-            <TabsList className="w-full">
+            <TabsList className="w-full bg-muted/40">
               <TabsTrigger value="execution">Execution</TabsTrigger>
               <TabsTrigger value="ops">Ops</TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
@@ -1379,7 +1349,7 @@ export function DemoWorkspace({
                 </PlanContent>
               </Plan>
 
-              <Card className="gap-3 py-4">
+              <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Task Checklist</CardTitle>
                 </CardHeader>
@@ -1413,7 +1383,7 @@ export function DemoWorkspace({
             </TabsContent>
 
             <TabsContent value="ops" className="space-y-4">
-              <Card className="gap-3 py-4">
+              <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Tool Logs</CardTitle>
                 </CardHeader>
@@ -1439,7 +1409,7 @@ export function DemoWorkspace({
             </TabsContent>
 
             <TabsContent value="audit" className="space-y-4">
-              <Card className="gap-3 py-4">
+              <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Checkpoint</CardTitle>
                 </CardHeader>
@@ -1471,7 +1441,7 @@ export function DemoWorkspace({
                 </CardContent>
               </Card>
 
-              <Card className="gap-3 py-4">
+              <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Approval Ledger</CardTitle>
                 </CardHeader>
@@ -1495,13 +1465,51 @@ export function DemoWorkspace({
                   </ScrollArea>
                 </CardContent>
               </Card>
+
+              <Card className="gap-3 border-border/70 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm">Saved Sessions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-4">
+                  <Button type="button" className="w-full" onClick={saveSession}>
+                    セッション保存
+                  </Button>
+                  {sessionStatus ? <p className="text-xs text-muted-foreground">{sessionStatus}</p> : null}
+                  {sessions.length > 0 ? (
+                    <ScrollArea className="h-[190px]">
+                      <div className="space-y-2 pr-2">
+                        {sessions.map((session) => (
+                          <div key={session.id} className="rounded-lg border border-border/70 p-2 text-xs">
+                            <p className="font-semibold">{session.title}</p>
+                            <p className="text-muted-foreground">
+                              {session.modelProvider} / {session.modelId}
+                            </p>
+                            <p className="text-muted-foreground">{session.updatedAt}</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="mt-1 w-full"
+                              onClick={() => void restoreSession(session.id)}
+                            >
+                              復元
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">保存済みセッションなし</p>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </aside>
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[250px_1fr]">
-        <Card className="gap-3 py-4">
+      <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
+        <Card className="gap-3 border-border/70 py-4">
           <CardHeader className="px-4">
             <CardTitle className="text-sm">Artifacts</CardTitle>
           </CardHeader>

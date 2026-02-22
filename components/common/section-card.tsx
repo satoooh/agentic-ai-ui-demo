@@ -9,13 +9,12 @@ interface SectionCardProps {
 
 export function SectionCard({ title, description, children }: SectionCardProps) {
   return (
-    <Card className="border-border/80 bg-card/95 shadow-sm">
-      <CardHeader className="pb-3">
+    <Card className="border-border/75 bg-card/95 shadow-sm transition-shadow hover:shadow-md">
+      <CardHeader className="space-y-2 pb-2">
         <CardTitle className="text-base leading-snug">{title}</CardTitle>
-        {description ? <CardDescription className="text-sm">{description}</CardDescription> : null}
+        {description ? <CardDescription className="text-sm leading-relaxed">{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent className="space-y-4">{children}</CardContent>
+      <CardContent className="space-y-3">{children}</CardContent>
     </Card>
   );
 }
-

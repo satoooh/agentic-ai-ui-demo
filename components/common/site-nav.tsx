@@ -18,10 +18,10 @@ export function SiteNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-3 md:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-2">
-          <Badge variant="outline" className="hidden h-6 rounded-full px-2.5 text-[11px] sm:inline-flex">
+          <Badge variant="outline" className="hidden h-6 rounded-full px-2.5 text-[11px] text-muted-foreground sm:inline-flex">
             AI Elements
           </Badge>
           <span className="truncate text-sm font-semibold tracking-tight sm:text-base">
@@ -29,7 +29,7 @@ export function SiteNav() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 rounded-full bg-muted/30 p-1">
           {links.map((link) => {
             const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
@@ -39,8 +39,8 @@ export function SiteNav() {
                 variant={active ? "secondary" : "ghost"}
                 size="sm"
                 className={cn(
-                  "h-8 px-2 text-xs sm:px-3 sm:text-sm",
-                  active && "shadow-xs ring-1 ring-border",
+                  "h-8 rounded-full px-2 text-xs sm:px-3 sm:text-sm",
+                  active && "bg-background shadow-xs ring-1 ring-border/80",
                 )}
               >
                 <Link href={link.href}>{link.label}</Link>
@@ -52,4 +52,3 @@ export function SiteNav() {
     </header>
   );
 }
-
