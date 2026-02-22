@@ -142,7 +142,6 @@ interface ApprovalLogItem {
 }
 
 interface RuntimeInfo {
-  demoMode: "mock" | "live";
   hasOpenAIKey: boolean;
   hasGeminiKey: boolean;
 }
@@ -485,7 +484,6 @@ export function DemoWorkspace({
   bottomPanel,
 }: DemoWorkspaceProps) {
   const [viewMode, setViewMode] = useState<"guided" | "full">("guided");
-  const [chatModeOverride, setChatModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
   const [meetingProfileId, setMeetingProfileId] = useState(MEETING_PROFILES[0].id);
@@ -839,7 +837,6 @@ export function DemoWorkspace({
       demo,
       provider,
       model,
-      ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
       approved: options?.approved ?? false,
       ...(options?.operation ? { operation: options.operation } : {}),
       ...(demo === "meeting"
@@ -851,7 +848,6 @@ export function DemoWorkspace({
         : {}),
     }),
     [
-      chatModeOverride,
       demo,
       meetingSystemContext,
       model,
@@ -2164,29 +2160,6 @@ export function DemoWorkspace({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Select
-                  value={chatModeOverride}
-                  onValueChange={(value) =>
-                    setChatModeOverride(value as "auto" | "mock" | "live")
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">chat mode: auto</SelectItem>
-                    <SelectItem value="mock">chat mode: mock</SelectItem>
-                    <SelectItem value="live">chat mode: live</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
-                  {chatModeOverride === "auto"
-                    ? "auto はサーバーの DEMO_MODE に従います"
-                    : `${chatModeOverride} を強制中`}
-                </div>
-              </div>
-
               <ContextMeter
                 usedTokens={contextStats.inputTokens + contextStats.outputTokens}
                 maxTokens={32000}
@@ -2221,7 +2194,6 @@ export function DemoWorkspace({
                 <p className="font-medium">Runtime</p>
                 {runtimeInfo ? (
                   <div className="mt-1 space-y-1 text-muted-foreground">
-                    <p>server mode: {runtimeInfo.demoMode}</p>
                     <p>OpenAI key: {runtimeInfo.hasOpenAIKey ? "configured" : "missing"}</p>
                     <p>Gemini key: {runtimeInfo.hasGeminiKey ? "configured" : "missing"}</p>
                   </div>

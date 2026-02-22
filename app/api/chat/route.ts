@@ -5,9 +5,7 @@ import {
   streamText,
 } from "ai";
 import { z } from "zod";
-import { env } from "@/lib/env";
 import { resolveLanguageModel } from "@/lib/models";
-import { buildMockReply } from "@/lib/mock/chat";
 import type { DemoId, DemoUIMessage, ModelProvider } from "@/types/chat";
 
 export const runtime = "nodejs";
@@ -18,7 +16,6 @@ const requestSchema = z.object({
   demo: z.enum(["sales", "recruiting", "meeting", "research"]).default("sales"),
   provider: z.enum(["openai", "gemini"]).default("openai"),
   model: z.string().optional(),
-  modeOverride: z.enum(["mock", "live"]).optional(),
   approved: z.boolean().optional(),
   operation: z.enum(["default", "devils-advocate", "autonomous-loop", "scenario"]).optional(),
   meetingContext: z.string().optional(),
@@ -74,117 +71,6 @@ function buildSystemPrompt(input: {
   return [common, readableFormat, op].join("\n\n") + meetingContextBlock + meetingLogBlock;
 }
 
-function buildMockInputText(input: {
-  demo: DemoId;
-  latestText: string;
-  meetingContext?: string;
-  meetingProfileId?: string;
-  meetingLog?: string;
-}): string {
-  if (input.demo !== "meeting") {
-    return input.latestText;
-  }
-
-  const sections = [
-    input.meetingContext ?? "",
-    input.meetingProfileId ? `会議タイプID: ${input.meetingProfileId}` : "",
-    input.latestText ? `ユーザー依頼:\n${input.latestText}` : "",
-    input.meetingLog ? `会議ログ:\n${input.meetingLog}` : "",
-  ].filter(Boolean);
-
-  return sections.join("\n\n");
-}
-
-function writeMockReply({
-  writer,
-  demo,
-  text,
-  approved,
-  meetingProfileId,
-}: {
-  writer: Parameters<Parameters<typeof createUIMessageStream<DemoUIMessage>>[0]["execute"]>[0]["writer"];
-  demo: DemoId;
-  text: string;
-  approved?: boolean;
-  meetingProfileId?: string;
-}) {
-  const reply = buildMockReply({ demo, text, approved, meetingProfileId });
-
-  writer.write({
-    type: "data-status",
-    id: `status-${Date.now()}`,
-    data: {
-      phase: "mock",
-      message: "mock モードでレスポンスを生成しました。",
-    },
-    transient: true,
-  });
-
-  reply.tools.forEach((tool) => {
-    writer.write({
-      type: "data-tool",
-      id: tool.id,
-      data: tool,
-    });
-  });
-
-  if (reply.approval.required) {
-    writer.write({
-      type: "data-approval",
-      id: `approval-${Date.now()}`,
-      data: reply.approval,
-    });
-  }
-
-  reply.queue.forEach((queueItem) => {
-    writer.write({
-      type: "data-queue",
-      id: queueItem.id,
-      data: queueItem,
-    });
-  });
-
-  writer.write({
-    type: "data-plan",
-    id: `plan-${Date.now()}`,
-    data: { steps: reply.plan },
-  });
-
-  writer.write({
-    type: "data-task",
-    id: `task-${Date.now()}`,
-    data: { items: reply.tasks },
-  });
-
-  reply.artifacts.forEach((artifact) => {
-    writer.write({
-      type: "data-artifact",
-      id: artifact.id,
-      data: artifact,
-    });
-  });
-
-  reply.citations.forEach((citation) => {
-    writer.write({
-      type: "source-url",
-      sourceId: citation.id,
-      url: citation.url,
-      title: citation.title,
-    });
-
-    writer.write({
-      type: "data-citation",
-      id: citation.id,
-      data: citation,
-    });
-  });
-
-  const textId = `text-${Date.now()}`;
-  writer.write({ type: "text-start", id: textId });
-  writer.write({ type: "text-delta", id: textId, delta: reply.message });
-  writer.write({ type: "text-end", id: textId });
-}
-
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = requestSchema.safeParse(body);
@@ -198,56 +84,32 @@ export async function POST(request: Request) {
 
   const messages = (parsed.data.messages ?? []) as DemoUIMessage[];
   const latestText = extractLatestText(messages);
-  const mockInputText = buildMockInputText({
-    demo: parsed.data.demo,
-    latestText,
-    meetingContext: parsed.data.meetingContext,
-    meetingProfileId: parsed.data.meetingProfileId,
-    meetingLog: parsed.data.meetingLog,
+  const modelResult = resolveLanguageModel({
+    provider: parsed.data.provider as ModelProvider,
+    model: parsed.data.model,
   });
+
+  if (!modelResult.ok) {
+    return new Response(
+      JSON.stringify({
+        error: "Model configuration error",
+        message:
+          modelResult.reason ??
+          "LLMの設定が不正です。OPENAI_API_KEY または GOOGLE_GENERATIVE_AI_API_KEY とモデル設定を確認してください。",
+      }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  if (!latestText) {
+    return new Response(
+      JSON.stringify({ error: "Empty message", message: "送信内容が空です。" }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }
 
   const stream = createUIMessageStream<DemoUIMessage>({
     execute: async ({ writer }) => {
-      const mode = parsed.data.modeOverride ?? env.DEMO_MODE;
-      const inLiveMode = mode === "live";
-
-      if (!inLiveMode) {
-        writeMockReply({
-          writer,
-          demo: parsed.data.demo,
-          text: mockInputText,
-          approved: parsed.data.approved,
-          meetingProfileId: parsed.data.meetingProfileId,
-        });
-        return;
-      }
-
-      const modelResult = resolveLanguageModel({
-        provider: parsed.data.provider as ModelProvider,
-        model: parsed.data.model,
-      });
-
-      if (!modelResult.ok) {
-        writer.write({
-          type: "data-status",
-          id: `status-${Date.now()}`,
-          data: {
-            phase: "fallback",
-            message: `${modelResult.reason} mock レスポンスにフォールバックします。`,
-          },
-          transient: true,
-        });
-
-        writeMockReply({
-          writer,
-          demo: parsed.data.demo,
-          text: mockInputText,
-          approved: parsed.data.approved,
-          meetingProfileId: parsed.data.meetingProfileId,
-        });
-        return;
-      }
-
       writer.write({
         type: "data-tool",
         id: `tool-model-${Date.now()}`,

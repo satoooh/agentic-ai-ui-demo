@@ -69,9 +69,8 @@ export default function HomePage() {
                 Japan Vertical Agentic Demo Lab
               </h1>
               <p className="mt-2 max-w-4xl text-sm text-muted-foreground sm:text-base">
-                「会議ログ入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。既定は
-                <code className="mx-1">mock</code>で確実に動作し、環境変数を設定すれば
-                <code className="mx-1">live</code>連携へ段階移行できます。
+                「会議ログ入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
+                チャットは常に LLM 推論で実行され、環境変数設定後すぐに実運用に近い検証ができます。
               </p>
             </div>
 

@@ -5,12 +5,6 @@ import { env } from "@/lib/env";
 
 const rows = [
   {
-    key: "DEMO_MODE",
-    required: true,
-    value: env.DEMO_MODE,
-    description: "mock | live の実行モード",
-  },
-  {
     key: "GITHUB_TOKEN",
     required: false,
     value: env.GITHUB_TOKEN ? "*** configured ***" : "(unset)",
@@ -53,17 +47,6 @@ const configuredCount = rows.filter((row) => row.value !== "(unset)").length;
 export default function SettingsPage() {
   return (
     <div className="space-y-4">
-      {env.DEMO_MODE === "mock" ? (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-semibold">現在は DEMO_MODE=mock です</p>
-          <p className="mt-1">
-            API Keyを設定していても、chat は mock 応答になります。live推論を試す場合は
-            <code className="mx-1">DEMO_MODE=live</code>に切り替えるか、各デモの
-            <code className="mx-1">chat mode: live</code>を選択してください。
-          </p>
-        </div>
-      ) : null}
-
       <Card className="border-border/75">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
@@ -71,7 +54,7 @@ export default function SettingsPage() {
             Settings
           </CardTitle>
           <CardDescription>
-            デモ連携に必要な環境変数を確認します。未設定でも <code>mock</code> で体験は継続可能です。
+            デモ連携に必要な環境変数を確認します。チャットは常に LLM 推論で実行されます。
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 text-sm md:grid-cols-2">
