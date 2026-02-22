@@ -17,6 +17,7 @@ interface BuildReplyInput {
   demo: DemoId;
   text: string;
   approved?: boolean;
+  meetingProfileId?: string;
 }
 
 interface MeetingTemplate {
@@ -162,6 +163,13 @@ const MEETING_TEMPLATES: MeetingTemplate[] = [
     ],
   },
 ];
+
+const MEETING_PROFILE_TO_TEMPLATE_LABEL: Record<string, string> = {
+  "sales-weekly": "営業週次",
+  "hiring-sync": "採用進捗",
+  "product-planning": "プロダクト計画",
+  "exec-review": "経営レビュー",
+};
 
 function extractMeetingProfileLabel(text: string): string {
   const match = text.match(/会議タイプ:\s*([^\n]+)/);
@@ -473,8 +481,10 @@ function buildRecruitingReply(text: string): MockReply {
   };
 }
 
-function buildMeetingReply(text: string): MockReply {
-  const profileLabel = extractMeetingProfileLabel(text);
+function buildMeetingReply(text: string, meetingProfileId?: string): MockReply {
+  const profileLabel =
+    (meetingProfileId && MEETING_PROFILE_TO_TEMPLATE_LABEL[meetingProfileId]) ||
+    extractMeetingProfileLabel(text);
   const template =
     MEETING_TEMPLATES.find((item) => item.label === profileLabel) ??
     MEETING_TEMPLATES.find((item) => item.label === "経営レビュー")!;
@@ -685,7 +695,7 @@ export function buildMockReply(input: BuildReplyInput): MockReply {
     return buildRecruitingReply(input.text);
   }
   if (input.demo === "meeting") {
-    return buildMeetingReply(input.text);
+    return buildMeetingReply(input.text, input.meetingProfileId);
   }
   return buildResearchReply(input.text);
 }

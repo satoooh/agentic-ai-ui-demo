@@ -811,31 +811,53 @@ export function DemoWorkspace({
 
   const isStreaming = status === "streaming" || status === "submitted";
 
-  const withDemoContext = useCallback(
-    (rawText: string) => {
-      const trimmed = rawText.trim();
-      if (!trimmed) {
-        return "";
-      }
+  const withDemoContext = useCallback((rawText: string) => rawText.trim(), []);
 
-      if (demo !== "meeting") {
-        return trimmed;
-      }
+  const meetingSystemContext = useMemo(() => {
+    if (demo !== "meeting") {
+      return "";
+    }
 
-      const contextBlock =
-        "会議設定:\n" +
-        `- 会議タイプ: ${selectedMeetingProfile.label}\n` +
-        `- 目的: ${selectedMeetingProfile.objective}\n` +
-        `- 参加者: ${selectedMeetingProfile.participants}\n` +
-        `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
-        `- 主要論点: ${selectedMeetingProfile.keyTopics.join(" / ")}\n` +
-        "上記設定を必ず前提にして、日本語で簡潔に回答してください。\n\n" +
-        `${buildMeetingOutputFormatInstruction(selectedMeetingProfile)}\n` +
-        "必ず見出し付きで出力し、次アクション表は Markdown table で記述してください。";
+    return (
+      "会議設定:\n" +
+      `- 会議タイプ: ${selectedMeetingProfile.label}\n` +
+      `- 目的: ${selectedMeetingProfile.objective}\n` +
+      `- 参加者: ${selectedMeetingProfile.participants}\n` +
+      `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
+      `- 主要論点: ${selectedMeetingProfile.keyTopics.join(" / ")}\n` +
+      `${buildMeetingOutputFormatInstruction(selectedMeetingProfile)}\n` +
+      "必ず見出し付きで出力し、次アクション表は Markdown table で記述してください。"
+    );
+  }, [demo, selectedMeetingProfile]);
 
-      return `${contextBlock}\n\nユーザー依頼:\n${trimmed}`;
-    },
-    [demo, selectedMeetingProfile],
+  const buildRequestBody = useCallback(
+    (options?: {
+      approved?: boolean;
+      operation?: "default" | "devils-advocate" | "autonomous-loop" | "scenario";
+      meetingLog?: string;
+    }) => ({
+      demo,
+      provider,
+      model,
+      ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+      approved: options?.approved ?? false,
+      ...(options?.operation ? { operation: options.operation } : {}),
+      ...(demo === "meeting"
+        ? {
+            meetingContext: meetingSystemContext,
+            meetingProfileId: selectedMeetingProfile.id,
+            ...(options?.meetingLog ? { meetingLog: options.meetingLog } : {}),
+          }
+        : {}),
+    }),
+    [
+      chatModeOverride,
+      demo,
+      meetingSystemContext,
+      model,
+      provider,
+      selectedMeetingProfile.id,
+    ],
   );
 
   const send = async () => {
@@ -855,13 +877,7 @@ export function DemoWorkspace({
     await sendMessage(
       { text: contextualText },
       {
-        body: {
-          demo,
-          provider,
-          model,
-          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
-          approved: false,
-        },
+        body: buildRequestBody({ approved: false, operation: "default" }),
       },
     );
 
@@ -882,18 +898,14 @@ export function DemoWorkspace({
     const meetingLog = (options?.meetingLogOverride ?? meetingTranscript).trim();
     const notes = (options?.notesOverride ?? draft).trim();
 
-    const basePrompt =
-      "あなたは悪魔の代弁者エージェントです。以下の会話ログを読み、" +
-      "前提の穴・反証シナリオ・失敗時の影響・追加で取るべき検証データを、日本語で簡潔に出してください。";
     const promptSections = [
-      basePrompt,
-      meetingLog
-        ? `会議ログ:\n${meetingLog}`
-        : transcript
-          ? `会話ログ:\n${transcript}`
-          : "会話ログ: (まだ会話がないため、現在のタスク前提から反証を出すこと)",
+      "悪魔の代弁者レビューを実行してください。",
       notes ? `追加メモ:\n${notes}` : "",
-      "出力形式:\n1. 反証ポイント(3件)\n2. 失敗シナリオ(2件)\n3. 追加検証クエリ(3件)",
+      meetingLog
+        ? "会議ログを参照して、前提の穴を優先して指摘してください。"
+        : transcript
+          ? "会話ログをもとにレビューしてください。"
+          : "会話が空なので、一般的な失敗前提でレビューしてください。",
     ].filter(Boolean);
     const contextualPrompt = withDemoContext(promptSections.join("\n\n"));
     if (!contextualPrompt) {
@@ -903,13 +915,11 @@ export function DemoWorkspace({
     await sendMessage(
       { text: contextualPrompt },
       {
-        body: {
-          demo,
-          provider,
-          model,
-          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+        body: buildRequestBody({
           approved: false,
-        },
+          operation: "devils-advocate",
+          meetingLog: meetingLog || transcript || undefined,
+        }),
       },
     );
 
@@ -965,13 +975,14 @@ export function DemoWorkspace({
         await sendMessage(
           { text: withDemoContext(prompt) },
           {
-            body: {
-              demo,
-              provider,
-              model,
-              ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+            body: buildRequestBody({
               approved: false,
-            },
+              operation: "autonomous-loop",
+              meetingLog:
+                demo === "meeting"
+                  ? meetingTranscript.trim() || buildConversationTranscript(messages) || undefined
+                  : undefined,
+            }),
           },
         );
         await wait(220);
@@ -1037,13 +1048,14 @@ export function DemoWorkspace({
         await sendMessage(
           { text: withDemoContext(step.prompt) },
           {
-            body: {
-              demo,
-              provider,
-              model,
-              ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+            body: buildRequestBody({
               approved: step.approved ?? false,
-            },
+              operation: "scenario",
+              meetingLog:
+                demo === "meeting"
+                  ? meetingTranscript.trim() || buildConversationTranscript(messages) || undefined
+                  : undefined,
+            }),
           },
         );
 
@@ -1117,13 +1129,7 @@ export function DemoWorkspace({
         text: `承認: ${approval.action}`,
       },
       {
-        body: {
-          demo,
-          provider,
-          model,
-          ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
-          approved: true,
-        },
+        body: buildRequestBody({ approved: true, operation: "default" }),
       },
     );
 

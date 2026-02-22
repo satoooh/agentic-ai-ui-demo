@@ -20,6 +20,10 @@ const requestSchema = z.object({
   model: z.string().optional(),
   modeOverride: z.enum(["mock", "live"]).optional(),
   approved: z.boolean().optional(),
+  operation: z.enum(["default", "devils-advocate", "autonomous-loop", "scenario"]).optional(),
+  meetingContext: z.string().optional(),
+  meetingProfileId: z.string().optional(),
+  meetingLog: z.string().optional(),
 });
 
 function extractLatestText(messages: DemoUIMessage[]): string {
@@ -35,18 +39,76 @@ function extractLatestText(messages: DemoUIMessage[]): string {
     .trim();
 }
 
+function buildSystemPrompt(input: {
+  demo: DemoId;
+  operation?: "default" | "devils-advocate" | "autonomous-loop" | "scenario";
+  meetingContext?: string;
+  meetingLog?: string;
+}): string {
+  const common =
+    "あなたは業務オペレーション向けのAIアシスタントです。日本語で簡潔に、読みやすい構造で回答してください。";
+  const readableFormat =
+    "出力は必ず以下の順で:\n" +
+    "1. 要点サマリー（3行以内）\n" +
+    "2. 重要な論点（箇条書き）\n" +
+    "3. 次アクション（担当/期限/検証指標を含む）";
+
+  const op =
+    input.operation === "devils-advocate"
+      ? "今回は悪魔の代弁者として、前提の穴・失敗シナリオ・追加検証を優先して示してください。"
+      : input.operation === "autonomous-loop"
+        ? "今回は自律ループ中です。直前の結果を踏まえて次の一手を明確に更新してください。"
+        : input.operation === "scenario"
+          ? "今回はシナリオ実行中です。現在ステップの目的に集中し、冗長な説明は避けてください。"
+          : "今回の依頼に対して、実行可能な提案を短く返してください。";
+
+  const meetingContextBlock =
+    input.demo === "meeting" && input.meetingContext
+      ? `\n\n会議コンテキスト:\n${input.meetingContext}`
+      : "";
+  const meetingLogBlock =
+    input.demo === "meeting" && input.meetingLog
+      ? `\n\n会議ログ（参照用）:\n${input.meetingLog}`
+      : "";
+
+  return [common, readableFormat, op].join("\n\n") + meetingContextBlock + meetingLogBlock;
+}
+
+function buildMockInputText(input: {
+  demo: DemoId;
+  latestText: string;
+  meetingContext?: string;
+  meetingProfileId?: string;
+  meetingLog?: string;
+}): string {
+  if (input.demo !== "meeting") {
+    return input.latestText;
+  }
+
+  const sections = [
+    input.meetingContext ?? "",
+    input.meetingProfileId ? `会議タイプID: ${input.meetingProfileId}` : "",
+    input.latestText ? `ユーザー依頼:\n${input.latestText}` : "",
+    input.meetingLog ? `会議ログ:\n${input.meetingLog}` : "",
+  ].filter(Boolean);
+
+  return sections.join("\n\n");
+}
+
 function writeMockReply({
   writer,
   demo,
   text,
   approved,
+  meetingProfileId,
 }: {
   writer: Parameters<Parameters<typeof createUIMessageStream<DemoUIMessage>>[0]["execute"]>[0]["writer"];
   demo: DemoId;
   text: string;
   approved?: boolean;
+  meetingProfileId?: string;
 }) {
-  const reply = buildMockReply({ demo, text, approved });
+  const reply = buildMockReply({ demo, text, approved, meetingProfileId });
 
   writer.write({
     type: "data-status",
@@ -136,6 +198,13 @@ export async function POST(request: Request) {
 
   const messages = (parsed.data.messages ?? []) as DemoUIMessage[];
   const latestText = extractLatestText(messages);
+  const mockInputText = buildMockInputText({
+    demo: parsed.data.demo,
+    latestText,
+    meetingContext: parsed.data.meetingContext,
+    meetingProfileId: parsed.data.meetingProfileId,
+    meetingLog: parsed.data.meetingLog,
+  });
 
   const stream = createUIMessageStream<DemoUIMessage>({
     execute: async ({ writer }) => {
@@ -146,8 +215,9 @@ export async function POST(request: Request) {
         writeMockReply({
           writer,
           demo: parsed.data.demo,
-          text: latestText,
+          text: mockInputText,
           approved: parsed.data.approved,
+          meetingProfileId: parsed.data.meetingProfileId,
         });
         return;
       }
@@ -171,8 +241,9 @@ export async function POST(request: Request) {
         writeMockReply({
           writer,
           demo: parsed.data.demo,
-          text: latestText,
+          text: mockInputText,
           approved: parsed.data.approved,
+          meetingProfileId: parsed.data.meetingProfileId,
         });
         return;
       }
@@ -192,8 +263,12 @@ export async function POST(request: Request) {
 
       const result = streamText({
         model: modelResult.model,
-        system:
-          "You are an enterprise workflow copilot. Reply in concise Japanese with operational clarity, highlight risks, and provide next actions.",
+        system: buildSystemPrompt({
+          demo: parsed.data.demo,
+          operation: parsed.data.operation,
+          meetingContext: parsed.data.meetingContext,
+          meetingLog: parsed.data.meetingLog,
+        }),
         messages: await convertToModelMessages(messages),
         onFinish() {
           writer.write({
