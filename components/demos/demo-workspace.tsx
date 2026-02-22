@@ -23,6 +23,14 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtSearchResults,
+  ChainOfThoughtStep,
+} from "@/components/ai-elements/chain-of-thought";
+import {
   Context as ContextMeter,
   ContextContent,
   ContextContentBody,
@@ -30,7 +38,7 @@ import {
   ContextContentHeader,
   ContextTrigger,
 } from "@/components/ai-elements/context";
-import { Message, MessageContent } from "@/components/ai-elements/message";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import {
   OpenIn,
   OpenInChatGPT,
@@ -144,6 +152,14 @@ interface ApprovalLogItem {
 interface RuntimeInfo {
   hasOpenAIKey: boolean;
   hasGeminiKey: boolean;
+}
+
+interface WorklogStep {
+  id: string;
+  label: string;
+  description: string;
+  status: "complete" | "active" | "pending";
+  tags: string[];
 }
 
 interface MeetingProfile {
@@ -447,6 +463,18 @@ function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
   }
 
   return "bg-slate-200 text-slate-700";
+}
+
+function toWorklogStatus(status: PlanStep["status"]): WorklogStep["status"] {
+  if (status === "done") {
+    return "complete";
+  }
+
+  if (status === "doing") {
+    return "active";
+  }
+
+  return "pending";
 }
 
 function wait(ms: number) {
@@ -885,6 +913,37 @@ export function DemoWorkspace({
   );
   const completedGateCount = stageGates.filter((stage) => stage.done).length;
   const gateProgress = Math.round((completedGateCount / stageGates.length) * 100);
+  const worklogSteps = useMemo<WorklogStep[]>(() => {
+    if (plan.length > 0) {
+      return plan.slice(0, 4).map((step, index) => {
+        const relatedTool = tools.find((tool) => tool.detail.includes(step.title));
+        const fallbackDescription =
+          step.status === "done"
+            ? "このステップは完了済みです。"
+            : step.status === "doing"
+              ? "このステップを現在実行中です。"
+              : "このステップは次の実行候補です。";
+
+        return {
+          id: step.id,
+          label: step.title,
+          description: relatedTool?.detail ?? fallbackDescription,
+          status: toWorklogStatus(step.status),
+          tags: [`step ${index + 1}`, step.status],
+        };
+      });
+    }
+
+    return stageGates.map((stage, index) => ({
+      id: stage.id,
+      label: stage.label,
+      description: stage.done
+        ? `${stage.label}は完了しています。`
+        : `${stage.label}はこれから実行されます。`,
+      status: stage.done ? "complete" : index === completedGateCount ? "active" : "pending",
+      tags: ["workflow", stage.done ? "done" : "waiting"],
+    }));
+  }, [completedGateCount, plan, stageGates, tools]);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -1749,6 +1808,27 @@ export function DemoWorkspace({
                   </p>
                 )}
               </div>
+              <ChainOfThought defaultOpen={viewMode === "guided"}>
+                <ChainOfThoughtHeader>Agent Worklog（CoT）</ChainOfThoughtHeader>
+                <ChainOfThoughtContent>
+                  {worklogSteps.map((step) => (
+                    <ChainOfThoughtStep
+                      key={step.id}
+                      label={step.label}
+                      description={step.description}
+                      status={step.status}
+                    >
+                      <ChainOfThoughtSearchResults>
+                        {step.tags.map((tag) => (
+                          <ChainOfThoughtSearchResult key={`${step.id}-${tag}`}>
+                            {tag}
+                          </ChainOfThoughtSearchResult>
+                        ))}
+                      </ChainOfThoughtSearchResults>
+                    </ChainOfThoughtStep>
+                  ))}
+                </ChainOfThoughtContent>
+              </ChainOfThought>
             </CardHeader>
 
             <Conversation className={cn("bg-muted/20", viewMode === "guided" ? "h-[420px]" : "h-[540px]")}>
@@ -1765,9 +1845,12 @@ export function DemoWorkspace({
                       {message.parts.map((part, index) => {
                         if (part.type === "text") {
                           return (
-                            <p key={`${message.id}-${index}`} className="whitespace-pre-wrap">
+                            <MessageResponse
+                              key={`${message.id}-${index}`}
+                              className="leading-7 [&_h1]:mt-3 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:text-sm [&_h2]:font-semibold [&_li]:my-0.5 [&_ol]:my-2 [&_ul]:my-2 [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border/70 [&_pre]:bg-slate-950/90 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1"
+                            >
                               {part.text}
-                            </p>
+                            </MessageResponse>
                           );
                         }
 
@@ -2577,6 +2660,12 @@ export function DemoWorkspace({
                     srcDoc={selectedArtifact.content}
                     className="h-72 w-full rounded-lg border"
                   />
+                ) : artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
+                  <div className="max-h-80 overflow-auto rounded-lg border border-border/70 bg-background p-3">
+                    <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1">
+                      {selectedArtifact.content}
+                    </MessageResponse>
+                  </div>
                 ) : (
                   <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
                     {selectedArtifact.content}
@@ -2617,9 +2706,17 @@ export function DemoWorkspace({
             </ArtifactHeader>
             <ArtifactContent>
               {selectedArtifact ? (
-                <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-                  {selectedArtifact.content}
-                </pre>
+                artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
+                  <div className="max-h-72 overflow-auto rounded-lg border border-border/70 bg-background p-3">
+                    <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100">
+                      {selectedArtifact.content}
+                    </MessageResponse>
+                  </div>
+                ) : (
+                  <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                    {selectedArtifact.content}
+                  </pre>
+                )
               ) : (
                 <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
               )}
