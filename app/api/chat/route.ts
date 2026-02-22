@@ -248,6 +248,7 @@ export async function POST(request: Request) {
 
   const messages = (parsed.data.messages ?? []) as DemoUIMessage[];
   const latestText = extractLatestText(messages);
+  const meetingLog = parsed.data.meetingLog?.trim() ?? "";
   const requestedProvider = parsed.data.provider as ModelProvider;
   let resolvedProvider = requestedProvider;
   let modelResult = resolveLanguageModel({
@@ -290,6 +291,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (parsed.data.demo === "meeting" && meetingLog.length < 20) {
+    return new Response(
+      JSON.stringify({
+        error: "Missing meeting transcript",
+        message: "会議レビューでは議事録入力（20文字以上）が必須です。Step 1 で入力してください。",
+      }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    );
+  }
+
   const stream = createUIMessageStream<DemoUIMessage>({
     execute: async ({ writer }) => {
       const startedAtIso = new Date().toISOString();
@@ -314,7 +325,7 @@ export async function POST(request: Request) {
           demo: parsed.data.demo,
           operation: parsed.data.operation,
           meetingContext: parsed.data.meetingContext,
-          meetingLog: parsed.data.meetingLog,
+          meetingLog,
         }),
         messages: await convertToModelMessages(messages),
       });
@@ -375,7 +386,7 @@ export async function POST(request: Request) {
             latestUserText: latestText,
             assistantMarkdown,
             meetingContext: parsed.data.meetingContext,
-            meetingLog: parsed.data.meetingLog,
+            meetingLog,
           }),
           temperature: 0,
         });

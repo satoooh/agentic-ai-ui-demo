@@ -485,6 +485,10 @@ function wait(ms: number) {
   });
 }
 
+function hasRequiredMeetingTranscript(text: string): boolean {
+  return text.trim().length >= 20;
+}
+
 function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "error") {
   if (status === "done") {
     return "bg-emerald-100 text-emerald-800";
@@ -809,6 +813,13 @@ export function DemoWorkspace({
       null,
     [meetingSamples, selectedMeetingSampleId],
   );
+  const salesWeeklySample = useMemo(
+    () =>
+      meetingTranscriptSamples.find(
+        (sample) => sample.meetingProfileId === "sales-weekly",
+      ) ?? null,
+    [],
+  );
   useEffect(() => {
     if (meetingSamples.length === 0) {
       return;
@@ -830,6 +841,11 @@ export function DemoWorkspace({
     () => (viewMode === "guided" ? activeSuggestions.slice(0, 2) : activeSuggestions),
     [activeSuggestions, viewMode],
   );
+  const meetingTranscriptReady = useMemo(
+    () => hasRequiredMeetingTranscript(meetingTranscript),
+    [meetingTranscript],
+  );
+  const meetingPrerequisiteBlocked = demo === "meeting" && !meetingTranscriptReady;
 
   const contextStats = useMemo(() => {
     const userText = messages
@@ -1012,12 +1028,13 @@ export function DemoWorkspace({
         ? {
             meetingContext: meetingSystemContext,
             meetingProfileId: selectedMeetingProfile.id,
-            ...(options?.meetingLog ? { meetingLog: options.meetingLog } : {}),
+            meetingLog: (options?.meetingLog ?? meetingTranscript).trim(),
           }
         : {}),
     }),
     [
       demo,
+      meetingTranscript,
       meetingSystemContext,
       model,
       provider,
@@ -1025,7 +1042,28 @@ export function DemoWorkspace({
     ],
   );
 
+  const ensureMeetingTranscript = useCallback(
+    (actionLabel: string) => {
+      if (demo !== "meeting") {
+        return true;
+      }
+      if (meetingTranscriptReady) {
+        return true;
+      }
+
+      setLoopStatus(
+        `${actionLabel}の前に Step 1 で議事録を入力してください（20文字以上）。営業週次サンプルの読み込みも利用できます。`,
+      );
+      return false;
+    },
+    [demo, meetingTranscriptReady],
+  );
+
   const send = async () => {
+    if (!ensureMeetingTranscript("送信")) {
+      return;
+    }
+
     const trimmed = draft.trim();
     if (!trimmed) {
       return;
@@ -1061,6 +1099,13 @@ export function DemoWorkspace({
 
     const transcript = buildConversationTranscript(messages);
     const meetingLog = (options?.meetingLogOverride ?? meetingTranscript).trim();
+    if (demo === "meeting" && !hasRequiredMeetingTranscript(meetingLog)) {
+      setLoopStatus(
+        "反証レビューの前に Step 1 で議事録を入力してください（20文字以上）。営業週次サンプルの読み込みも利用できます。",
+      );
+      return;
+    }
+
     const notes = (options?.notesOverride ?? draft).trim();
 
     const promptSections = [
@@ -1104,6 +1149,19 @@ export function DemoWorkspace({
     setLoopStatus(`サンプル「${sample.title}」を読み込みました。`);
   };
 
+  const loadSalesWeeklySample = () => {
+    if (!salesWeeklySample) {
+      setLoopStatus("営業週次サンプルが見つかりませんでした。");
+      return;
+    }
+
+    setMeetingProfileId("sales-weekly");
+    setSelectedMeetingSampleId(salesWeeklySample.id);
+    setMeetingTranscript(salesWeeklySample.dirtyTranscript);
+    setDraft(salesWeeklySample.note);
+    setLoopStatus(`営業週次サンプル「${salesWeeklySample.title}」を読み込みました。`);
+  };
+
   const runMeetingSample = async () => {
     if (!selectedMeetingSample || isStreaming) {
       return;
@@ -1119,6 +1177,10 @@ export function DemoWorkspace({
 
   const runAutonomousLoop = async () => {
     if (isStreaming || isAutoLoopRunning) {
+      return;
+    }
+
+    if (!ensureMeetingTranscript("自律ループ")) {
       return;
     }
 
@@ -1179,6 +1241,10 @@ export function DemoWorkspace({
 
   const runScenario = async (scenario: DemoScenario) => {
     if (runningScenarioId) {
+      return;
+    }
+
+    if (!ensureMeetingTranscript("シナリオ実行")) {
       return;
     }
 
@@ -1694,16 +1760,26 @@ export function DemoWorkspace({
               </CardHeader>
               <CardContent className="space-y-2 px-4 text-xs text-muted-foreground">
                 <p>Queue: critical {queueSummary.critical} / warning {queueSummary.warning}</p>
-                <p>1. `Run Scenario` で最初の会話を生成</p>
-                <p>2. 中央で内容を修正して再送</p>
-                <p>3. 下段 Artifacts から成果物をコピー</p>
+                {demo === "meeting" ? (
+                  <>
+                    <p>1. Step 1 で議事録を入力（必須）</p>
+                    <p>2. 会議タイプを選び、`Run Scenario` 実行</p>
+                    <p>3. 下段 Artifacts から成果物をコピー</p>
+                  </>
+                ) : (
+                  <>
+                    <p>1. `Run Scenario` で最初の会話を生成</p>
+                    <p>2. 中央で内容を修正して再送</p>
+                    <p>3. 下段 Artifacts から成果物をコピー</p>
+                  </>
+                )}
                 {primaryScenario ? (
                   <Button
                     type="button"
                     size="sm"
                     className="w-full"
                     onClick={() => void runScenario(primaryScenario)}
-                    disabled={Boolean(runningScenarioId)}
+                    disabled={Boolean(runningScenarioId) || meetingPrerequisiteBlocked}
                   >
                     {runningScenarioId === primaryScenario.id ? "running..." : "Run Scenario"}
                   </Button>
@@ -1757,7 +1833,13 @@ export function DemoWorkspace({
                             主要ステップ: {scenario.steps[0]?.label} → {scenario.steps[1]?.label ?? "..." }
                           </p>
                         )}
-                        <Button type="button" size="sm" className="mt-2 w-full" onClick={() => void runScenario(scenario)} disabled={Boolean(runningScenarioId)}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => void runScenario(scenario)}
+                          disabled={Boolean(runningScenarioId) || meetingPrerequisiteBlocked}
+                        >
                           {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
                         </Button>
                         {scenarioDurations[scenario.id] ? (
@@ -1887,6 +1969,11 @@ export function DemoWorkspace({
                   </div>
                 ) : null}
               </div>
+              {meetingPrerequisiteBlocked ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+                  会議レビューは Step 1 の議事録入力が必須です（20文字以上）。
+                </div>
+              ) : null}
               <ChainOfThought defaultOpen={viewMode === "guided"}>
                 <ChainOfThoughtHeader>Agent Worklog（CoT）</ChainOfThoughtHeader>
                 <ChainOfThoughtContent>
@@ -1995,7 +2082,12 @@ export function DemoWorkspace({
                     <p className="text-xs font-semibold">3-step 会議レビュー</p>
                     <div className="mt-2 space-y-3 text-[11px]">
                       <div className="space-y-1.5">
-                        <p className="text-muted-foreground">0. 汚れた発言録サンプル（ダミー）</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-muted-foreground">1. 議事録を入力（必須）</p>
+                          <Badge variant={meetingTranscriptReady ? "default" : "outline"}>
+                            {meetingTranscriptReady ? "ready" : "required"}
+                          </Badge>
+                        </div>
                         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
                           <Select
                             value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
@@ -2024,19 +2116,25 @@ export function DemoWorkspace({
                           <Button
                             type="button"
                             size="sm"
-                            variant="secondary"
-                            onClick={() => void runMeetingSample()}
-                            disabled={!selectedMeetingSample || isStreaming}
+                            variant="outline"
+                            onClick={loadSalesWeeklySample}
+                            disabled={!salesWeeklySample || isStreaming}
                           >
-                            サンプル出力
+                            営業週次サンプル
                           </Button>
                         </div>
+                        <Textarea
+                          value={meetingTranscript}
+                          onChange={(event) => setMeetingTranscript(event.target.value)}
+                          placeholder="議事録を貼り付けてください（必須・20文字以上）"
+                          className="min-h-24 bg-background"
+                        />
                         <p className="text-[10px] text-muted-foreground">
-                          タイムスタンプゆれ・口語・未確定メモを含む擬似議事録です。
+                          先に議事録を読み込むと、この内容を常に参照してレビューします。
                         </p>
                       </div>
                       <div className="space-y-1.5">
-                        <p className="text-muted-foreground">1. 会議タイプを選択</p>
+                        <p className="text-muted-foreground">2. 会議タイプを選択</p>
                         <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
                           <SelectTrigger className="h-8 bg-background">
                             <SelectValue />
@@ -2049,15 +2147,6 @@ export function DemoWorkspace({
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <p className="text-muted-foreground">2. 議事録を貼り付け（任意）</p>
-                        <Textarea
-                          value={meetingTranscript}
-                          onChange={(event) => setMeetingTranscript(event.target.value)}
-                          placeholder="議事録を貼ると悪魔の代弁者レビューを実行できます"
-                          className="min-h-20 bg-background"
-                        />
                       </div>
                       <div className="space-y-1.5">
                         <p className="text-muted-foreground">3. 実行</p>
@@ -2076,7 +2165,7 @@ export function DemoWorkspace({
                             size="sm"
                             variant="secondary"
                             onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
-                            disabled={Boolean(runningScenarioId)}
+                            disabled={Boolean(runningScenarioId) || !meetingTranscriptReady}
                           >
                             会議タイプ実行
                           </Button>
@@ -2085,9 +2174,18 @@ export function DemoWorkspace({
                             size="sm"
                             variant="outline"
                             onClick={() => void runDevilsAdvocate()}
-                            disabled={isStreaming}
+                            disabled={isStreaming || !meetingTranscriptReady}
                           >
                             反証レビュー
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void runMeetingSample()}
+                            disabled={!selectedMeetingSample || isStreaming || !meetingTranscriptReady}
+                          >
+                            サンプル出力
                           </Button>
                         </div>
                       </div>
@@ -2098,7 +2196,64 @@ export function DemoWorkspace({
                     <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-xs font-semibold">Meeting Setup</p>
+                          <p className="text-xs font-semibold">Step 1: Meeting Transcript（必須）</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            先に議事録を入力すると、以降の生成は必ずこのログを基準に実行されます。
+                          </p>
+                        </div>
+                        <Badge variant={meetingTranscriptReady ? "default" : "outline"}>
+                          {meetingTranscriptReady ? "ready" : "required"}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                          <Select
+                            value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
+                            onValueChange={setSelectedMeetingSampleId}
+                          >
+                            <SelectTrigger className="h-8 bg-background">
+                              <SelectValue placeholder="サンプル発言録を選択" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {meetingSamples.map((sample) => (
+                                <SelectItem key={sample.id} value={sample.id}>
+                                  {sample.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => loadMeetingSample()}
+                            disabled={!selectedMeetingSample || isStreaming}
+                          >
+                            読み込み
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={loadSalesWeeklySample}
+                            disabled={!salesWeeklySample || isStreaming}
+                          >
+                            営業週次サンプル
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={meetingTranscript}
+                          onChange={(event) => setMeetingTranscript(event.target.value)}
+                          placeholder="ここに議事録を貼り付けてください（必須・20文字以上）"
+                          className="min-h-24 bg-background"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold">Step 2: Meeting Profile</p>
                           <p className="text-[11px] text-muted-foreground">
                             会議タイプを選ぶと、以降の回答はその会議目的に沿って生成されます。
                           </p>
@@ -2158,7 +2313,7 @@ export function DemoWorkspace({
                             size="sm"
                             variant="secondary"
                             onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
-                            disabled={Boolean(runningScenarioId)}
+                            disabled={Boolean(runningScenarioId) || !meetingTranscriptReady}
                           >
                             この会議タイプを実行
                           </Button>
@@ -2169,63 +2324,31 @@ export function DemoWorkspace({
                     <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
+                          <p className="text-xs font-semibold">Step 3: Meeting Red-Team Agent</p>
                           <p className="text-[11px] text-muted-foreground">
-                            議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
+                            議事録をもとに、悪魔の代弁者として反証ポイントを抽出します。
                           </p>
                         </div>
                         <Badge variant="outline">devil&apos;s advocate</Badge>
                       </div>
-                      <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-                        <Select
-                          value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
-                          onValueChange={setSelectedMeetingSampleId}
-                        >
-                          <SelectTrigger className="h-8 bg-background">
-                            <SelectValue placeholder="サンプル発言録を選択" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {meetingSamples.map((sample) => (
-                              <SelectItem key={sample.id} value={sample.id}>
-                                {sample.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => loadMeetingSample()}
-                          disabled={!selectedMeetingSample || isStreaming}
-                        >
-                          読み込み
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => void runMeetingSample()}
-                          disabled={!selectedMeetingSample || isStreaming}
-                        >
-                          サンプル出力
-                        </Button>
-                      </div>
-                      <Textarea
-                        value={meetingTranscript}
-                        onChange={(event) => setMeetingTranscript(event.target.value)}
-                        placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
-                        className="mt-2 min-h-24 bg-background"
-                      />
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Button
                           type="button"
                           size="sm"
                           variant="secondary"
                           onClick={() => void runDevilsAdvocate()}
-                          disabled={isStreaming}
+                          disabled={isStreaming || !meetingTranscriptReady}
                         >
                           議事録で反証実行
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void runMeetingSample()}
+                          disabled={!selectedMeetingSample || isStreaming || !meetingTranscriptReady}
+                        >
+                          サンプル出力
                         </Button>
                         <Button
                           type="button"
@@ -2271,14 +2394,18 @@ export function DemoWorkspace({
                     <span>{attachmentNames.length > 0 ? attachmentNames.join(", ") : "添付なし"}</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button type="button" onClick={() => void send()} disabled={isStreaming}>
+                    <Button
+                      type="button"
+                      onClick={() => void send()}
+                      disabled={isStreaming || meetingPrerequisiteBlocked}
+                    >
                       送信
                     </Button>
                     <Button
                       type="button"
                       variant="secondary"
                       onClick={() => void runAutonomousLoop()}
-                      disabled={isStreaming || isAutoLoopRunning}
+                      disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
                     >
                       {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
                     </Button>
@@ -2286,7 +2413,7 @@ export function DemoWorkspace({
                       type="button"
                       variant="outline"
                       onClick={() => void runDevilsAdvocate()}
-                      disabled={isStreaming}
+                      disabled={isStreaming || meetingPrerequisiteBlocked}
                     >
                       悪魔の代弁者
                     </Button>
@@ -2304,14 +2431,18 @@ export function DemoWorkspace({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => void send()} disabled={isStreaming}>
+                  <Button
+                    type="button"
+                    onClick={() => void send()}
+                    disabled={isStreaming || meetingPrerequisiteBlocked}
+                  >
                     送信
                   </Button>
                   <Button
                     type="button"
                     variant="secondary"
                     onClick={() => void runAutonomousLoop()}
-                    disabled={isStreaming || isAutoLoopRunning}
+                    disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
                   >
                     {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
                   </Button>
@@ -2320,7 +2451,7 @@ export function DemoWorkspace({
                       type="button"
                       variant="outline"
                       onClick={() => void runDevilsAdvocate()}
-                      disabled={isStreaming}
+                      disabled={isStreaming || meetingPrerequisiteBlocked}
                     >
                       悪魔の代弁者
                     </Button>
