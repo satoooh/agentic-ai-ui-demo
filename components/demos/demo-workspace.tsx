@@ -3,6 +3,77 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import {
+  Artifact as ArtifactPanel,
+  ArtifactAction,
+  ArtifactActions,
+  ArtifactContent,
+  ArtifactHeader,
+  ArtifactTitle,
+} from "@/components/ai-elements/artifact";
+import {
+  Checkpoint as CheckpointBar,
+  CheckpointIcon,
+  CheckpointTrigger,
+} from "@/components/ai-elements/checkpoint";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Context as ContextMeter,
+  ContextContent,
+  ContextContentBody,
+  ContextContentFooter,
+  ContextContentHeader,
+  ContextTrigger,
+} from "@/components/ai-elements/context";
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import {
+  OpenIn,
+  OpenInChatGPT,
+  OpenInClaude,
+  OpenInContent,
+  OpenInLabel,
+  OpenInSeparator,
+  OpenInTrigger,
+  OpenInv0,
+} from "@/components/ai-elements/open-in-chat";
+import {
+  Plan,
+  PlanAction,
+  PlanContent,
+  PlanDescription,
+  PlanHeader,
+  PlanTitle,
+  PlanTrigger,
+} from "@/components/ai-elements/plan";
+import {
+  Queue as QueuePanel,
+  QueueItem as QueueEntry,
+  QueueItemContent,
+  QueueItemDescription,
+  QueueItemIndicator,
+  QueueList,
+} from "@/components/ai-elements/queue";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+  Source,
+  Sources,
+  SourcesContent,
+  SourcesTrigger,
+} from "@/components/ai-elements/sources";
+import {
+  Task,
+  TaskContent,
+  TaskItem as TaskEntry,
+  TaskTrigger,
+} from "@/components/ai-elements/task";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDefaultModel, MODEL_OPTIONS } from "@/lib/models";
 import type {
   ApprovalRequest,
@@ -199,7 +270,6 @@ export function DemoWorkspace({
   >({});
   const [scenarioDurations, setScenarioDurations] = useState<Record<string, number>>({});
   const [scenarioElapsedSec, setScenarioElapsedSec] = useState(0);
-  const [openInChatTarget, setOpenInChatTarget] = useState<"chatgpt" | "claude" | "v0">("chatgpt");
   const [approvalLogs, setApprovalLogs] = useState<ApprovalLogItem[]>([]);
   const [activeApprovalLogId, setActiveApprovalLogId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<
@@ -611,16 +681,19 @@ export function DemoWorkspace({
     setCitations(checkpoint.citations);
   };
 
-  const openInChat = () => {
-    const query = encodeURIComponent(draft || "この案件の次アクションを整理してください。");
-    const targetUrl =
-      openInChatTarget === "chatgpt"
-        ? `https://chatgpt.com/?q=${query}`
-        : openInChatTarget === "claude"
-          ? `https://claude.ai/new?q=${query}`
-          : `https://v0.dev/chat?q=${query}`;
+  const handleDraftKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      void send();
+      return;
+    }
 
-    window.open(targetUrl, "_blank", "noopener,noreferrer");
+    if (event.key === "Escape" && isStreaming) {
+      event.preventDefault();
+      stop();
+    }
   };
 
   const startVoiceInput = () => {
@@ -812,211 +885,80 @@ export function DemoWorkspace({
   }, [loadSessions]);
 
   return (
-    <div className="space-y-4">
-      <header className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
-          <h1 className="text-2xl font-bold">{title}</h1>
-          <p className="mt-2 text-sm text-slate-200">{subtitle}</p>
-        </div>
-        <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
-          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
-            <p className="text-slate-500">Queue</p>
-            <p className="text-sm font-semibold text-slate-900">{queue.length} items</p>
-          </div>
-          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
-            <p className="text-slate-500">Plan Progress</p>
-            <p className="text-sm font-semibold text-slate-900">{planProgress}%</p>
-          </div>
-          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
-            <p className="text-slate-500">Task Progress</p>
-            <p className="text-sm font-semibold text-slate-900">{taskProgress}%</p>
-          </div>
-          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
-            <p className="text-slate-500">Streaming Status</p>
-            <p className="text-sm font-semibold text-slate-900">{status}</p>
+    <div className="space-y-5">
+      <header className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-zinc-700 p-6 text-white">
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-200">{subtitle}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Badge variant="secondary">{queue.length} queue</Badge>
+            <Badge variant="secondary">plan {planProgress}%</Badge>
+            <Badge variant="secondary">task {taskProgress}%</Badge>
+            <Badge variant="secondary">{isStreaming ? "streaming" : "ready"}</Badge>
           </div>
         </div>
-        <div className="border-t border-slate-200 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Input to Approval
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {stageGates.map((stage) => (
-              <span
-                key={stage.id}
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                  stage.done
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border border-slate-300 bg-slate-100 text-slate-700"
-                }`}
-              >
-                {stage.label}: {stage.done ? "done" : "waiting"}
-              </span>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2 border-t bg-muted/30 px-4 py-3">
+          {stageGates.map((stage) => (
+            <Badge key={stage.id} variant={stage.done ? "default" : "outline"}>
+              {stage.label}: {stage.done ? "done" : "waiting"}
+            </Badge>
+          ))}
         </div>
       </header>
 
       {topPanel}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr_320px]">
+      <div className="grid gap-4 xl:grid-cols-[280px_1fr_320px]">
         <aside className="space-y-4">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Queue</h2>
-            <div className="mt-2 flex flex-wrap gap-1 text-[11px]">
-              <span className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-800">
-                info: {queueSummary.info}
-              </span>
-              <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
-                warning: {queueSummary.warning}
-              </span>
-              <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-800">
-                critical: {queueSummary.critical}
-              </span>
-            </div>
-            <ul className="mt-2 space-y-2">
-              {queue.map((item) => (
-                <li
-                  key={item.id}
-                  className={`rounded border p-2 text-xs ${getSeverityStyle(item.severity)}`}
-                >
-                  <p className="font-semibold text-slate-900">{item.title}</p>
-                  <p>{item.description}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{item.severity} / {item.timestamp}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Saved Sessions</h2>
-            <button
-              type="button"
-              onClick={saveSession}
-              className="mt-2 w-full rounded bg-slate-900 px-3 py-1 text-sm font-medium text-white"
-            >
-              セッション保存
-            </button>
-            {sessionStatus ? <p className="mt-2 text-xs text-slate-600">{sessionStatus}</p> : null}
-            <ul className="mt-2 space-y-1 text-xs text-slate-700">
-              {sessions.map((session) => (
-                <li key={session.id} className="rounded border border-slate-200 p-2">
-                  <p className="font-semibold text-slate-900">{session.title}</p>
-                  <p>{session.modelProvider} / {session.modelId}</p>
-                  <p className="text-[11px] text-slate-500">{session.updatedAt}</p>
-                  <button
-                    type="button"
-                    onClick={() => void restoreSession(session.id)}
-                    className="mt-1 rounded border border-slate-300 px-2 py-1 text-[11px]"
-                  >
-                    復元
-                  </button>
-                </li>
-              ))}
-              {sessions.length === 0 ? <li>保存済みセッションなし</li> : null}
-            </ul>
-          </section>
-        </aside>
-
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Conversation</h2>
-            <span
-              className={`rounded px-2 py-0.5 text-[11px] font-medium ${
-                isStreaming ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              {isStreaming ? "streaming..." : "ready"}
-            </span>
-          </div>
-          <div className="max-h-[360px] space-y-2 overflow-auto rounded border border-slate-200 bg-slate-50 p-3">
-            {messages.length === 0 ? <p className="text-xs text-slate-600">まだ会話はありません。</p> : null}
-            {messages.map((message) => (
-              <article
-                key={message.id}
-                className={`rounded p-2 text-sm ${
-                  message.role === "user" ? "bg-white" : "bg-emerald-50"
-                }`}
-              >
-                <p className="text-xs font-semibold text-slate-900">{message.role}</p>
-                {message.parts.map((part, index) => {
-                  if (part.type === "text") {
-                    return (
-                      <p key={`${message.id}-${index}`} className="mt-1 whitespace-pre-wrap text-slate-800">
-                        {part.text}
-                      </p>
-                    );
-                  }
-
-                  if (part.type === "source-url") {
-                    return (
-                      <a
-                        key={`${message.id}-${index}`}
-                        href={part.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-1 block text-xs text-blue-700 underline"
-                      >
-                        Source: {part.title ?? part.url}
-                      </a>
-                    );
-                  }
-
-                  if (part.type === "data-citation") {
-                    return (
-                      <p key={`${message.id}-${index}`} className="mt-1 text-xs text-slate-700">
-                        根拠: {part.data.title}
-                      </p>
-                    );
-                  }
-
-                  return null;
-                })}
-              </article>
-            ))}
-            {isStreaming ? (
-              <div className="space-y-2">
-                <div className="h-3 w-2/3 animate-pulse rounded bg-slate-300" />
-                <div className="h-3 w-4/5 animate-pulse rounded bg-slate-300" />
-                <div className="h-3 w-1/2 animate-pulse rounded bg-slate-300" />
+          <QueuePanel>
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-sm">Queue</p>
+              <div className="flex gap-1 text-xs">
+                <Badge variant="outline">i {queueSummary.info}</Badge>
+                <Badge variant="outline">w {queueSummary.warning}</Badge>
+                <Badge variant="outline">c {queueSummary.critical}</Badge>
               </div>
-            ) : null}
-          </div>
+            </div>
+            <QueueList className="mt-1">
+              {queue.map((item) => (
+                <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
+                  <div className="flex items-center gap-2">
+                    <QueueItemIndicator completed={item.severity === "info"} />
+                    <QueueItemContent>{item.title}</QueueItemContent>
+                    <Badge variant="secondary" className="ml-auto text-[10px]">
+                      {item.severity}
+                    </Badge>
+                  </div>
+                  <QueueItemDescription>{item.description}</QueueItemDescription>
+                  <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
+                </QueueEntry>
+              ))}
+            </QueueList>
+          </QueuePanel>
 
           {scenarios.length > 0 ? (
-            <section className="rounded border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold text-slate-900">1-click Demo Scenario</h3>
-                {scenarioStatus ? <span className="text-[11px] text-slate-600">{scenarioStatus}</span> : null}
-              </div>
-              <div className="mt-2 grid gap-2 md:grid-cols-2">
+            <Card className="gap-3 py-4">
+              <CardHeader className="px-4">
+                <CardTitle className="text-sm">1-click Demo Scenario</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 px-4">
                 {scenarios.map((scenario) => (
-                  <div key={scenario.id} className="rounded border border-slate-200 bg-white p-2">
-                    <p className="text-xs font-semibold text-slate-900">{scenario.title}</p>
-                    <p className="mt-1 text-[11px] text-slate-600">{scenario.description}</p>
-                    {scenario.outcome ? (
-                      <p className="mt-1 text-[11px] text-slate-600">Outcome: {scenario.outcome}</p>
-                    ) : null}
-                    {scenario.targetDurationSec ? (
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        target: {scenario.targetDurationSec}s
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-[11px] text-slate-500">steps: {scenario.steps.length}</p>
-                    <div className="mt-2 h-1.5 rounded bg-slate-200">
+                  <div key={scenario.id} className="rounded-lg border bg-background p-2">
+                    <p className="text-xs font-semibold">{scenario.title}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{scenario.description}</p>
+                    <div className="mt-2 h-1.5 rounded bg-muted">
                       <div
-                        className="h-1.5 rounded bg-slate-900"
+                        className="h-1.5 rounded bg-primary"
                         style={{
                           width: `${
                             scenario.steps.length === 0
                               ? 0
                               : Math.round(
-                                  ((scenario.steps.filter(
-                                    (step) =>
-                                      scenarioStepStates[scenario.id]?.[step.id] === "done",
+                                  (scenario.steps.filter(
+                                    (step) => scenarioStepStates[scenario.id]?.[step.id] === "done",
                                   ).length /
                                     scenario.steps.length) *
-                                    100),
+                                    100,
                                 )
                           }%`,
                         }}
@@ -1026,456 +968,520 @@ export function DemoWorkspace({
                       {scenario.steps.map((step) => {
                         const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
                         return (
-                          <li
-                            key={step.id}
-                            className="flex items-center justify-between gap-2 text-[11px] text-slate-700"
-                          >
+                          <li key={step.id} className="flex items-center justify-between text-[11px]">
                             <span className="truncate">{step.label}</span>
-                            <span
-                              className={`rounded px-1.5 py-0.5 font-medium ${getScenarioStepBadgeStyle(
-                                stepStatus,
-                              )}`}
-                            >
+                            <span className={`rounded px-1.5 py-0.5 ${getScenarioStepBadgeStyle(stepStatus)}`}>
                               {stepStatus}
                             </span>
                           </li>
                         );
                       })}
                     </ul>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-2 w-full"
+                      onClick={() => void runScenario(scenario)}
+                      disabled={Boolean(runningScenarioId)}
+                    >
+                      {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
+                    </Button>
                     {scenarioDurations[scenario.id] ? (
-                      <p className="mt-2 text-[11px] text-slate-500">
+                      <p className="mt-1 text-[11px] text-muted-foreground">
                         last run: {scenarioDurations[scenario.id]}s
                       </p>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => void runScenario(scenario)}
-                      disabled={Boolean(runningScenarioId)}
-                      className="mt-2 rounded bg-slate-900 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
-                    >
-                      {runningScenarioId === scenario.id ? "running..." : "Run"}
-                    </button>
                   </div>
                 ))}
+                {runningScenarioId ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{scenarioStatus ?? "実行中"}</span>
+                      <span>{scenarioElapsedSec}s</span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 w-full"
+                      onClick={stopScenario}
+                    >
+                      Stop Scenario
+                    </Button>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Saved Sessions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4">
+              <Button type="button" className="w-full" onClick={saveSession}>
+                セッション保存
+              </Button>
+              {sessionStatus ? <p className="text-xs text-muted-foreground">{sessionStatus}</p> : null}
+              <div className="space-y-2">
+                {sessions.map((session) => (
+                  <div key={session.id} className="rounded-lg border p-2 text-xs">
+                    <p className="font-semibold">{session.title}</p>
+                    <p className="text-muted-foreground">
+                      {session.modelProvider} / {session.modelId}
+                    </p>
+                    <p className="text-muted-foreground">{session.updatedAt}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-1 w-full"
+                      onClick={() => void restoreSession(session.id)}
+                    >
+                      復元
+                    </Button>
+                  </div>
+                ))}
+                {sessions.length === 0 ? <p className="text-xs text-muted-foreground">保存済みセッションなし</p> : null}
               </div>
-              {runningScenarioId ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <button
+            </CardContent>
+          </Card>
+        </aside>
+
+        <section className="space-y-4">
+          <Card className="gap-0 overflow-hidden py-0">
+            <CardHeader className="flex items-center justify-between border-b px-4 py-3">
+              <CardTitle className="text-sm">Conversation</CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant={isStreaming ? "default" : "secondary"}>
+                  {isStreaming ? "streaming..." : "ready"}
+                </Badge>
+                <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
+                  <OpenInTrigger />
+                  <OpenInContent>
+                    <OpenInLabel>Open in</OpenInLabel>
+                    <OpenInSeparator />
+                    <OpenInChatGPT />
+                    <OpenInClaude />
+                    <OpenInv0 />
+                  </OpenInContent>
+                </OpenIn>
+              </div>
+            </CardHeader>
+
+            <Conversation className="h-[430px] bg-muted/25">
+              <ConversationContent className="gap-4 p-4">
+                {messages.length === 0 ? (
+                  <ConversationEmptyState
+                    title="まだ会話はありません"
+                    description="左のシナリオを実行するか、下の入力欄から開始してください。"
+                  />
+                ) : null}
+                {messages.map((message) => (
+                  <Message key={message.id} from={message.role}>
+                    <MessageContent>
+                      {message.parts.map((part, index) => {
+                        if (part.type === "text") {
+                          return (
+                            <p key={`${message.id}-${index}`} className="whitespace-pre-wrap">
+                              {part.text}
+                            </p>
+                          );
+                        }
+
+                        if (part.type === "source-url") {
+                          return (
+                            <a
+                              key={`${message.id}-${index}`}
+                              href={part.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs underline"
+                            >
+                              Source: {part.title ?? part.url}
+                            </a>
+                          );
+                        }
+
+                        if (part.type === "data-citation") {
+                          return (
+                            <p key={`${message.id}-${index}`} className="text-xs text-muted-foreground">
+                              根拠: {part.data.title}
+                            </p>
+                          );
+                        }
+
+                        return null;
+                      })}
+                    </MessageContent>
+                  </Message>
+                ))}
+                {isStreaming ? (
+                  <Message from="assistant">
+                    <MessageContent>
+                      <Shimmer>回答を生成しています...</Shimmer>
+                    </MessageContent>
+                  </Message>
+                ) : null}
+              </ConversationContent>
+              <ConversationScrollButton />
+            </Conversation>
+
+            <CardContent className="space-y-3 border-t bg-background p-4">
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((suggestion) => (
+                  <Button
+                    key={suggestion}
                     type="button"
-                    onClick={stopScenario}
-                    className="rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applySuggestion(suggestion)}
                   >
-                    Stop Scenario
-                  </button>
-                  <span className="text-[11px] text-slate-600">elapsed: {scenarioElapsedSec}s</span>
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleDraftKeyDown}
+                placeholder="メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
+                className="h-28 w-full rounded-lg border bg-background p-3 text-sm outline-none ring-0 focus-visible:border-primary"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <label className="inline-flex cursor-pointer items-center">
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => handleFileSelection(event.target.files)}
+                    />
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <span>添付</span>
+                    </Button>
+                  </label>
+                  <span>{attachmentNames.length > 0 ? attachmentNames.join(", ") : "添付なし"}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => void send()} disabled={isStreaming}>
+                    送信
+                  </Button>
+                  <Button type="button" variant="outline" onClick={stop}>
+                    停止
+                  </Button>
+                  <Button type="button" variant="outline" onClick={createCheckpoint}>
+                    Checkpoint保存
+                  </Button>
+                </div>
+              </div>
+
+              {(enableVoice || enableTts) ? (
+                <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 md:grid-cols-2">
+                  {enableVoice ? (
+                    <div>
+                      <p className="text-xs font-semibold">Voice Input</p>
+                      <div className="mt-2 flex gap-2">
+                        <Button type="button" size="sm" onClick={startVoiceInput}>
+                          音声入力開始
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={stopVoiceInput}>
+                          停止
+                        </Button>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">状態: {voiceStatus}</p>
+                    </div>
+                  ) : null}
+                  {enableTts ? (
+                    <div>
+                      <p className="text-xs font-semibold">TTS Preview</p>
+                      <select
+                        value={ttsVoice}
+                        onChange={(event) => setTtsVoice(event.target.value)}
+                        className="mt-2 w-full rounded-md border bg-background px-2 py-1 text-xs"
+                      >
+                        <option value="ja-JP-default">ja-JP-default</option>
+                        <option value="ja-JP-clear">ja-JP-clear</option>
+                        <option value="ja-JP-station">ja-JP-station</option>
+                      </select>
+                      <Button type="button" size="sm" className="mt-2" onClick={() => void previewTts()}>
+                        読み上げ確認
+                      </Button>
+                      {ttsNote ? <p className="mt-1 text-xs text-muted-foreground">{ttsNote}</p> : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-            </section>
-          ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => applySuggestion(suggestion)}
-                className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="入力してください"
-            className="h-28 w-full rounded border border-slate-300 p-3 text-sm"
-          />
-
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
-            <label className="rounded border border-slate-300 px-2 py-1">
-              添付
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => handleFileSelection(event.target.files)}
-              />
-            </label>
-            {attachmentNames.length > 0 ? <span>{attachmentNames.join(", ")}</span> : <span>添付なし</span>}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void send()}
-              disabled={isStreaming}
-              className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              送信
-            </button>
-            <button
-              type="button"
-              onClick={stop}
-              className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
-            >
-              停止
-            </button>
-            <button
-              type="button"
-              onClick={createCheckpoint}
-              className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
-            >
-              Checkpoint保存
-            </button>
-            <button
-              type="button"
-              onClick={openInChat}
-              className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700"
-            >
-              Open in Chat
-            </button>
-            <select
-              value={openInChatTarget}
-              onChange={(event) =>
-                setOpenInChatTarget(event.target.value as "chatgpt" | "claude" | "v0")
-              }
-              className="rounded border border-slate-300 px-2 py-2 text-sm text-slate-700"
-            >
-              <option value="chatgpt">ChatGPT</option>
-              <option value="claude">Claude</option>
-              <option value="v0">v0</option>
-            </select>
-          </div>
-
-          {enableVoice ? (
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
-              <p className="text-sm font-semibold text-slate-900">Voice Input</p>
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={startVoiceInput}
-                  className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white"
-                >
-                  音声入力開始
-                </button>
-                <button
-                  type="button"
-                  onClick={stopVoiceInput}
-                  className="rounded border border-slate-300 px-3 py-1 text-xs"
-                >
-                  停止
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-600">状態: {voiceStatus}</p>
-            </div>
-          ) : null}
-
-          {enableTts ? (
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
-              <p className="text-sm font-semibold text-slate-900">TTS Preview</p>
-              <select
-                value={ttsVoice}
-                onChange={(event) => setTtsVoice(event.target.value)}
-                className="mt-2 w-full rounded border border-slate-300 px-2 py-1 text-xs"
-              >
-                <option value="ja-JP-default">ja-JP-default</option>
-                <option value="ja-JP-clear">ja-JP-clear</option>
-                <option value="ja-JP-station">ja-JP-station</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void previewTts()}
-                className="mt-2 rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white"
-              >
-                読み上げ確認
-              </button>
-              {ttsNote ? <p className="mt-1 text-xs text-slate-600">{ttsNote}</p> : null}
-            </div>
-          ) : null}
-
-          {error ? <p className="text-xs text-red-600">{error.message}</p> : null}
+              {error ? <p className="text-xs text-red-600">{error.message}</p> : null}
+            </CardContent>
+          </Card>
         </section>
 
         <aside className="space-y-4">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Model Selector</h2>
-            <select
-              value={provider}
-              onChange={(event) => setProvider(event.target.value as ModelProvider)}
-              className="mt-2 w-full rounded border border-slate-300 px-2 py-1 text-sm"
-            >
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Gemini</option>
-            </select>
-            <select
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              className="mt-2 w-full rounded border border-slate-300 px-2 py-1 text-sm"
-            >
-              {MODEL_OPTIONS[provider].map((modelOption) => (
-                <option key={modelOption} value={modelOption}>
-                  {modelOption}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-600">status: {status}</p>
-            <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
-              <p className="font-semibold text-slate-900">Agent</p>
-              <p>provider: {provider}</p>
-              <p>model: {model}</p>
-              <p>instructions: B2B workflow optimization</p>
-              <p>tools: connectors / approval / artifacts</p>
-            </div>
-          </section>
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Model & Context</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4">
+              <select
+                value={provider}
+                onChange={(event) => setProvider(event.target.value as ModelProvider)}
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+              >
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+              </select>
+              <select
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
+              >
+                {MODEL_OPTIONS[provider].map((modelOption) => (
+                  <option key={modelOption} value={modelOption}>
+                    {modelOption}
+                  </option>
+                ))}
+              </select>
+              <ContextMeter
+                usedTokens={contextStats.inputTokens + contextStats.outputTokens}
+                maxTokens={32000}
+                modelId={model}
+                usage={{
+                  inputTokens: contextStats.inputTokens,
+                  inputTokenDetails: {
+                    noCacheTokens: contextStats.inputTokens,
+                    cacheReadTokens: 0,
+                    cacheWriteTokens: 0,
+                  },
+                  outputTokens: contextStats.outputTokens,
+                  outputTokenDetails: {
+                    textTokens: contextStats.outputTokens,
+                    reasoningTokens: 0,
+                  },
+                  totalTokens: contextStats.inputTokens + contextStats.outputTokens,
+                }}
+              >
+                <ContextTrigger size="sm" className="w-full justify-between" />
+                <ContextContent>
+                  <ContextContentHeader />
+                  <ContextContentBody>
+                    <p className="text-xs">input: {contextStats.inputTokens}</p>
+                    <p className="text-xs">output: {contextStats.outputTokens}</p>
+                  </ContextContentBody>
+                  <ContextContentFooter />
+                </ContextContent>
+              </ContextMeter>
+              <p className="text-xs text-muted-foreground">status: {status}</p>
+            </CardContent>
+          </Card>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Plan / Task</h2>
-            <div className="mt-2 space-y-2">
+          <Plan defaultOpen isStreaming={isStreaming}>
+            <PlanHeader>
               <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                  <span>Plan</span>
-                  <span>{planProgress}%</span>
-                </div>
-                <div className="h-2 rounded bg-slate-200">
-                  <div className="h-2 rounded bg-slate-900" style={{ width: `${planProgress}%` }} />
-                </div>
+                <PlanTitle>Execution Plan</PlanTitle>
+                <PlanDescription>進捗を見ながら承認ポイントを管理します。</PlanDescription>
               </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                  <span>Task</span>
-                  <span>{taskProgress}%</span>
-                </div>
-                <div className="h-2 rounded bg-slate-200">
-                  <div className="h-2 rounded bg-emerald-600" style={{ width: `${taskProgress}%` }} />
-                </div>
-              </div>
-            </div>
-            <ul className="mt-2 space-y-1 text-xs text-slate-700">
+              <PlanAction>
+                <PlanTrigger />
+              </PlanAction>
+            </PlanHeader>
+            <PlanContent className="space-y-2">
               {plan.map((step) => (
-                <li key={step.id} className="flex items-center justify-between rounded border border-slate-200 px-2 py-1">
+                <div key={step.id} className="flex items-center justify-between rounded-md border px-2 py-1 text-xs">
                   <span>{step.title}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${getStatusBadgeStyle(step.status)}`}>
+                  <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(step.status)}`}>
                     {step.status}
                   </span>
-                </li>
+                </div>
               ))}
-            </ul>
-            <p className="mt-3 text-sm font-semibold text-slate-900">Task</p>
-            <ul className="mt-1 space-y-1 text-xs text-slate-700">
-              {tasks.map((task) => (
-                <li key={task.id}>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="checkbox"
-                      checked={task.done}
-                      onChange={(event) => {
-                        const done = event.target.checked;
-                        setTasks((prev) =>
-                          prev.map((current) =>
-                            current.id === task.id ? { ...current, done } : current,
-                          ),
-                        );
-                      }}
-                    />
-                    {task.label}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </section>
+            </PlanContent>
+          </Plan>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Tool Logs</h2>
-            <ul className="mt-2 space-y-2 text-xs text-slate-700">
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Task</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4">
+              <Task defaultOpen>
+                <TaskTrigger title="Checklist" />
+                <TaskContent>
+                  {tasks.map((task) => (
+                    <TaskEntry key={task.id}>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={task.done}
+                          onChange={(event) => {
+                            const done = event.target.checked;
+                            setTasks((prev) =>
+                              prev.map((current) =>
+                                current.id === task.id ? { ...current, done } : current,
+                              ),
+                            );
+                          }}
+                        />
+                        <span>{task.label}</span>
+                      </label>
+                    </TaskEntry>
+                  ))}
+                </TaskContent>
+              </Task>
+            </CardContent>
+          </Card>
+
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Tool Logs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4 text-xs">
               {tools.map((tool) => (
-                <li key={tool.id} className="rounded border border-slate-200 bg-slate-50 p-2">
+                <div key={tool.id} className="rounded-md border bg-muted/30 p-2">
                   <div className="flex items-center justify-between">
-                    <p className="font-semibold text-slate-900">{tool.name}</p>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${getStatusBadgeStyle(tool.status)}`}>
+                    <p className="font-semibold">{tool.name}</p>
+                    <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(tool.status)}`}>
                       {tool.status}
                     </span>
                   </div>
-                  <p>{tool.detail}</p>
-                </li>
+                  <p className="mt-1 text-muted-foreground">{tool.detail}</p>
+                </div>
               ))}
-              {tools.length === 0 ? <li>ログなし</li> : null}
-            </ul>
-          </section>
+              {tools.length === 0 ? <p className="text-muted-foreground">ログなし</p> : null}
+            </CardContent>
+          </Card>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Context</h2>
-            <p className="mt-1 text-xs text-slate-700">input tokens: {contextStats.inputTokens}</p>
-            <p className="text-xs text-slate-700">output tokens: {contextStats.outputTokens}</p>
-            <p className="text-xs text-slate-700">est. cost: ${contextStats.costUsd.toFixed(5)}</p>
-            <div className="mt-2 space-y-1">
-              <div className="h-1.5 w-full rounded bg-slate-200">
-                <div
-                  className="h-1.5 rounded bg-sky-600"
-                  style={{ width: `${Math.min(100, Math.max(8, contextStats.inputTokens / 2))}%` }}
-                />
-              </div>
-              <div className="h-1.5 w-full rounded bg-slate-200">
-                <div
-                  className="h-1.5 rounded bg-violet-600"
-                  style={{ width: `${Math.min(100, Math.max(8, contextStats.outputTokens / 2))}%` }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Checkpoint</h2>
-            <ul className="mt-2 space-y-1 text-xs text-slate-700">
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Checkpoint</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4">
+              <CheckpointBar>
+                <CheckpointTrigger onClick={createCheckpoint} tooltip="現時点を保存">
+                  <CheckpointIcon />
+                  save current
+                </CheckpointTrigger>
+              </CheckpointBar>
               {checkpoints.map((checkpoint) => (
-                <li key={checkpoint.id}>
-                  <button
-                    type="button"
-                    onClick={() => restoreCheckpoint(checkpoint)}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-left"
-                  >
-                    {checkpoint.label}
-                  </button>
-                </li>
+                <Button
+                  key={checkpoint.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => restoreCheckpoint(checkpoint)}
+                >
+                  {checkpoint.label}
+                </Button>
               ))}
-              {checkpoints.length === 0 ? <li>保存済みなし</li> : null}
-            </ul>
-          </section>
+              {checkpoints.length === 0 ? <p className="text-xs text-muted-foreground">保存済みなし</p> : null}
+            </CardContent>
+          </Card>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Approval Ledger</h2>
-            <ul className="mt-2 space-y-2 text-xs text-slate-700">
+          <Card className="gap-3 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Approval Ledger</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4 text-xs">
               {approvalLogs.map((log) => (
-                <li key={log.id} className="rounded border border-slate-200 bg-slate-50 p-2">
+                <div key={log.id} className="rounded-md border bg-muted/20 p-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-slate-900">{log.action}</p>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] ${
-                        log.status === "approved"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : log.status === "dismissed"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
+                    <p className="font-semibold">{log.action}</p>
+                    <Badge variant={log.status === "approved" ? "default" : "outline"}>
                       {log.status}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="mt-1">{log.reason}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{log.timestamp}</p>
-                </li>
+                  <p className="mt-1 text-muted-foreground">{log.reason}</p>
+                  <p className="mt-1 text-muted-foreground">{log.timestamp}</p>
+                </div>
               ))}
-              {approvalLogs.length === 0 ? <li>履歴なし</li> : null}
-            </ul>
-          </section>
-
-          {approval?.required ? (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
-              承認待ちアクションがあります。画面下部の Confirmation モーダルで確定してください。
-            </section>
-          ) : null}
+              {approvalLogs.length === 0 ? <p className="text-muted-foreground">履歴なし</p> : null}
+            </CardContent>
+          </Card>
         </aside>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Artifacts</h2>
-        <div className="mt-3 grid gap-3 lg:grid-cols-[240px_1fr]">
-          <ul className="space-y-1 text-xs text-slate-700">
+      <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
+        <Card className="gap-3 py-4">
+          <CardHeader className="px-4">
+            <CardTitle className="text-sm">Artifacts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 px-4">
             {artifacts.map((artifact) => (
-              <li key={artifact.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedArtifactId(artifact.id)}
-                  className={`w-full rounded px-2 py-1 text-left ${
-                    selectedArtifact?.id === artifact.id
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-300"
-                  }`}
-                >
-                  {artifact.name}
-                </button>
-              </li>
+              <Button
+                key={artifact.id}
+                type="button"
+                variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => setSelectedArtifactId(artifact.id)}
+              >
+                {artifact.name}
+              </Button>
             ))}
-          </ul>
+          </CardContent>
+        </Card>
 
-          <div className="rounded border border-slate-200 p-3">
+        <ArtifactPanel>
+          <ArtifactHeader>
+            <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
+            <ArtifactActions>
+              <ArtifactAction
+                onClick={() => setArtifactViewMode("rendered")}
+                tooltip="Preview"
+                disabled={!selectedArtifact}
+              >
+                preview
+              </ArtifactAction>
+              <ArtifactAction
+                onClick={() => setArtifactViewMode("raw")}
+                tooltip="Raw"
+                disabled={!selectedArtifact}
+              >
+                raw
+              </ArtifactAction>
+              <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
+                {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+              </ArtifactAction>
+              <ArtifactAction onClick={downloadArtifact} tooltip="Download" disabled={!selectedArtifact}>
+                download
+              </ArtifactAction>
+            </ArtifactActions>
+          </ArtifactHeader>
+          <ArtifactContent>
             {selectedArtifact ? (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{selectedArtifact.name}</p>
-                    <p className="text-xs text-slate-500">updated: {selectedArtifact.updatedAt}</p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setArtifactViewMode("rendered")}
-                      className={`rounded px-2 py-1 text-[11px] ${
-                        artifactViewMode === "rendered" ? "bg-slate-900 text-white" : "border border-slate-300"
-                      }`}
-                    >
-                      preview
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setArtifactViewMode("raw")}
-                      className={`rounded px-2 py-1 text-[11px] ${
-                        artifactViewMode === "raw" ? "bg-slate-900 text-white" : "border border-slate-300"
-                      }`}
-                    >
-                      raw
-                    </button>
-                    <button
-                      type="button"
-                      onClick={copyArtifact}
-                      className="rounded border border-slate-300 px-2 py-1 text-[11px]"
-                    >
-                      {copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={downloadArtifact}
-                      className="rounded border border-slate-300 px-2 py-1 text-[11px]"
-                    >
-                      download
-                    </button>
-                  </div>
-                </div>
-                {artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
-                  <iframe
-                    title={selectedArtifact.name}
-                    srcDoc={selectedArtifact.content}
-                    className="mt-2 h-48 w-full rounded border border-slate-200"
-                  />
-                ) : (
-                  <pre className="mt-2 max-h-56 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">
-                    {selectedArtifact.content}
-                  </pre>
-                )}
-              </>
+              artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
+                <iframe
+                  title={selectedArtifact.name}
+                  srcDoc={selectedArtifact.content}
+                  className="h-72 w-full rounded-lg border"
+                />
+              ) : (
+                <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                  {selectedArtifact.content}
+                </pre>
+              )
             ) : (
-              <p className="text-xs text-slate-600">成果物はまだありません。</p>
+              <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
             )}
-          </div>
-        </div>
-
-        {citations.length > 0 ? (
-          <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3">
-            <p className="text-sm font-semibold text-slate-900">Sources / InlineCitation</p>
-            <ul className="mt-1 list-inside list-disc space-y-1 text-xs text-slate-700">
-              {citations.map((citation) => (
-                <li key={citation.id}>
-                  <a href={citation.url} target="_blank" rel="noopener noreferrer" className="underline">
-                    {citation.title}
-                  </a>
-                  {citation.quote ? ` - ${citation.quote}` : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+          </ArtifactContent>
+        </ArtifactPanel>
       </section>
+
+      {citations.length > 0 ? (
+        <Sources>
+          <SourcesTrigger count={citations.length} />
+          <SourcesContent>
+            {citations.map((citation) => (
+              <Source key={citation.id} href={citation.url} title={citation.title}>
+                <span className="text-xs">
+                  {citation.title}
+                  {citation.quote ? ` - ${citation.quote}` : ""}
+                </span>
+              </Source>
+            ))}
+          </SourcesContent>
+        </Sources>
+      ) : null}
 
       {bottomPanel}
 
@@ -1486,20 +1492,12 @@ export function DemoWorkspace({
             <h3 className="mt-1 text-lg font-semibold text-slate-900">{approval.action}</h3>
             <p className="mt-2 text-sm text-slate-700">{approval.reason}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => void approveCurrentAction()}
-                className="rounded bg-amber-700 px-3 py-1.5 text-sm font-medium text-white"
-              >
+              <Button type="button" onClick={() => void approveCurrentAction()}>
                 承認して実行
-              </button>
-              <button
-                type="button"
-                onClick={dismissCurrentAction}
-                className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700"
-              >
+              </Button>
+              <Button type="button" variant="outline" onClick={dismissCurrentAction}>
                 キャンセル
-              </button>
+              </Button>
             </div>
           </div>
         </div>
