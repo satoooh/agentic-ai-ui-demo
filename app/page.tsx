@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { ArrowRightIcon, SparklesIcon } from "lucide-react";
 import { SectionCard } from "@/components/common/section-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 const demos = [
   {
@@ -25,36 +29,59 @@ const demos = [
 export default function HomePage() {
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Japan Vertical Agentic Demo Lab</h1>
-        <p className="mt-3 text-slate-700">
-          このセットアップは、`mock` 前提で必ず動作し、環境変数を設定すれば `live` 連携を段階的に追加できる土台です。
-          各デモは「入力 → 進捗 → 成果物 → 承認」を揃えています。
-        </p>
-        <div className="mt-4 flex gap-3">
-          <Link href="/settings" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">
-            環境変数を確認
-          </Link>
-          <span className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">
-            Runbook: /RUNBOOK.md
-          </span>
+      <section className="relative overflow-hidden rounded-2xl border bg-card/95 p-6 shadow-sm">
+        <div className="absolute -right-8 -top-12 size-40 rounded-full bg-chart-2/10 blur-2xl" aria-hidden />
+        <div className="absolute -left-10 -bottom-16 size-52 rounded-full bg-chart-1/10 blur-3xl" aria-hidden />
+        <div className="relative space-y-4">
+          <Badge className="w-fit" variant="secondary">
+            <SparklesIcon className="size-3.5" />
+            Agentic UI Demo Pack
+          </Badge>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Japan Vertical Agentic Demo Lab
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm text-muted-foreground sm:text-base">
+              このセットアップは `mock` 前提で必ず動作し、環境変数を設定すれば `live` 連携を段階的に追加できる土台です。
+              各デモは「入力 → 進捗 → 成果物 → 承認」を揃えています。
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild>
+              <Link href="/settings">
+                環境変数を確認
+                <ArrowRightIcon className="size-4" />
+              </Link>
+            </Button>
+            <Card className="border-dashed bg-background/70">
+              <CardContent className="px-3 py-1.5 text-xs text-muted-foreground">
+                Runbook: <code>RUNBOOK.md</code>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-3">
         {demos.map((demo) => (
           <SectionCard key={demo.href} title={demo.title} description={demo.summary}>
-            <ul className="list-inside list-disc space-y-1 text-sm text-slate-700">
+            <div className="flex flex-wrap gap-1.5">
               {demo.focus.map((item) => (
-                <li key={item}>{item}</li>
+                <Badge key={item} variant="outline" className="text-[11px]">
+                  {item}
+                </Badge>
               ))}
-            </ul>
-            <Link href={demo.href} className="mt-4 inline-block rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white">
-              デモを開く
-            </Link>
+            </div>
+            <Button asChild className="w-full justify-between">
+              <Link href={demo.href}>
+                デモを開く
+                <ArrowRightIcon className="size-4" />
+              </Link>
+            </Button>
           </SectionCard>
         ))}
       </div>
     </div>
   );
 }
+

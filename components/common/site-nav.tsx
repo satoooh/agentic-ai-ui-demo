@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Home" },
@@ -9,18 +15,41 @@ const links = [
 ];
 
 export function SiteNav() {
+  const pathname = usePathname();
+
   return (
-    <header className="border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-        <p className="text-sm font-semibold text-slate-900">Japan Vertical Agentic Demo Lab</p>
-        <nav className="flex gap-3 text-sm text-slate-600">
-          {links.map((link) => (
-            <Link key={link.href} href={link.href} className="rounded px-2 py-1 hover:bg-slate-100 hover:text-slate-900">
-              {link.label}
-            </Link>
-          ))}
+    <header className="sticky top-0 z-40 border-b bg-background/88 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <Link href="/" className="flex min-w-0 items-center gap-2">
+          <Badge variant="outline" className="hidden h-6 rounded-full px-2.5 text-[11px] sm:inline-flex">
+            AI Elements
+          </Badge>
+          <span className="truncate text-sm font-semibold tracking-tight sm:text-base">
+            Japan Vertical Agentic Demo Lab
+          </span>
+        </Link>
+
+        <nav className="flex items-center gap-1">
+          {links.map((link) => {
+            const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+            return (
+              <Button
+                key={link.href}
+                asChild
+                variant={active ? "secondary" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-8 px-2 text-xs sm:px-3 sm:text-sm",
+                  active && "shadow-xs ring-1 ring-border",
+                )}
+              >
+                <Link href={link.href}>{link.label}</Link>
+              </Button>
+            );
+          })}
         </nav>
       </div>
     </header>
   );
 }
+

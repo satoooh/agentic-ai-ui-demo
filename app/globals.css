@@ -3,7 +3,6 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
-@plugin "daisyui";
 
 :root {
   --color-bg: #f8fafc;
@@ -44,7 +43,11 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top right, #e2e8f0 0%, #f8fafc 45%, #f1f5f9 100%);
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 520px at 92% -12%, color-mix(in oklab, var(--color-chart-2) 22%, white 78%) 0%, transparent 72%),
+    radial-gradient(920px 460px at -8% 18%, color-mix(in oklab, var(--color-chart-1) 12%, white 88%) 0%, transparent 68%),
+    linear-gradient(180deg, #f8fafc 0%, #f6f8fb 58%, #f3f6fb 100%);
   color: var(--color-text);
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
 }
