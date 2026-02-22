@@ -15,10 +15,11 @@ export default function ResearchDemoPage() {
     <DemoWorkspace
       demo="research"
       title="企業リサーチデモ: Public Intelligence Studio"
-      subtitle="企業指定 → IR/公開情報収集 → 根拠付き分析 → 配布承認までを、実務向けリサーチ導線で実演する。"
+      subtitle="企業指定 → 公開IR/ニュース/企業属性収集 → 根拠付き分析 → 配布承認までを、実務向けリサーチ導線で実演する。"
       suggestions={[
         "トヨタ自動車のIRと公開ニュースから懸念点を要約して",
         "MSFTの最新10-K/10-Qの示唆を営業提案向けに抽出して",
+        "SONYの企業プロフィールをWikidataで補完して",
         "この企業調査レポートを配布承認に回して",
       ]}
       scenarios={[
@@ -37,12 +38,12 @@ export default function ResearchDemoPage() {
             {
               id: "research-step-2",
               label: "IR収集",
-              prompt: "EDINET/SECの提出書類から直近の重要ポイントを抽出してください。",
+              prompt: "SECの提出書類から直近の重要ポイントを抽出してください。",
             },
             {
               id: "research-step-3",
               label: "公開情報分析",
-              prompt: "公開ニュースも合わせてリスクと機会を3点ずつ整理してください。",
+              prompt: "公開ニュースとWikidataの企業属性も合わせてリスクと機会を3点ずつ整理してください。",
             },
             {
               id: "research-step-4",
@@ -101,13 +102,20 @@ export default function ResearchDemoPage() {
           updatedAt: new Date().toISOString(),
         },
         {
+          id: "company-profile-initial",
+          name: "company-profile.json",
+          kind: "json",
+          content: JSON.stringify(mockResearchSignals.filter((signal) => signal.kind === "regulatory_note"), null, 2),
+          updatedAt: new Date().toISOString(),
+        },
+        {
           id: "company-brief",
           name: "company-brief.md",
           kind: "markdown",
           content:
             "# 企業調査ブリーフ（初期）\n\n" +
             "- 対象: Microsoft\n" +
-            "- 収集対象: EDINET / SEC / GDELT\n" +
+            "- 収集対象: SEC / GDELT / Wikidata\n" +
             "- 次アクション: 重要提出書類の差分と公開ニュースの整合を確認",
           updatedAt: new Date().toISOString(),
         },
@@ -142,7 +150,7 @@ export default function ResearchDemoPage() {
                 id: "research-script-2",
                 at: "00:18",
                 cue: "Collect",
-                value: "EDINET/SEC/GDELTからIR・公開情報を取得",
+                value: "SEC/GDELT/WikidataからIR・公開情報を取得",
               },
               {
                 id: "research-script-3",
@@ -173,19 +181,6 @@ export default function ResearchDemoPage() {
             title="Research Connector IDE"
             snippets={[
               {
-                id: "snippet-edinet",
-                fileName: "connectors/edinet.ts",
-                language: "ts",
-                content:
-                  "export async function fetchEdinet(date: string, apiKey: string) {\n" +
-                  "  const response = await fetch(`https://api.edinet-fsa.go.jp/api/v2/documents.json?date=${date}&type=2`, {\n" +
-                  "    headers: { 'Subscription-Key': apiKey },\n" +
-                  "  });\n" +
-                  "  if (!response.ok) throw new Error(`status ${response.status}`);\n" +
-                  "  return response.json();\n" +
-                  "}\n",
-              },
-              {
                 id: "snippet-sec",
                 fileName: "connectors/sec-edgar.ts",
                 language: "ts",
@@ -209,8 +204,23 @@ export default function ResearchDemoPage() {
                   "  return response.json();\n" +
                   "}\n",
               },
+              {
+                id: "snippet-wikidata",
+                fileName: "connectors/wikidata.ts",
+                language: "ts",
+                content:
+                  "export async function fetchCompanyProfile(query: string) {\n" +
+                  "  const params = new URLSearchParams({\n" +
+                  "    action: 'wbsearchentities', format: 'json', language: 'ja', type: 'item', search: query,\n" +
+                  "  });\n" +
+                  "  const endpoint = `https://www.wikidata.org/w/api.php?${params.toString()}`;\n" +
+                  "  const response = await fetch(endpoint);\n" +
+                  "  if (!response.ok) throw new Error(`status ${response.status}`);\n" +
+                  "  return response.json();\n" +
+                  "}\n",
+              },
             ]}
-            envVars={["DEMO_MODE", "EDINET_API_KEY", "SEC_USER_AGENT"]}
+            envVars={["DEMO_MODE", "SEC_USER_AGENT"]}
           />
           <WorkflowEditor
             storageKey="workflow:research"

@@ -16,8 +16,7 @@ npm run dev
 - `OPENAI_API_KEY` / `OPENAI_MODEL`
 - `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_MODEL`
 - `GITHUB_TOKEN`（任意。GitHub APIレート上限対策）
-- `EDINET_API_KEY`（任意。EDINET API live取得時に必要）
-- `SEC_USER_AGENT`（任意。SEC EDGARアクセス時の識別子）
+- `SEC_USER_AGENT`（任意。SEC/GDELT/Wikidataアクセス時の識別子）
 - `DATABASE_URL`（Drizzle/libsql接続先）
 - `DATABASE_AUTH_TOKEN`（Turso利用時）
 

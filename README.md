@@ -34,7 +34,7 @@ npm run dev
 
 - 営業: アカウント調査→提案骨子→外部送付承認
 - 採用: 候補者要約→面接調整→オファー承認
-- 企業調査: EDINET/SEC/GDELT収集→根拠付きブリーフ→配布承認
+- 企業調査: SEC/GDELT/Wikidata収集→根拠付きブリーフ→配布承認
 
 全デモで `Run Scenario` を起点に、操作導線を即再現できます。
 
@@ -43,7 +43,7 @@ npm run dev
 - `POST /api/chat` : mock/live切替可能な会話エンドポイント
 - `GET /api/connectors/sales-account` : GitHub組織情報（`mode`, `org`）
 - `GET /api/connectors/recruiting-market` : 採用市況ジョブシグナル（`mode`, `query`）
-- `GET /api/connectors/research-signal` : EDINET + SEC + GDELTの企業調査シグナル（`mode`, `query`）
+- `GET /api/connectors/research-signal` : SEC + GDELT + Wikidataの企業調査シグナル（`mode`, `query`）
 - `POST /api/voice/tts` : 音声生成モック
 - `POST /api/voice/transcribe` : 文字起こしモック
 - `GET /api/sessions` / `POST /api/sessions` / `GET /api/sessions/[id]` : セッション保存・復元
@@ -54,8 +54,7 @@ npm run dev
 - `OPENAI_API_KEY` / `OPENAI_MODEL`
 - `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_MODEL`
 - `GITHUB_TOKEN`（任意、GitHub APIレート上限対策）
-- `EDINET_API_KEY`（任意、EDINET live取得時に必要）
-- `SEC_USER_AGENT`（任意、SEC EDGAR呼び出し時に使用）
+- `SEC_USER_AGENT`（任意、SEC/GDELT/Wikidata呼び出し時に使用）
 - `DATABASE_URL` / `DATABASE_AUTH_TOKEN`
 
 ## 参照ドキュメント

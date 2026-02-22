@@ -113,7 +113,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
         "$ npm run test",
         "Running connector tests...",
         "✗ connectors/research-signal.test.ts",
-        "TypeError: Failed to parse EDINET response payload",
+        "TypeError: Failed to parse Wikidata response payload",
       ]);
       return;
     }
@@ -254,8 +254,8 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
 
           {failed ? (
             <StackTrace
-              trace={`TypeError: Failed to parse EDINET response payload
-  at fetchEdinetSignals (connectors/research-signal.ts:126:18)
+              trace={`TypeError: Failed to parse Wikidata response payload
+  at fetchWikidataSignals (connectors/research-signal.ts:286:15)
   at runCompanyBriefPipeline (pipelines/company-brief.ts:14:9)`}
               defaultOpen
             >
@@ -280,8 +280,8 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
           <Commit defaultOpen>
             <CommitHeader>
               <CommitInfo>
-                <CommitHash>c18d2f4</CommitHash>
-                <CommitMessage>feat(research): add EDINET/SEC/GDELT fallback handling</CommitMessage>
+                <CommitHash>b6a12e9</CommitHash>
+                <CommitMessage>feat(research): switch to keyless SEC/GDELT/Wikidata sources</CommitMessage>
                 <CommitMetadata>
                   <span>ai-agent</span>
                   <CommitSeparator />
@@ -289,7 +289,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
                 </CommitMetadata>
               </CommitInfo>
               <CommitActions>
-                <CommitCopyButton hash="c18d2f4" />
+                <CommitCopyButton hash="b6a12e9" />
               </CommitActions>
             </CommitHeader>
             <CommitContent>

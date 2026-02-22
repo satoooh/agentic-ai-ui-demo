@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import type { ResearchSignal } from "@/types/demo";
 
 interface SourceStatus {
-  source: "edinet" | "sec" | "gdelt";
+  source: "sec" | "gdelt" | "wikidata";
   mode: "live" | "mock";
   count: number;
   note: string;
@@ -32,6 +32,7 @@ interface ResearchConnectorResponse {
     requestedAt: string;
     filings: ResearchSignal[];
     news: ResearchSignal[];
+    profiles: ResearchSignal[];
     notes: string[];
   };
   signals: ResearchSignal[];
@@ -39,13 +40,13 @@ interface ResearchConnectorResponse {
 }
 
 function formatSourceLabel(source: SourceStatus["source"]) {
-  if (source === "edinet") {
-    return "EDINET";
-  }
   if (source === "sec") {
     return "SEC";
   }
-  return "GDELT";
+  if (source === "gdelt") {
+    return "GDELT";
+  }
+  return "Wikidata";
 }
 
 function formatKindLabel(kind: ResearchSignal["kind"]) {
@@ -104,7 +105,7 @@ export function ResearchSourcePanel() {
     <Card className="border-border/80 bg-card/95">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-sm">Corporate Research Sources (EDINET / SEC / GDELT)</CardTitle>
+          <CardTitle className="text-sm">Corporate Research Sources (SEC / GDELT / Wikidata)</CardTitle>
           <Badge variant={payload?.mode === "live" ? "default" : "secondary"}>
             {payload?.mode ?? "loading"}
           </Badge>
@@ -158,7 +159,7 @@ export function ResearchSourcePanel() {
 
             <Separator />
 
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 xl:grid-cols-3">
               <div className="space-y-2">
                 <p className="font-medium">IR filings</p>
                 <ul className="space-y-2">
@@ -212,6 +213,35 @@ export function ResearchSourcePanel() {
                   ) : (
                     <li className="rounded-lg border border-dashed border-border/70 p-2.5 text-muted-foreground">
                       一致する公開ニュースがありません。query を変更して再取得してください。
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-medium">Company profile</p>
+                <ul className="space-y-2">
+                  {payload.snapshot.profiles.length > 0 ? (
+                    payload.snapshot.profiles.slice(0, 5).map((signal) => (
+                      <li key={signal.id} className="rounded-lg border border-border/70 bg-muted/15 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <a
+                            href={signal.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate font-medium underline"
+                          >
+                            {signal.title}
+                          </a>
+                          <Badge variant="outline">{formatKindLabel(signal.kind)}</Badge>
+                        </div>
+                        <p className="mt-1 text-muted-foreground">{signal.summary}</p>
+                        <p className="mt-1 text-muted-foreground">{new Date(signal.publishedAt).toLocaleString("ja-JP")}</p>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="rounded-lg border border-dashed border-border/70 p-2.5 text-muted-foreground">
+                      一致する企業プロフィール情報がありません。社名を英語表記でも試してください。
                     </li>
                   )}
                 </ul>

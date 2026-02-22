@@ -29,7 +29,7 @@ const demos = [
   {
     href: "/research",
     title: "企業調査: Public Intelligence Studio",
-    summary: "企業指定 → IR書類収集（EDINET/SEC）→ 公開情報分析 → 配布承認の一連を実演。",
+    summary: "企業指定 → IR書類収集（SEC）→ 公開情報分析（GDELT/Wikidata）→ 配布承認の一連を実演。",
     focus: ["Sources", "InlineCitation", "Terminal", "TestResults", "StackTrace", "Commit"],
     value: "初回企業調査を根拠付きアウトプットへ即変換",
   },

@@ -11,7 +11,6 @@ export const env = {
   GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
   GEMINI_MODEL: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
   GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-  EDINET_API_KEY: process.env.EDINET_API_KEY,
   SEC_USER_AGENT:
     process.env.SEC_USER_AGENT ??
     "agentic-ai-ui-demo/1.0 (research; contact@example.com)",

@@ -43,7 +43,7 @@ export interface CandidateBrief {
 
 export interface ResearchSignal {
   id: string;
-  source: "edinet" | "sec" | "gdelt" | "mock";
+  source: "sec" | "gdelt" | "wikidata" | "mock";
   kind: "ir_filing" | "public_news" | "regulatory_note";
   title: string;
   summary: string;
@@ -57,6 +57,7 @@ export interface CorporateResearchSnapshot {
   requestedAt: string;
   filings: ResearchSignal[];
   news: ResearchSignal[];
+  profiles: ResearchSignal[];
   notes: string[];
 }
 

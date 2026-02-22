@@ -24,7 +24,7 @@
 
 ### M3: リサーチデモ
 
-- EDINET + SEC + GDELT 連携（live/mock）
+- SEC + GDELT + Wikidata 連携（live/mock）
 - 企業IR根拠付きブリーフ生成
 - Connector IDE（Terminal/Test/StackTrace）で検証導線を提供
 

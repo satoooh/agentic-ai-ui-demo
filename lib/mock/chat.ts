@@ -297,7 +297,7 @@ function buildResearchReply(text: string): MockReply {
         kind: "markdown",
         content:
           `# Company IR Brief: ${targetCompany}\n\n` +
-          "- 収集対象: EDINET / SEC / 公開ニュース\n" +
+          "- 収集対象: SEC / GDELT / Wikidata\n" +
           "- 主要示唆: 財務開示の直近変化と外部報道の論点を接続\n" +
           "- 次アクション: 競合比較・リスク監視・商談仮説へ展開",
         updatedAt: now(),

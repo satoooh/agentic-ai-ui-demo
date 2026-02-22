@@ -15,7 +15,7 @@
 - `app/`: 画面とAPIエンドポイント
 - `components/`: AI Elementsを含む表示部品
 - `lib/mock/`: ドメイン別モックデータ
-- `lib/connectors/`: 外部API接続（GitHub/Arbeitnow/EDINET/SEC/GDELT）
+- `lib/connectors/`: 外部API接続（GitHub/Arbeitnow/SEC/GDELT/Wikidata）
 - `lib/db/`: セッション保存用リポジトリ
 - `lib/env.ts`: 環境変数解決
 - `types/`: ドメイン型

@@ -53,7 +53,7 @@
 
 - 営業: GitHub組織情報（`/api/connectors/sales-account`）
 - 採用: Arbeitnow Job API（`/api/connectors/recruiting-market`）
-- 企業調査: EDINET + SEC EDGAR + GDELT（`/api/connectors/research-signal`）
+- 企業調査: SEC EDGAR + GDELT + Wikidata（`/api/connectors/research-signal`）
 - すべて live 失敗時は mock へフォールバック
 
 ## 6. 受け入れ基準
