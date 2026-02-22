@@ -1,6 +1,6 @@
 import type { Evidence, GeneratedConnectorProject, ResearchSignal, WorkflowGraph } from "@/types/demo";
 
-export const mockResearchSignals: ResearchSignal[] = [
+export const sampleResearchSignals: ResearchSignal[] = [
   {
     id: "ir-sec-1",
     source: "sec",
@@ -33,7 +33,7 @@ export const mockResearchSignals: ResearchSignal[] = [
   },
 ];
 
-export const mockResearchEvidence: Evidence[] = [
+export const sampleResearchEvidence: Evidence[] = [
   {
     sourceTitle: "SEC EDGAR APIs",
     url: "https://www.sec.gov/search-filings/edgar-application-programming-interfaces",
@@ -51,13 +51,13 @@ export const mockResearchEvidence: Evidence[] = [
   },
 ];
 
-export const mockResearchConnectorProject: GeneratedConnectorProject = {
+export const sampleResearchConnectorProject: GeneratedConnectorProject = {
   files: ["connectors/sec-edgar.ts", "connectors/gdelt.ts", "connectors/wikidata.ts", "pipelines/company-brief.ts"],
   tests: ["connectors/sec-edgar.test.ts", "connectors/wikidata.test.ts", "pipelines/company-brief.test.ts"],
-  envVars: ["DEMO_MODE", "SEC_USER_AGENT"],
+  envVars: ["SEC_USER_AGENT"],
 };
 
-export const mockResearchWorkflow: WorkflowGraph = {
+export const sampleResearchWorkflow: WorkflowGraph = {
   nodes: [
     { id: "q1", label: "企業名/証券コード入力", owner: "Analyst", status: "done" },
     { id: "q2", label: "IR書類取得（SEC）", owner: "Agent", status: "doing" },

@@ -14,7 +14,7 @@ export interface MeetingTranscriptSample {
   dirtyTranscript: string;
 }
 
-export const mockMeetingTranscript = {
+export const sampleMeetingTranscript = {
   title: "営業・採用横断の週次オペレーション会議",
   participants: ["営業責任者", "採用責任者", "PM", "経営企画"],
   excerpt:
@@ -22,7 +22,7 @@ export const mockMeetingTranscript = {
     "来月までは新規施策を増やしすぎない方針。",
 };
 
-export const mockMeetingReview = {
+export const sampleMeetingReview = {
   summary:
     "リソース制約下で採用と売上の両立を目指す方針。優先順位の明確化と実行条件の定義が不足している。",
   assumptions: [
@@ -42,10 +42,10 @@ export const mockMeetingReview = {
   ],
 };
 
-export const mockMeetingSignals: MeetingSignal[] = [
+export const sampleMeetingSignals: MeetingSignal[] = [
   {
     id: "meeting-signal-1",
-    source: "mock",
+    source: "hn",
     title: "Hiring slowdown and process bottlenecks",
     summary: "採用市場では候補者不足より選考速度と候補者体験が離脱要因になりやすい。",
     url: "https://example.local/meeting-signals/hiring-bottleneck",
@@ -55,7 +55,7 @@ export const mockMeetingSignals: MeetingSignal[] = [
   },
   {
     id: "meeting-signal-2",
-    source: "mock",
+    source: "hn",
     title: "B2B expansion under constrained teams",
     summary: "新規施策より既存運用の自動化を優先した方が短期成果が出やすい。",
     url: "https://example.local/meeting-signals/b2b-expansion",
@@ -65,7 +65,7 @@ export const mockMeetingSignals: MeetingSignal[] = [
   },
 ];
 
-export const mockMeetingWorkflow: WorkflowGraph = {
+export const sampleMeetingWorkflow: WorkflowGraph = {
   nodes: [
     { id: "m1", label: "議事録入力", owner: "Facilitator", status: "done" },
     { id: "m2", label: "主張・前提の抽出", owner: "Agent", status: "done" },
@@ -81,7 +81,7 @@ export const mockMeetingWorkflow: WorkflowGraph = {
   ],
 };
 
-export const mockMeetingTranscriptSamples: MeetingTranscriptSample[] = [
+export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
   {
     id: "meeting-sample-sales-q2",
     meetingProfileId: "sales-weekly",

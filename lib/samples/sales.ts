@@ -1,6 +1,6 @@
 import type { SalesAccountInsight, SalesOutreachDraft, WorkflowGraph } from "@/types/demo";
 
-export const mockSalesAccountInsight: SalesAccountInsight = {
+export const sampleSalesAccountInsight: SalesAccountInsight = {
   orgLogin: "vercel",
   displayName: "Vercel",
   website: "https://vercel.com",
@@ -31,7 +31,7 @@ export const mockSalesAccountInsight: SalesAccountInsight = {
   ],
 };
 
-export const mockSalesOutreachDraft: SalesOutreachDraft = {
+export const sampleSalesOutreachDraft: SalesOutreachDraft = {
   account: "Acme SaaS",
   objective: "開発生産性改善の商談化",
   talkTrack: [
@@ -42,7 +42,7 @@ export const mockSalesOutreachDraft: SalesOutreachDraft = {
   followUpTasks: ["提案資料ドラフト作成", "ROI試算の送付", "次回MTG候補日を提示"],
 };
 
-export const mockSalesWorkflow: WorkflowGraph = {
+export const sampleSalesWorkflow: WorkflowGraph = {
   nodes: [
     { id: "s1", label: "アカウント調査", owner: "AE", status: "done" },
     { id: "s2", label: "提案骨子作成", owner: "Sales Ops", status: "done" },

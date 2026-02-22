@@ -6,17 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { SalesAccountInsight } from "@/types/demo";
 
 interface SalesConnectorResponse {
-  mode: "mock" | "live";
+  mode: "live";
   insight: SalesAccountInsight;
   note: string;
 }
@@ -24,7 +17,6 @@ interface SalesConnectorResponse {
 export function SalesSourcePanel() {
   const [payload, setPayload] = useState<SalesConnectorResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [modeOverride, setModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [orgInput, setOrgInput] = useState("vercel");
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
@@ -35,9 +27,6 @@ export function SalesSourcePanel() {
 
     try {
       const params = new URLSearchParams();
-      if (modeOverride !== "auto") {
-        params.set("mode", modeOverride);
-      }
       if (orgInput.trim()) {
         params.set("org", orgInput.trim());
       }
@@ -57,7 +46,7 @@ export function SalesSourcePanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [modeOverride, orgInput]);
+  }, [orgInput]);
 
   useEffect(() => {
     void fetchData();
@@ -68,30 +57,15 @@ export function SalesSourcePanel() {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm">Account Connector (GitHub)</CardTitle>
-          <Badge variant={payload?.mode === "live" ? "default" : "secondary"}>
-            {payload?.mode ?? "loading"}
-          </Badge>
+          <Badge variant="secondary">live data</Badge>
         </div>
-        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-[1fr_auto_auto]">
+        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-[1fr_auto]">
           <Input
             value={orgInput}
             onChange={(event) => setOrgInput(event.target.value)}
             placeholder="org (e.g. vercel)"
             className="h-8 text-xs"
           />
-          <Select
-            value={modeOverride}
-            onValueChange={(value) => setModeOverride(value as "auto" | "mock" | "live")}
-          >
-            <SelectTrigger className="h-8 w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">mode: auto</SelectItem>
-              <SelectItem value="mock">mode: mock</SelectItem>
-              <SelectItem value="live">mode: live</SelectItem>
-            </SelectContent>
-          </Select>
           <Button type="button" size="sm" variant="outline" onClick={() => void fetchData()}>
             <RefreshCcwIcon className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
             {isLoading ? "refreshing..." : "refresh"}

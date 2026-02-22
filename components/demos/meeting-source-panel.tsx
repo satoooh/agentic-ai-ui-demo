@@ -6,17 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { MeetingSignal } from "@/types/demo";
 
 interface MeetingSignalResponse {
-  mode: "mock" | "live";
+  mode: "live";
   query: string;
   signals: MeetingSignal[];
   note: string;
@@ -25,7 +18,6 @@ interface MeetingSignalResponse {
 export function MeetingSourcePanel() {
   const [payload, setPayload] = useState<MeetingSignalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [modeOverride, setModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [query, setQuery] = useState("hiring strategy b2b sales");
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
@@ -36,9 +28,6 @@ export function MeetingSourcePanel() {
 
     try {
       const params = new URLSearchParams();
-      if (modeOverride !== "auto") {
-        params.set("mode", modeOverride);
-      }
       if (query.trim()) {
         params.set("query", query.trim());
       }
@@ -58,7 +47,7 @@ export function MeetingSourcePanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [modeOverride, query]);
+  }, [query]);
 
   useEffect(() => {
     void fetchData();
@@ -69,30 +58,15 @@ export function MeetingSourcePanel() {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm">Meeting Signal Connector (HN)</CardTitle>
-          <Badge variant={payload?.mode === "live" ? "default" : "secondary"}>
-            {payload?.mode ?? "loading"}
-          </Badge>
+          <Badge variant="secondary">live data</Badge>
         </div>
-        <div className="grid gap-2 text-xs sm:grid-cols-[1fr_auto_auto]">
+        <div className="grid gap-2 text-xs sm:grid-cols-[1fr_auto]">
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="topic query"
             className="h-8 text-xs"
           />
-          <Select
-            value={modeOverride}
-            onValueChange={(value) => setModeOverride(value as "auto" | "mock" | "live")}
-          >
-            <SelectTrigger className="h-8 w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">mode: auto</SelectItem>
-              <SelectItem value="mock">mode: mock</SelectItem>
-              <SelectItem value="live">mode: live</SelectItem>
-            </SelectContent>
-          </Select>
           <Button type="button" size="sm" variant="outline" onClick={() => void fetchData()}>
             <RefreshCcwIcon className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
             {isLoading ? "refreshing..." : "refresh"}

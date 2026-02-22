@@ -4,12 +4,12 @@ import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { MeetingSourcePanel } from "@/components/demos/meeting-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
-  mockMeetingReview,
-  mockMeetingSignals,
-  mockMeetingTranscriptSamples,
-  mockMeetingTranscript,
-  mockMeetingWorkflow,
-} from "@/lib/mock/meeting";
+  sampleMeetingReview,
+  sampleMeetingSignals,
+  meetingTranscriptSamples,
+  sampleMeetingTranscript,
+  sampleMeetingWorkflow,
+} from "@/lib/samples/meeting";
 
 export default function MeetingDemoPage() {
   return (
@@ -34,12 +34,12 @@ export default function MeetingDemoPage() {
           timestamp: new Date().toISOString(),
         },
       ]}
-      initialPlan={mockMeetingWorkflow.nodes.map((node) => ({
+      initialPlan={sampleMeetingWorkflow.nodes.map((node) => ({
         id: node.id,
         title: node.label,
         status: node.status,
       }))}
-      initialTasks={mockMeetingReview.nextActions.map((action, index) => ({
+      initialTasks={sampleMeetingReview.nextActions.map((action, index) => ({
         id: `meeting-task-${index}`,
         label: action,
         done: false,
@@ -50,23 +50,23 @@ export default function MeetingDemoPage() {
           name: "meeting-transcript.md",
           kind: "markdown",
           content:
-            `# ${mockMeetingTranscript.title}\n\n` +
-            `- 参加者: ${mockMeetingTranscript.participants.join(", ")}\n` +
-            `- 抜粋: ${mockMeetingTranscript.excerpt}\n`,
+            `# ${sampleMeetingTranscript.title}\n\n` +
+            `- 参加者: ${sampleMeetingTranscript.participants.join(", ")}\n` +
+            `- 抜粋: ${sampleMeetingTranscript.excerpt}\n`,
           updatedAt: new Date().toISOString(),
         },
         {
           id: "meeting-review-initial",
           name: "meeting-review.json",
           kind: "json",
-          content: JSON.stringify(mockMeetingReview, null, 2),
+          content: JSON.stringify(sampleMeetingReview, null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
           id: "meeting-signals-initial",
           name: "meeting-signals.json",
           kind: "json",
-          content: JSON.stringify(mockMeetingSignals, null, 2),
+          content: JSON.stringify(sampleMeetingSignals, null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
@@ -75,7 +75,7 @@ export default function MeetingDemoPage() {
           kind: "markdown",
           content:
             "# サンプル発言録（ダミー）\n\n" +
-            mockMeetingTranscriptSamples
+            meetingTranscriptSamples
               .map(
                 (sample, index) =>
                   `## ${index + 1}. ${sample.title}\n` +
@@ -155,7 +155,7 @@ export default function MeetingDemoPage() {
       bottomPanel={
         <WorkflowEditor
           storageKey="workflow:meeting"
-          initialGraph={mockMeetingWorkflow}
+          initialGraph={sampleMeetingWorkflow}
           title="Canvas Workflow: 会議レビュー反復オペレーション"
         />
       }

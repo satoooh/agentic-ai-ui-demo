@@ -45,26 +45,25 @@ npm run dev
 
 ## APIエンドポイント
 
-- `POST /api/chat` : mock/live切替可能な会話エンドポイント
-- `GET /api/connectors/sales-account` : GitHub組織情報（`mode`, `org`）
-- `GET /api/connectors/recruiting-market` : 採用市況ジョブシグナル（`mode`, `query`）
-- `GET /api/connectors/meeting-signal` : 会議レビュー向け公開シグナル（HN, `mode`, `query`）
-- `GET /api/connectors/research-signal` : SEC + GDELT + Wikidataの企業調査シグナル（`mode`, `query`）
-- `POST /api/voice/tts` : 音声生成モック
-- `POST /api/voice/transcribe` : 文字起こしモック
-- `GET /api/runtime` : サーバー側の `DEMO_MODE` とAPIキー設定有無
+- `POST /api/chat` : LLM推論会話エンドポイント
+- `GET /api/connectors/sales-account` : GitHub組織情報（`org`）
+- `GET /api/connectors/recruiting-market` : 採用市況ジョブシグナル（`query`）
+- `GET /api/connectors/meeting-signal` : 会議レビュー向け公開シグナル（HN, `query`）
+- `GET /api/connectors/research-signal` : SEC + GDELT + Wikidataの企業調査シグナル（`query`）
+- `POST /api/voice/tts` : 音声プレビュー用エンドポイント
+- `POST /api/voice/transcribe` : 文字起こし入力検証用エンドポイント
+- `GET /api/runtime` : APIキー設定有無
 - `GET /api/sessions` / `POST /api/sessions` / `GET /api/sessions/[id]` : セッション保存・復元
 
 ## 環境変数
 
-- `DEMO_MODE=mock|live`
 - `OPENAI_API_KEY` / `OPENAI_MODEL`
 - `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_MODEL`
 - `GITHUB_TOKEN`（任意、GitHub APIレート上限対策）
 - `SEC_USER_AGENT`（任意、SEC/GDELT/Wikidata呼び出し時に使用）
 - `DATABASE_URL` / `DATABASE_AUTH_TOKEN`
 
-各デモ画面の `Model & Context` で `chat mode: live` を選ぶと、`DEMO_MODE=mock` でも live 推論を個別に試せます。  
+各デモ画面の `Model & Context` で OpenAI / Gemini とモデルを選択できます。  
 同パネルの `Runtime` に、サーバーが認識しているキー設定状態を表示します。
 
 ## 参照ドキュメント

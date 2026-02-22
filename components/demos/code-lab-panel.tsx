@@ -150,7 +150,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
         <div className="space-y-3">
           <SchemaDisplay
             method="GET"
-            path="/api/connectors/research-signal?query={query}&mode={mode}"
+            path="/api/connectors/research-signal?query={query}"
             description="Corporate research connector schema (MVP)."
             parameters={[
               {
@@ -159,13 +159,6 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
                 required: true,
                 location: "query",
                 description: "企業名またはティッカー",
-              },
-              {
-                name: "mode",
-                type: "string",
-                required: false,
-                location: "query",
-                description: "mock | live の実行モード",
               },
             ]}
           />

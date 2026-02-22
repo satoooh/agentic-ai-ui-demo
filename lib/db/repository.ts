@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { artifacts, demoSessions } from "@/lib/db/schema";
 import { createDbClient } from "@/lib/db/client";
 import type {
@@ -140,19 +140,13 @@ function parsePayload(payload: string): SessionPayload {
 
 export async function listSessions({
   demo,
-  mode,
   limit = 10,
 }: {
   demo: DemoId;
-  mode?: DemoMode;
   limit?: number;
 }): Promise<Array<Pick<DemoSessionSnapshot, "id" | "title" | "updatedAt" | "modelProvider" | "modelId">>> {
   await ensureSchema();
   const db = createDbClient();
-
-  const whereClause = mode
-    ? and(eq(demoSessions.demo, demo), eq(demoSessions.mode, mode))
-    : eq(demoSessions.demo, demo);
 
   const rows = await db
     .select({
@@ -161,7 +155,7 @@ export async function listSessions({
       updatedAt: demoSessions.updatedAt,
     })
     .from(demoSessions)
-    .where(whereClause)
+    .where(eq(demoSessions.demo, demo))
     .orderBy(desc(demoSessions.updatedAt))
     .limit(limit);
 
@@ -194,7 +188,7 @@ export async function getSessionById(id: string): Promise<DemoSessionSnapshot | 
   return {
     id: row.id,
     demo: row.demo as DemoId,
-    mode: row.mode as DemoMode,
+    mode: "live",
     modelProvider: payload.modelProvider,
     modelId: payload.modelId,
     title: payload.title,

@@ -6,7 +6,7 @@
 
 - 対象ドメイン: 営業 / 採用 / 企業調査（IR/公開情報）
 - 目的: 「この業務のどこが短縮されるか」を3分で説明できるデモにする
-- 前提: `DEMO_MODE=mock` で常時動作し、`live` は段階連携
+- 前提: すべてのチャット処理は LLM 実行（OpenAI/Gemini）
 
 ## 2. 調査インサイト（ユースケース再定義の根拠）
 
@@ -54,12 +54,12 @@
 - 営業: GitHub組織情報（`/api/connectors/sales-account`）
 - 採用: Arbeitnow Job API（`/api/connectors/recruiting-market`）
 - 企業調査: SEC EDGAR + GDELT + Wikidata（`/api/connectors/research-signal`）
-- すべて live 失敗時は mock へフォールバック
+- 外部取得失敗時はエラー理由と再試行方針をUIに明示
 
 ## 6. 受け入れ基準
 
-- mockモードで3デモの通し操作が成立する
+- 3デモで通し操作（入力→進捗→成果物→反復）が成立する
 - 承認対象操作は承認無しで確定できない
 - 成果物が保存・再表示できる
-- live未設定や外部API失敗でフロー全体が停止しない
+- 外部API失敗時に、失敗箇所と原因が画面で追跡できる
 - LLMプロバイダを OpenAI / Gemini で切替できる

@@ -30,7 +30,7 @@ lib/
   env.ts
   db/{client,schema,repository}.ts
   connectors/
-  mock/
+  samples/
 types/
   demo.ts
   chat.ts
@@ -52,9 +52,9 @@ types/
 - chat: `{ messages?, demo, provider, model, approved? }`
 - tts: `{ text, voice? }`
 - connectors:
-  - `/api/connectors/sales-account?mode=&org=`
-  - `/api/connectors/recruiting-market?mode=&query=`
-  - `/api/connectors/research-signal?mode=&query=`
+  - `/api/connectors/sales-account?org=`
+  - `/api/connectors/recruiting-market?query=`
+  - `/api/connectors/research-signal?query=`
 - sessions:
   - `POST /api/sessions` で現在状態を保存
   - `GET /api/sessions?demo=...` で一覧

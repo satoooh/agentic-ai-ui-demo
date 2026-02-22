@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { getSalesAccountInsight } from "@/lib/connectors/sales-account";
 
-function parseMode(value: string | null): "mock" | "live" | undefined {
-  if (value === "mock" || value === "live") {
-    return value;
-  }
-  return undefined;
-}
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const modeOverride = parseMode(searchParams.get("mode"));
   const org = searchParams.get("org") ?? undefined;
-  const data = await getSalesAccountInsight({ modeOverride, org });
-  return NextResponse.json(data);
+
+  try {
+    const data = await getSalesAccountInsight({ org });
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to fetch account signal",
+        message: error instanceof Error ? error.message : "unknown error",
+      },
+      { status: 502 },
+    );
+  }
 }

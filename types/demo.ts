@@ -1,4 +1,4 @@
-export type DemoMode = "mock" | "live";
+export type DemoMode = "live";
 
 export interface SalesOutreachDraft {
   account: string;
@@ -43,7 +43,7 @@ export interface CandidateBrief {
 
 export interface ResearchSignal {
   id: string;
-  source: "sec" | "gdelt" | "wikidata" | "mock";
+  source: "sec" | "gdelt" | "wikidata";
   kind: "ir_filing" | "public_news" | "regulatory_note";
   title: string;
   summary: string;
@@ -63,7 +63,7 @@ export interface CorporateResearchSnapshot {
 
 export interface MeetingSignal {
   id: string;
-  source: "hn" | "mock";
+  source: "hn";
   title: string;
   summary: string;
   url: string;

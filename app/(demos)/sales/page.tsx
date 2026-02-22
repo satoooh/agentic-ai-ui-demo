@@ -4,10 +4,10 @@ import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { SalesSourcePanel } from "@/components/demos/sales-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
-  mockSalesAccountInsight,
-  mockSalesOutreachDraft,
-  mockSalesWorkflow,
-} from "@/lib/mock/sales";
+  sampleSalesAccountInsight,
+  sampleSalesOutreachDraft,
+  sampleSalesWorkflow,
+} from "@/lib/samples/sales";
 
 export default function SalesDemoPage() {
   return (
@@ -69,12 +69,12 @@ export default function SalesDemoPage() {
           timestamp: new Date().toISOString(),
         },
       ]}
-      initialPlan={mockSalesWorkflow.nodes.map((node) => ({
+      initialPlan={sampleSalesWorkflow.nodes.map((node) => ({
         id: node.id,
         title: node.label,
         status: node.status,
       }))}
-      initialTasks={mockSalesOutreachDraft.followUpTasks.map((task, index) => ({
+      initialTasks={sampleSalesOutreachDraft.followUpTasks.map((task, index) => ({
         id: `sales-task-${index}`,
         label: task,
         done: false,
@@ -84,14 +84,14 @@ export default function SalesDemoPage() {
           id: "sales-account-initial",
           name: "account-brief.json",
           kind: "json",
-          content: JSON.stringify(mockSalesAccountInsight, null, 2),
+          content: JSON.stringify(sampleSalesAccountInsight, null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
           id: "sales-outreach-initial",
           name: "outreach-plan.json",
           kind: "json",
-          content: JSON.stringify(mockSalesOutreachDraft, null, 2),
+          content: JSON.stringify(sampleSalesOutreachDraft, null, 2),
           updatedAt: new Date().toISOString(),
         },
       ]}
@@ -163,7 +163,7 @@ export default function SalesDemoPage() {
       bottomPanel={
         <WorkflowEditor
           storageKey="workflow:sales"
-          initialGraph={mockSalesWorkflow}
+          initialGraph={sampleSalesWorkflow}
           title="Canvas Workflow: 提案反復オペレーション"
         />
       }

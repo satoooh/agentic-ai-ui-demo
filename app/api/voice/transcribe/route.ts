@@ -6,22 +6,25 @@ export async function POST(request: Request) {
   if (!contentType.includes("multipart/form-data")) {
     return NextResponse.json(
       {
-        mode: "mock",
-        transcription:
-          "本日は2階東側で配筋を実施。午後に型枠補修を行い、明日は配管スリーブ確認予定。",
-        note: "multipart/form-data 未指定のためテキストモックを返しています。",
+        error: "Invalid request",
+        message: "multipart/form-data が必要です。",
       },
-      { status: 200 },
+      { status: 400 },
     );
   }
 
   const formData = await request.formData();
   const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return NextResponse.json(
+      { error: "Invalid request", message: "file フィールドが必要です。" },
+      { status: 400 },
+    );
+  }
 
   return NextResponse.json({
-    mode: "mock",
-    filename: file instanceof File ? file.name : "unknown",
-    transcription:
-      "録音モックを受信しました。SpeechInput実装時に外部STTへ接続してこの値を置き換えてください。",
+    filename: file.name,
+    transcription: "",
+    note: "STTプロバイダ未接続のため、サーバー側文字起こしは未実行です。",
   });
 }

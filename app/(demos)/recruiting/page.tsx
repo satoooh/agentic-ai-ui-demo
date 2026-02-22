@@ -4,10 +4,10 @@ import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { RecruitingSourcePanel } from "@/components/demos/recruiting-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
-  mockCandidateBrief,
-  mockRecruitingJobs,
-  mockRecruitingWorkflow,
-} from "@/lib/mock/recruiting";
+  sampleCandidateBrief,
+  sampleRecruitingJobs,
+  sampleRecruitingWorkflow,
+} from "@/lib/samples/recruiting";
 
 export default function RecruitingDemoPage() {
   return (
@@ -69,7 +69,7 @@ export default function RecruitingDemoPage() {
           timestamp: new Date().toISOString(),
         },
       ]}
-      initialPlan={mockRecruitingWorkflow.nodes.map((node) => ({
+      initialPlan={sampleRecruitingWorkflow.nodes.map((node) => ({
         id: node.id,
         title: node.label,
         status: node.status,
@@ -85,14 +85,14 @@ export default function RecruitingDemoPage() {
           id: "candidate-brief-initial",
           name: "candidate-brief.json",
           kind: "json",
-          content: JSON.stringify(mockCandidateBrief, null, 2),
+          content: JSON.stringify(sampleCandidateBrief, null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
           id: "recruiting-market-jobs",
           name: "market-job-signals.json",
           kind: "json",
-          content: JSON.stringify(mockRecruitingJobs, null, 2),
+          content: JSON.stringify(sampleRecruitingJobs, null, 2),
           updatedAt: new Date().toISOString(),
         },
       ]}
@@ -164,7 +164,7 @@ export default function RecruitingDemoPage() {
       bottomPanel={
         <WorkflowEditor
           storageKey="workflow:recruiting"
-          initialGraph={mockRecruitingWorkflow}
+          initialGraph={sampleRecruitingWorkflow}
           title="Canvas Workflow: 採用反復オペレーション"
         />
       }

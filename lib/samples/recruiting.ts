@@ -1,6 +1,6 @@
 import type { CandidateBrief, RecruitingJobPosting, WorkflowGraph } from "@/types/demo";
 
-export const mockRecruitingJobs: RecruitingJobPosting[] = [
+export const sampleRecruitingJobs: RecruitingJobPosting[] = [
   {
     id: "job-frontend-1",
     title: "Senior Frontend Engineer",
@@ -33,7 +33,7 @@ export const mockRecruitingJobs: RecruitingJobPosting[] = [
   },
 ];
 
-export const mockCandidateBrief: CandidateBrief = {
+export const sampleCandidateBrief: CandidateBrief = {
   candidateId: "cand-048",
   role: "Senior Frontend Engineer",
   highlights: [
@@ -45,7 +45,7 @@ export const mockCandidateBrief: CandidateBrief = {
   recommendation: "yes",
 };
 
-export const mockRecruitingWorkflow: WorkflowGraph = {
+export const sampleRecruitingWorkflow: WorkflowGraph = {
   nodes: [
     { id: "r1", label: "候補者スクリーニング", owner: "Recruiter", status: "done" },
     { id: "r2", label: "面接調整", owner: "Coordinator", status: "done" },

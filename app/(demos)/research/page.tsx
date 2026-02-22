@@ -5,11 +5,11 @@ import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { ResearchSourcePanel } from "@/components/demos/research-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
-  mockResearchConnectorProject,
-  mockResearchEvidence,
-  mockResearchSignals,
-  mockResearchWorkflow,
-} from "@/lib/mock/research";
+  sampleResearchConnectorProject,
+  sampleResearchEvidence,
+  sampleResearchSignals,
+  sampleResearchWorkflow,
+} from "@/lib/samples/research";
 
 export default function ResearchDemoPage() {
   return (
@@ -71,7 +71,7 @@ export default function ResearchDemoPage() {
           timestamp: new Date().toISOString(),
         },
       ]}
-      initialPlan={mockResearchWorkflow.nodes.map((node) => ({
+      initialPlan={sampleResearchWorkflow.nodes.map((node) => ({
         id: node.id,
         title: node.label,
         status: node.status,
@@ -87,21 +87,21 @@ export default function ResearchDemoPage() {
           id: "ir-filings-initial",
           name: "ir-filings.json",
           kind: "json",
-          content: JSON.stringify(mockResearchSignals.filter((signal) => signal.kind === "ir_filing"), null, 2),
+          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "ir_filing"), null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
           id: "public-signals-initial",
           name: "public-signals.json",
           kind: "json",
-          content: JSON.stringify(mockResearchSignals.filter((signal) => signal.kind === "public_news"), null, 2),
+          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "public_news"), null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
           id: "company-profile-initial",
           name: "company-profile.json",
           kind: "json",
-          content: JSON.stringify(mockResearchSignals.filter((signal) => signal.kind === "regulatory_note"), null, 2),
+          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "regulatory_note"), null, 2),
           updatedAt: new Date().toISOString(),
         },
         {
@@ -119,11 +119,11 @@ export default function ResearchDemoPage() {
           id: "connector-project",
           name: "connector-project.json",
           kind: "json",
-          content: JSON.stringify(mockResearchConnectorProject, null, 2),
+          content: JSON.stringify(sampleResearchConnectorProject, null, 2),
           updatedAt: new Date().toISOString(),
         },
       ]}
-      initialCitations={mockResearchEvidence.map((evidence, index) => ({
+      initialCitations={sampleResearchEvidence.map((evidence, index) => ({
         id: `research-citation-${index}`,
         title: evidence.sourceTitle,
         url: evidence.url,
@@ -217,11 +217,11 @@ export default function ResearchDemoPage() {
                   "}\n",
               },
             ]}
-            envVars={["DEMO_MODE", "SEC_USER_AGENT"]}
+            envVars={["SEC_USER_AGENT"]}
           />
           <WorkflowEditor
             storageKey="workflow:research"
-            initialGraph={mockResearchWorkflow}
+            initialGraph={sampleResearchWorkflow}
             title="Canvas Workflow: 企業調査反復オペレーション"
           />
         </div>

@@ -1,5 +1,4 @@
 import { env } from "@/lib/env";
-import { mockResearchSignals } from "@/lib/mock/research";
 import type { CorporateResearchSnapshot, ResearchSignal } from "@/types/demo";
 
 const SEC_TICKER_ENDPOINT = "https://www.sec.gov/files/company_tickers_exchange.json";
@@ -9,18 +8,24 @@ const WIKIDATA_SEARCH_ENDPOINT = "https://www.wikidata.org/w/api.php";
 
 interface SourceStatus {
   source: "sec" | "gdelt" | "wikidata";
-  mode: "live" | "mock";
+  mode: "live" | "error";
   count: number;
   note: string;
 }
 
 interface ConnectorResult {
-  mode: "mock" | "live";
+  mode: "live";
   query: string;
   snapshot: CorporateResearchSnapshot;
   sourceStatuses: SourceStatus[];
   signals: ResearchSignal[];
   note: string;
+}
+
+interface SourceFetchResult {
+  mode: "live" | "error";
+  note: string;
+  signals: ResearchSignal[];
 }
 
 function normalize(value: string) {
@@ -69,48 +74,7 @@ function parseGdeltDate(raw: string | undefined): string {
   return new Date(Date.UTC(year, month, day, hour, minute, second)).toISOString();
 }
 
-function getMockSnapshot(query: string): ConnectorResult {
-  const filings = mockResearchSignals.filter((signal) => signal.kind === "ir_filing");
-  const news = mockResearchSignals.filter((signal) => signal.kind === "public_news");
-  const profiles = mockResearchSignals.filter((signal) => signal.kind === "regulatory_note");
-
-  return {
-    mode: "mock",
-    query,
-    snapshot: {
-      query,
-      requestedAt: new Date().toISOString(),
-      filings,
-      news,
-      profiles,
-      notes: ["mock モード指定のため、企業IR/公開情報はサンプルデータです。"],
-    },
-    sourceStatuses: [
-      {
-        source: "sec",
-        mode: "mock",
-        count: filings.length,
-        note: "mock dataset",
-      },
-      {
-        source: "gdelt",
-        mode: "mock",
-        count: news.length,
-        note: "mock dataset",
-      },
-      {
-        source: "wikidata",
-        mode: "mock",
-        count: profiles.length,
-        note: "mock dataset",
-      },
-    ],
-    signals: mockResearchSignals,
-    note: "mock モード指定のためモックデータを返しています。",
-  };
-}
-
-async function fetchSecSignals(query: string) {
+async function fetchSecSignals(query: string): Promise<SourceFetchResult> {
   const headers = {
     accept: "application/json",
     "user-agent": env.SEC_USER_AGENT,
@@ -120,9 +84,9 @@ async function fetchSecSignals(query: string) {
     const tickersPayload = await fetchJsonWithTimeout(SEC_TICKER_ENDPOINT, { headers });
     if (!isRecord(tickersPayload) || !Array.isArray(tickersPayload.data)) {
       return {
-        mode: "mock" as const,
-        note: "SECティッカー一覧の取得結果が不正でした。",
-        signals: [] as ResearchSignal[],
+        mode: "error",
+        note: "SECティッカー一覧の返却形式が不正でした。",
+        signals: [],
       };
     }
 
@@ -143,9 +107,9 @@ async function fetchSecSignals(query: string) {
 
     if (!selected) {
       return {
-        mode: "mock" as const,
-        note: "SECで一致する企業が見つかりませんでした。",
-        signals: [] as ResearchSignal[],
+        mode: "error",
+        note: "SECで一致する企業が見つかりませんでした。queryにティッカー（例: MSFT）を指定してください。",
+        signals: [],
       };
     }
 
@@ -160,9 +124,9 @@ async function fetchSecSignals(query: string) {
       !isRecord(submissionsPayload.filings.recent)
     ) {
       return {
-        mode: "mock" as const,
-        note: "SEC提出書類データの形式が不正でした。",
-        signals: [] as ResearchSignal[],
+        mode: "error",
+        note: "SEC提出書類データの返却形式が不正でした。",
+        signals: [],
       };
     }
 
@@ -208,27 +172,27 @@ async function fetchSecSignals(query: string) {
 
     if (signals.length === 0) {
       return {
-        mode: "mock" as const,
+        mode: "error",
         note: "SEC提出書類は取得できましたが対象フォームが見つかりませんでした。",
-        signals: [] as ResearchSignal[],
+        signals: [],
       };
     }
 
     return {
-      mode: "live" as const,
+      mode: "live",
       note: `SECで ${selected.ticker} のIR書類を ${signals.length} 件取得しました。`,
       signals,
     };
   } catch (error) {
     return {
-      mode: "mock" as const,
+      mode: "error",
       note: `SEC取得エラー: ${error instanceof Error ? error.message : "unknown error"}`,
-      signals: [] as ResearchSignal[],
+      signals: [],
     };
   }
 }
 
-async function fetchGdeltSignals(query: string) {
+async function fetchGdeltSignals(query: string): Promise<SourceFetchResult> {
   try {
     const payload = await fetchJsonWithTimeout(
       `${GDELT_DOC_ENDPOINT}?query=${encodeURIComponent(
@@ -245,9 +209,9 @@ async function fetchGdeltSignals(query: string) {
 
     if (!isRecord(payload) || !Array.isArray(payload.articles)) {
       return {
-        mode: "mock" as const,
+        mode: "error",
         note: "GDELTの返却形式が不正でした。",
-        signals: [] as ResearchSignal[],
+        signals: [],
       };
     }
 
@@ -271,29 +235,24 @@ async function fetchGdeltSignals(query: string) {
       )
       .slice(0, 6);
 
-    if (signals.length === 0) {
-      return {
-        mode: "mock" as const,
-        note: "GDELTで一致するニュースが見つかりませんでした。",
-        signals: [] as ResearchSignal[],
-      };
-    }
-
     return {
-      mode: "live" as const,
-      note: `GDELTで企業関連ニュースを ${signals.length} 件取得しました。`,
+      mode: signals.length > 0 ? "live" : "error",
+      note:
+        signals.length > 0
+          ? `GDELTで企業関連ニュースを ${signals.length} 件取得しました。`
+          : "GDELTで一致するニュースが見つかりませんでした。",
       signals,
     };
   } catch (error) {
     return {
-      mode: "mock" as const,
+      mode: "error",
       note: `GDELT取得エラー: ${error instanceof Error ? error.message : "unknown error"}`,
-      signals: [] as ResearchSignal[],
+      signals: [],
     };
   }
 }
 
-async function fetchWikidataSignals(query: string) {
+async function fetchWikidataSignals(query: string): Promise<SourceFetchResult> {
   try {
     const params = new URLSearchParams({
       action: "wbsearchentities",
@@ -315,9 +274,9 @@ async function fetchWikidataSignals(query: string) {
 
     if (!isRecord(payload) || !Array.isArray(payload.search)) {
       return {
-        mode: "mock" as const,
+        mode: "error",
         note: "Wikidataの返却形式が不正でした。",
-        signals: [] as ResearchSignal[],
+        signals: [],
       };
     }
 
@@ -342,38 +301,27 @@ async function fetchWikidataSignals(query: string) {
       })
       .slice(0, 5);
 
-    if (signals.length === 0) {
-      return {
-        mode: "mock" as const,
-        note: "Wikidataで一致する企業情報が見つかりませんでした。",
-        signals: [] as ResearchSignal[],
-      };
-    }
-
     return {
-      mode: "live" as const,
-      note: `Wikidataで企業プロフィール候補を ${signals.length} 件取得しました。`,
+      mode: signals.length > 0 ? "live" : "error",
+      note:
+        signals.length > 0
+          ? `Wikidataで企業プロフィール候補を ${signals.length} 件取得しました。`
+          : "Wikidataで一致する企業プロフィールが見つかりませんでした。",
       signals,
     };
   } catch (error) {
     return {
-      mode: "mock" as const,
+      mode: "error",
       note: `Wikidata取得エラー: ${error instanceof Error ? error.message : "unknown error"}`,
-      signals: [] as ResearchSignal[],
+      signals: [],
     };
   }
 }
 
 export async function getResearchSignals(options?: {
-  modeOverride?: "mock" | "live";
   query?: string;
 }): Promise<ConnectorResult> {
-  const mode = options?.modeOverride ?? env.DEMO_MODE;
   const query = options?.query?.trim() || "Microsoft";
-
-  if (mode !== "live") {
-    return getMockSnapshot(query);
-  }
 
   const [sec, gdelt, wikidata] = await Promise.all([
     fetchSecSignals(query),
@@ -391,33 +339,26 @@ export async function getResearchSignals(options?: {
     { source: "wikidata", mode: wikidata.mode, count: wikidata.signals.length, note: wikidata.note },
   ];
 
-  const hasLiveSignals = filings.length > 0 || news.length > 0 || profiles.length > 0;
-  if (!hasLiveSignals) {
-    const fallback = getMockSnapshot(query);
-    return {
-      ...fallback,
-      sourceStatuses,
-      note: `live取得が空のためモックへフォールバックしました。${sourceStatuses
-        .map((status) => `[${status.source}] ${status.note}`)
-        .join(" / ")}`,
-    };
-  }
+  const snapshot: CorporateResearchSnapshot = {
+    query,
+    requestedAt: new Date().toISOString(),
+    filings,
+    news,
+    profiles,
+    notes: sourceStatuses.map((status) => `[${status.source}] ${status.note}`),
+  };
 
-  const notes = sourceStatuses.map((status) => `[${status.source}] ${status.note}`);
+  const signals = [...filings, ...news, ...profiles].sort((a, b) => b.score - a.score);
 
   return {
     mode: "live",
     query,
-    snapshot: {
-      query,
-      requestedAt: new Date().toISOString(),
-      filings,
-      news,
-      profiles,
-      notes,
-    },
+    snapshot,
     sourceStatuses,
-    signals: [...filings, ...news, ...profiles].sort((a, b) => b.score - a.score),
-    note: notes.join(" / "),
+    signals,
+    note:
+      signals.length > 0
+        ? snapshot.notes.join(" / ")
+        : `公開データ取得結果が空です。${snapshot.notes.join(" / ")}`,
   };
 }

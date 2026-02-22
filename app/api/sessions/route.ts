@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { env } from "@/lib/env";
 import { listSessions, saveSession } from "@/lib/db/repository";
 import type { DemoSessionSnapshot, ModelProvider } from "@/types/chat";
-import type { DemoMode, WorkflowGraph } from "@/types/demo";
+import type { WorkflowGraph } from "@/types/demo";
 
 export const runtime = "nodejs";
 
 const postSchema = z.object({
   demo: z.enum(["sales", "recruiting", "meeting", "research"]),
   title: z.string().min(1),
-  mode: z.enum(["mock", "live"]).optional(),
   modelProvider: z.enum(["openai", "gemini"]),
   modelId: z.string().min(1),
   messages: z.array(z.unknown()),
@@ -24,7 +22,6 @@ const postSchema = z.object({
 
 const getQuerySchema = z.object({
   demo: z.enum(["sales", "recruiting", "meeting", "research"]),
-  mode: z.enum(["mock", "live"]).optional(),
   limit: z.coerce.number().int().positive().max(30).optional(),
 });
 
@@ -32,7 +29,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const parsed = getQuerySchema.safeParse({
     demo: searchParams.get("demo"),
-    mode: searchParams.get("mode") ?? undefined,
     limit: searchParams.get("limit") ?? undefined,
   });
 
@@ -46,7 +42,6 @@ export async function GET(request: Request) {
   try {
     const sessions = await listSessions({
       demo: parsed.data.demo,
-      mode: parsed.data.mode,
       limit: parsed.data.limit,
     });
 
@@ -79,7 +74,7 @@ export async function POST(request: Request) {
     await saveSession({
       id,
       demo: parsed.data.demo,
-      mode: (parsed.data.mode ?? env.DEMO_MODE) as DemoMode,
+      mode: "live",
       payload: {
         modelProvider: parsed.data.modelProvider as ModelProvider,
         modelId: parsed.data.modelId,

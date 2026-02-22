@@ -18,10 +18,9 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    mode: "mock",
     audioUrl: null,
     voice: parsed.data.voice,
     text: parsed.data.text,
-    note: "TTS live 実装前のモックレスポンスです。AudioPlayer接続時は audioUrl を返す実装へ置換してください。",
+    note: "サーバーTTSは未接続です。クライアント側の SpeechSynthesis プレビューを利用してください。",
   });
 }

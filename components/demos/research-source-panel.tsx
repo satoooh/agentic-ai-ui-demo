@@ -6,25 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import type { ResearchSignal } from "@/types/demo";
 
 interface SourceStatus {
   source: "sec" | "gdelt" | "wikidata";
-  mode: "live" | "mock";
+  mode: "live" | "error";
   count: number;
   note: string;
 }
 
 interface ResearchConnectorResponse {
-  mode: "mock" | "live";
+  mode: "live";
   query: string;
   sourceStatuses: SourceStatus[];
   snapshot: {
@@ -62,7 +55,6 @@ function formatKindLabel(kind: ResearchSignal["kind"]) {
 export function ResearchSourcePanel() {
   const [payload, setPayload] = useState<ResearchConnectorResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [modeOverride, setModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [query, setQuery] = useState("Microsoft");
   const [isLoading, setIsLoading] = useState(false);
   const [lastFetchedAt, setLastFetchedAt] = useState<string | null>(null);
@@ -73,9 +65,6 @@ export function ResearchSourcePanel() {
 
     try {
       const params = new URLSearchParams();
-      if (modeOverride !== "auto") {
-        params.set("mode", modeOverride);
-      }
       if (query.trim()) {
         params.set("query", query.trim());
       }
@@ -95,7 +84,7 @@ export function ResearchSourcePanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [modeOverride, query]);
+  }, [query]);
 
   useEffect(() => {
     void fetchData();
@@ -106,30 +95,15 @@ export function ResearchSourcePanel() {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-sm">Corporate Research Sources (SEC / GDELT / Wikidata)</CardTitle>
-          <Badge variant={payload?.mode === "live" ? "default" : "secondary"}>
-            {payload?.mode ?? "loading"}
-          </Badge>
+          <Badge variant="secondary">live data</Badge>
         </div>
-        <div className="grid gap-2 text-xs sm:grid-cols-[1fr_auto_auto]">
+        <div className="grid gap-2 text-xs sm:grid-cols-[1fr_auto]">
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="company or ticker (例: Microsoft, SONY, トヨタ)"
             className="h-8 text-xs"
           />
-          <Select
-            value={modeOverride}
-            onValueChange={(value) => setModeOverride(value as "auto" | "mock" | "live")}
-          >
-            <SelectTrigger className="h-8 w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">mode: auto</SelectItem>
-              <SelectItem value="mock">mode: mock</SelectItem>
-              <SelectItem value="live">mode: live</SelectItem>
-            </SelectContent>
-          </Select>
           <Button type="button" size="sm" variant="outline" onClick={() => void fetchData()}>
             <RefreshCcwIcon className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
             {isLoading ? "refreshing..." : "refresh"}
@@ -149,7 +123,7 @@ export function ResearchSourcePanel() {
                 <div key={status.source} className="rounded-lg border border-border/70 bg-muted/15 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{formatSourceLabel(status.source)}</p>
-                    <Badge variant={status.mode === "live" ? "default" : "secondary"}>{status.mode}</Badge>
+                    <Badge variant={status.mode === "live" ? "default" : "destructive"}>{status.mode}</Badge>
                   </div>
                   <p className="mt-1 text-muted-foreground">count: {status.count}</p>
                   <p className="mt-0.5 text-muted-foreground">{status.note}</p>

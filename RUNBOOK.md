@@ -12,7 +12,6 @@ npm run dev
 
 ## 2. 環境変数
 
-- `DEMO_MODE=mock|live`
 - `OPENAI_API_KEY` / `OPENAI_MODEL`
 - `GOOGLE_GENERATIVE_AI_API_KEY` / `GEMINI_MODEL`
 - `GITHUB_TOKEN`（任意。GitHub APIレート上限対策）
@@ -22,7 +21,7 @@ npm run dev
 
 ## 3. 運用ルール
 
-- live未設定時は必ずmockへフォールバック
+- すべての会話処理は LLM 実行前提で運用する
 - 送信/オファー/配布など副作用操作は承認必須
 - 失敗時は原因と次アクションを画面に返す
 - 永続化は Drizzle + libsql(Turso) 方針を優先
@@ -42,7 +41,7 @@ npm run build
   - 承認
   の4ブロックが表示されることを確認
 - 各画面で `1-click Demo Scenario` を実行し、最終ステップまで `done` になることを確認
-- 各接続パネルで `mode: mock/live` を切り替え、`refresh` でフォールバック挙動を確認
+- 各接続パネルで `refresh` を実行し、live取得結果とエラー表示の両方を確認
 
 ## 5. ステータス記録テンプレ
 
