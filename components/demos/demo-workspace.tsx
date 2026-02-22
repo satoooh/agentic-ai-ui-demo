@@ -1331,6 +1331,37 @@ export function DemoWorkspace({
       },
     ];
   }, [demo, meetingTranscriptConfirmed, tools]);
+  const liveAgentCurrentStepLabel = useMemo(() => {
+    const active = liveAgentSteps.find((step) => step.status === "doing");
+    if (active) {
+      return active.label;
+    }
+
+    const pending = liveAgentSteps.find((step) => step.status === "todo");
+    if (pending) {
+      return pending.label;
+    }
+
+    return liveAgentSteps.at(-1)?.label ?? "完了";
+  }, [liveAgentSteps]);
+  const liveAgentStepsMarkdown = useMemo(() => {
+    if (liveAgentSteps.length === 0) {
+      return "ステップ情報はまだありません。";
+    }
+
+    return liveAgentSteps
+      .map(
+        (step, index) =>
+          `${index + 1}. **${step.label}** [${step.status}]  \n${compactUiText(step.detail, 160)}`,
+      )
+      .join("\n\n");
+  }, [liveAgentSteps]);
+  const streamingStatusLabel = useMemo(() => {
+    if (demo === "meeting" && showMeetingRuntimePanels) {
+      return `回答を生成しています...（${liveAgentCurrentStepLabel}）`;
+    }
+    return "回答を生成しています...";
+  }, [demo, liveAgentCurrentStepLabel, showMeetingRuntimePanels]);
   const agenticLanes = useMemo<AgenticLane[]>(() => {
     const observeState: AgenticLane["state"] =
       demo === "meeting"
@@ -2529,28 +2560,6 @@ export function DemoWorkspace({
                   ? "議事録確定後、このチャット上で要約・反証・次アクションを反復します。"
                   : "左列で開始し、ここで編集・再送して出力を固めます。"}
               </p>
-              {demo === "meeting" && showMeetingRuntimePanels ? (
-                <ChainOfThought
-                  defaultOpen
-                  className="rounded-md border border-border/70 bg-background/80 p-2"
-                >
-                  <ChainOfThoughtHeader>Live Agent Steps（現在の実行ステップ）</ChainOfThoughtHeader>
-                  <ChainOfThoughtContent>
-                    {liveAgentSteps.map((step) => (
-                      <ChainOfThoughtStep
-                        key={step.id}
-                        label={step.label}
-                        description={step.detail}
-                        status={toWorklogStatus(step.status)}
-                      >
-                        <ChainOfThoughtSearchResults>
-                          <ChainOfThoughtSearchResult>{step.status}</ChainOfThoughtSearchResult>
-                        </ChainOfThoughtSearchResults>
-                      </ChainOfThoughtStep>
-                    ))}
-                  </ChainOfThoughtContent>
-                </ChainOfThought>
-              ) : null}
               {showMeetingRuntimePanels ? (
                 <div className="grid gap-1.5 md:grid-cols-4">
                   {agenticLanes.map((lane) => (
@@ -2833,7 +2842,21 @@ export function DemoWorkspace({
                 {isStreaming ? (
                   <Message from="assistant">
                     <MessageContent>
-                      <Shimmer>回答を生成しています...</Shimmer>
+                      <Shimmer>{streamingStatusLabel}</Shimmer>
+                      {demo === "meeting" && showMeetingRuntimePanels ? (
+                        <Reasoning
+                          className="mb-0 mt-2 rounded-md border border-border/60 bg-background px-2.5 py-2"
+                          defaultOpen
+                          isStreaming={isStreaming}
+                        >
+                          <ReasoningTrigger className="text-[11px]">
+                            Thinking（現在の実行ステップ）
+                          </ReasoningTrigger>
+                          <ReasoningContent className="text-[11px] leading-6">
+                            {liveAgentStepsMarkdown}
+                          </ReasoningContent>
+                        </Reasoning>
+                      ) : null}
                     </MessageContent>
                   </Message>
                 ) : null}
