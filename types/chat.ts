@@ -61,6 +61,44 @@ export interface CodeSnippet {
   content: string;
 }
 
+export interface StructuredRisk {
+  title: string;
+  impact: string;
+  mitigation: string;
+  severity: "low" | "medium" | "high";
+}
+
+export interface StructuredAction {
+  task: string;
+  owner: string;
+  due: string;
+  metric: string;
+  priority: "high" | "medium" | "low";
+}
+
+export interface StructuredEvidence {
+  claim: string;
+  support: string;
+  nextCheck: string;
+}
+
+export interface StructuredWorklogStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: "todo" | "doing" | "done";
+  tags: string[];
+}
+
+export interface StructuredInsight {
+  summary: string;
+  keyPoints: string[];
+  risks: StructuredRisk[];
+  actions: StructuredAction[];
+  evidence: StructuredEvidence[];
+  worklog: StructuredWorklogStep[];
+}
+
 export interface DemoSessionSnapshot {
   id: string;
   demo: DemoId;
@@ -90,5 +128,6 @@ export type DemoUIMessage = UIMessage<
     citation: CitationItem;
     code: CodeSnippet;
     status: { phase: string; message: string };
+    structured: StructuredInsight;
   }
 >;

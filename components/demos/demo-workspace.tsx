@@ -107,6 +107,7 @@ import type {
   ModelProvider,
   PlanStep,
   QueueItem,
+  StructuredInsight,
   TaskItem,
   ToolEvent,
 } from "@/types/chat";
@@ -123,6 +124,7 @@ interface Checkpoint {
   artifacts: ArtifactItem[];
   tools: ToolEvent[];
   citations: CitationItem[];
+  structuredInsight?: StructuredInsight | null;
 }
 
 interface DemoScenarioStep {
@@ -605,6 +607,7 @@ export function DemoWorkspace({
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [loopStatus, setLoopStatus] = useState<string | null>(null);
   const [isAutoLoopRunning, setIsAutoLoopRunning] = useState(false);
+  const [structuredInsight, setStructuredInsight] = useState<StructuredInsight | null>(null);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
@@ -653,7 +656,11 @@ export function DemoWorkspace({
       }
 
       if (part.type === "data-tool") {
-        setTools((prev) => upsertById(prev, part.data as ToolEvent));
+        const toolEvent = part.data as ToolEvent;
+        setTools((prev) => upsertById(prev, toolEvent));
+        if (toolEvent.name === "model-call" && toolEvent.status === "running") {
+          setStructuredInsight(null);
+        }
         return;
       }
 
@@ -682,6 +689,11 @@ export function DemoWorkspace({
 
       if (part.type === "data-citation") {
         setCitations((prev) => upsertById(prev, part.data as CitationItem));
+        return;
+      }
+
+      if (part.type === "data-structured") {
+        setStructuredInsight(part.data as StructuredInsight);
       }
     },
   });
@@ -862,7 +874,16 @@ export function DemoWorkspace({
     () => (viewMode === "guided" ? activeScenarios.slice(0, 1) : activeScenarios),
     [activeScenarios, viewMode],
   );
-  const latestAssistantSummary = useMemo(() => extractLatestAssistantSummary(messages), [messages]);
+  const latestAssistantSummary = useMemo(() => {
+    if (structuredInsight) {
+      return {
+        summary: structuredInsight.summary,
+        bullets: structuredInsight.keyPoints.slice(0, 3),
+      };
+    }
+
+    return extractLatestAssistantSummary(messages);
+  }, [messages, structuredInsight]);
   const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
   const planProgress = useMemo(() => {
@@ -914,6 +935,16 @@ export function DemoWorkspace({
   const completedGateCount = stageGates.filter((stage) => stage.done).length;
   const gateProgress = Math.round((completedGateCount / stageGates.length) * 100);
   const worklogSteps = useMemo<WorklogStep[]>(() => {
+    if (structuredInsight && structuredInsight.worklog.length > 0) {
+      return structuredInsight.worklog.slice(0, 6).map((step) => ({
+        id: step.id,
+        label: step.label,
+        description: step.detail,
+        status: toWorklogStatus(step.status),
+        tags: step.tags.length > 0 ? step.tags : [step.status],
+      }));
+    }
+
     if (plan.length > 0) {
       return plan.slice(0, 4).map((step, index) => {
         const relatedTool = tools.find((tool) => tool.detail.includes(step.title));
@@ -943,7 +974,7 @@ export function DemoWorkspace({
       status: stage.done ? "complete" : index === completedGateCount ? "active" : "pending",
       tags: ["workflow", stage.done ? "done" : "waiting"],
     }));
-  }, [completedGateCount, plan, stageGates, tools]);
+  }, [completedGateCount, plan, stageGates, structuredInsight, tools]);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -1315,6 +1346,7 @@ export function DemoWorkspace({
       artifacts,
       tools,
       citations,
+      structuredInsight,
     };
 
     setCheckpoints((prev) => [checkpoint, ...prev].slice(0, 6));
@@ -1328,6 +1360,7 @@ export function DemoWorkspace({
     setArtifacts(checkpoint.artifacts);
     setTools(checkpoint.tools);
     setCitations(checkpoint.citations);
+    setStructuredInsight(checkpoint.structuredInsight ?? null);
   };
 
   const handleDraftKeyDown = (
@@ -1807,6 +1840,52 @@ export function DemoWorkspace({
                     まだ回答がありません。Run Scenarioまたは送信で回答を生成すると、ここに要点を固定表示します。
                   </p>
                 )}
+                {structuredInsight ? (
+                  <div className="mt-2 grid gap-2 md:grid-cols-3">
+                    <div className="rounded-md border border-border/60 bg-background p-2">
+                      <p className="text-[11px] font-semibold">重要論点</p>
+                      <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                        {structuredInsight.keyPoints.slice(0, 4).map((point) => (
+                          <li key={point}>• {point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background p-2">
+                      <p className="text-[11px] font-semibold">主要リスク</p>
+                      {structuredInsight.risks.length > 0 ? (
+                        <div className="mt-1 space-y-1">
+                          {structuredInsight.risks.slice(0, 3).map((risk) => (
+                            <div key={risk.title} className="rounded border border-border/60 px-1.5 py-1 text-[10px]">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">{risk.title}</span>
+                                <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                                  {risk.severity}
+                                </Badge>
+                              </div>
+                              <p className="mt-0.5 text-muted-foreground">{risk.mitigation}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-muted-foreground">リスク抽出なし</p>
+                      )}
+                    </div>
+                    <div className="rounded-md border border-border/60 bg-background p-2">
+                      <p className="text-[11px] font-semibold">次アクション</p>
+                      {structuredInsight.actions.length > 0 ? (
+                        <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                          {structuredInsight.actions.slice(0, 3).map((action) => (
+                            <li key={`${action.task}-${action.owner}`}>
+                              • {action.task}（{action.owner} / {action.due}）
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-muted-foreground">アクション抽出なし</p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <ChainOfThought defaultOpen={viewMode === "guided"}>
                 <ChainOfThoughtHeader>Agent Worklog（CoT）</ChainOfThoughtHeader>
