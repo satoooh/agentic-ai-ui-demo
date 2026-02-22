@@ -18,6 +18,8 @@ export default function TransportDemoPage() {
           id: "transport-delay-ops",
           title: "遅延発生時の運行デスク対応",
           description: "監視→案内文→公開承認までを再現。",
+          outcome: "監視から公表までのオペレーションを標準化",
+          targetDurationSec: 45,
           steps: [
             {
               id: "transport-step-1",

@@ -42,7 +42,17 @@ interface DemoScenario {
   id: string;
   title: string;
   description: string;
+  outcome?: string;
+  targetDurationSec?: number;
   steps: DemoScenarioStep[];
+}
+
+interface ApprovalLogItem {
+  id: string;
+  action: string;
+  reason: string;
+  status: "pending" | "approved" | "dismissed";
+  timestamp: string;
 }
 
 interface DemoWorkspaceProps {
@@ -132,6 +142,22 @@ function wait(ms: number) {
   });
 }
 
+function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "error") {
+  if (status === "done") {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (status === "running") {
+    return "bg-amber-100 text-amber-800";
+  }
+
+  if (status === "error") {
+    return "bg-red-100 text-red-700";
+  }
+
+  return "bg-slate-100 text-slate-700";
+}
+
 export function DemoWorkspace({
   demo,
   title,
@@ -168,12 +194,22 @@ export function DemoWorkspace({
   const [ttsNote, setTtsNote] = useState<string | null>(null);
   const [runningScenarioId, setRunningScenarioId] = useState<string | null>(null);
   const [scenarioStatus, setScenarioStatus] = useState<string | null>(null);
+  const [scenarioStepStates, setScenarioStepStates] = useState<
+    Record<string, Record<string, "pending" | "running" | "done" | "error">>
+  >({});
+  const [scenarioDurations, setScenarioDurations] = useState<Record<string, number>>({});
+  const [scenarioElapsedSec, setScenarioElapsedSec] = useState(0);
+  const [openInChatTarget, setOpenInChatTarget] = useState<"chatgpt" | "claude" | "v0">("chatgpt");
+  const [approvalLogs, setApprovalLogs] = useState<ApprovalLogItem[]>([]);
+  const [activeApprovalLogId, setActiveApprovalLogId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<
     Array<Pick<DemoSessionSnapshot, "id" | "title" | "updatedAt" | "modelProvider" | "modelId">>
   >([]);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+  const scenarioAbortRef = useRef(false);
+  const scenarioStartRef = useRef<number | null>(null);
 
   const {
     messages,
@@ -222,7 +258,25 @@ export function DemoWorkspace({
       }
 
       if (part.type === "data-approval") {
-        setApproval(part.data as ApprovalRequest);
+        const nextApproval = part.data as ApprovalRequest;
+        setApproval(nextApproval);
+
+        if (nextApproval.required) {
+          const logId = crypto.randomUUID();
+          setApprovalLogs((prev) =>
+            [
+              {
+                id: logId,
+                action: nextApproval.action,
+                reason: nextApproval.reason,
+                status: "pending" as const,
+                timestamp: new Date().toISOString(),
+              },
+              ...prev,
+            ].slice(0, 10),
+          );
+          setActiveApprovalLogId(logId);
+        }
         return;
       }
 
@@ -245,6 +299,22 @@ export function DemoWorkspace({
       return artifacts[0]?.id ?? "";
     });
   }, [artifacts]);
+
+  useEffect(() => {
+    if (!runningScenarioId || !scenarioStartRef.current) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      if (!scenarioStartRef.current) {
+        return;
+      }
+
+      setScenarioElapsedSec(Math.floor((Date.now() - scenarioStartRef.current) / 1000));
+    }, 250);
+
+    return () => window.clearInterval(timerId);
+  }, [runningScenarioId]);
 
   const selectedArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0],
@@ -308,6 +378,32 @@ export function DemoWorkspace({
     return Math.round((doneCount / tasks.length) * 100);
   }, [tasks]);
 
+  const stageGates = useMemo(
+    () => [
+      {
+        id: "input",
+        label: "Input",
+        done: messages.some((message) => message.role === "user"),
+      },
+      {
+        id: "progress",
+        label: "Progress",
+        done: plan.length > 0 || tasks.length > 0 || tools.length > 0,
+      },
+      {
+        id: "artifact",
+        label: "Artifact",
+        done: artifacts.length > 0,
+      },
+      {
+        id: "approval",
+        label: "Approval",
+        done: approvalLogs.some((log) => log.status === "approved"),
+      },
+    ],
+    [messages, plan.length, tasks.length, tools.length, artifacts.length, approvalLogs],
+  );
+
   const isStreaming = status === "streaming" || status === "submitted";
 
   const send = async () => {
@@ -341,14 +437,33 @@ export function DemoWorkspace({
       return;
     }
 
+    scenarioAbortRef.current = false;
+    scenarioStartRef.current = Date.now();
+    setScenarioElapsedSec(0);
     setRunningScenarioId(scenario.id);
     setScenarioStatus(`シナリオ「${scenario.title}」を実行中...`);
+    setScenarioStepStates((prev) => ({
+      ...prev,
+      [scenario.id]: Object.fromEntries(scenario.steps.map((step) => [step.id, "pending"])),
+    }));
 
     try {
       for (const [index, step] of scenario.steps.entries()) {
+        if (scenarioAbortRef.current) {
+          setScenarioStatus(`シナリオ「${scenario.title}」を停止しました。`);
+          break;
+        }
+
         setScenarioStatus(
           `シナリオ実行中 (${index + 1}/${scenario.steps.length}): ${step.label}`,
         );
+        setScenarioStepStates((prev) => ({
+          ...prev,
+          [scenario.id]: {
+            ...prev[scenario.id],
+            [step.id]: "running",
+          },
+        }));
 
         await sendMessage(
           { text: step.prompt },
@@ -362,19 +477,64 @@ export function DemoWorkspace({
           },
         );
 
+        setScenarioStepStates((prev) => ({
+          ...prev,
+          [scenario.id]: {
+            ...prev[scenario.id],
+            [step.id]: "done",
+          },
+        }));
         await wait(240);
       }
 
-      setScenarioStatus(`シナリオ「${scenario.title}」が完了しました。`);
+      if (!scenarioAbortRef.current) {
+        setScenarioStatus(`シナリオ「${scenario.title}」が完了しました。`);
+      }
     } catch (scenarioError) {
+      setScenarioStepStates((prev) => {
+        const current = prev[scenario.id];
+        if (!current) {
+          return prev;
+        }
+
+        const runningStepId = Object.entries(current).find(([, state]) => state === "running")?.[0];
+        if (!runningStepId) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [scenario.id]: {
+            ...current,
+            [runningStepId]: "error",
+          },
+        };
+      });
       setScenarioStatus(
         `シナリオ実行に失敗しました: ${
           scenarioError instanceof Error ? scenarioError.message : "unknown error"
         }`,
       );
     } finally {
+      const startedAt = scenarioStartRef.current;
+      if (startedAt) {
+        const elapsed = Math.max(1, Math.floor((Date.now() - startedAt) / 1000));
+        setScenarioDurations((prev) => ({ ...prev, [scenario.id]: elapsed }));
+      }
+
+      scenarioStartRef.current = null;
+      scenarioAbortRef.current = false;
       setRunningScenarioId(null);
     }
+  };
+
+  const stopScenario = () => {
+    if (!runningScenarioId) {
+      return;
+    }
+
+    scenarioAbortRef.current = true;
+    setScenarioStatus("停止要求を受け付けました。現在のステップ終了後に停止します。");
   };
 
   const approveCurrentAction = async () => {
@@ -395,6 +555,28 @@ export function DemoWorkspace({
         },
       },
     );
+
+    if (activeApprovalLogId) {
+      setApprovalLogs((prev) =>
+        prev.map((log) =>
+          log.id === activeApprovalLogId ? { ...log, status: "approved" } : log,
+        ),
+      );
+      setActiveApprovalLogId(null);
+    }
+
+    setApproval(null);
+  };
+
+  const dismissCurrentAction = () => {
+    if (activeApprovalLogId) {
+      setApprovalLogs((prev) =>
+        prev.map((log) =>
+          log.id === activeApprovalLogId ? { ...log, status: "dismissed" } : log,
+        ),
+      );
+      setActiveApprovalLogId(null);
+    }
 
     setApproval(null);
   };
@@ -431,7 +613,14 @@ export function DemoWorkspace({
 
   const openInChat = () => {
     const query = encodeURIComponent(draft || "この案件の次アクションを整理してください。");
-    window.open(`https://chatgpt.com/?q=${query}`, "_blank", "noopener,noreferrer");
+    const targetUrl =
+      openInChatTarget === "chatgpt"
+        ? `https://chatgpt.com/?q=${query}`
+        : openInChatTarget === "claude"
+          ? `https://claude.ai/new?q=${query}`
+          : `https://v0.dev/chat?q=${query}`;
+
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
   };
 
   const startVoiceInput = () => {
@@ -647,6 +836,25 @@ export function DemoWorkspace({
             <p className="text-sm font-semibold text-slate-900">{status}</p>
           </div>
         </div>
+        <div className="border-t border-slate-200 bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Input to Approval
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {stageGates.map((stage) => (
+              <span
+                key={stage.id}
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  stage.done
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border border-slate-300 bg-slate-100 text-slate-700"
+                }`}
+              >
+                {stage.label}: {stage.done ? "done" : "waiting"}
+              </span>
+            ))}
+          </div>
+        </div>
       </header>
 
       {topPanel}
@@ -786,7 +994,59 @@ export function DemoWorkspace({
                   <div key={scenario.id} className="rounded border border-slate-200 bg-white p-2">
                     <p className="text-xs font-semibold text-slate-900">{scenario.title}</p>
                     <p className="mt-1 text-[11px] text-slate-600">{scenario.description}</p>
+                    {scenario.outcome ? (
+                      <p className="mt-1 text-[11px] text-slate-600">Outcome: {scenario.outcome}</p>
+                    ) : null}
+                    {scenario.targetDurationSec ? (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        target: {scenario.targetDurationSec}s
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-[11px] text-slate-500">steps: {scenario.steps.length}</p>
+                    <div className="mt-2 h-1.5 rounded bg-slate-200">
+                      <div
+                        className="h-1.5 rounded bg-slate-900"
+                        style={{
+                          width: `${
+                            scenario.steps.length === 0
+                              ? 0
+                              : Math.round(
+                                  ((scenario.steps.filter(
+                                    (step) =>
+                                      scenarioStepStates[scenario.id]?.[step.id] === "done",
+                                  ).length /
+                                    scenario.steps.length) *
+                                    100),
+                                )
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <ul className="mt-2 space-y-1">
+                      {scenario.steps.map((step) => {
+                        const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
+                        return (
+                          <li
+                            key={step.id}
+                            className="flex items-center justify-between gap-2 text-[11px] text-slate-700"
+                          >
+                            <span className="truncate">{step.label}</span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 font-medium ${getScenarioStepBadgeStyle(
+                                stepStatus,
+                              )}`}
+                            >
+                              {stepStatus}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {scenarioDurations[scenario.id] ? (
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        last run: {scenarioDurations[scenario.id]}s
+                      </p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => void runScenario(scenario)}
@@ -798,6 +1058,18 @@ export function DemoWorkspace({
                   </div>
                 ))}
               </div>
+              {runningScenarioId ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={stopScenario}
+                    className="rounded border border-red-300 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700"
+                  >
+                    Stop Scenario
+                  </button>
+                  <span className="text-[11px] text-slate-600">elapsed: {scenarioElapsedSec}s</span>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -864,6 +1136,17 @@ export function DemoWorkspace({
             >
               Open in Chat
             </button>
+            <select
+              value={openInChatTarget}
+              onChange={(event) =>
+                setOpenInChatTarget(event.target.value as "chatgpt" | "claude" | "v0")
+              }
+              className="rounded border border-slate-300 px-2 py-2 text-sm text-slate-700"
+            >
+              <option value="chatgpt">ChatGPT</option>
+              <option value="claude">Claude</option>
+              <option value="v0">v0</option>
+            </select>
           </div>
 
           {enableVoice ? (
@@ -1060,6 +1343,33 @@ export function DemoWorkspace({
             </ul>
           </section>
 
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">Approval Ledger</h2>
+            <ul className="mt-2 space-y-2 text-xs text-slate-700">
+              {approvalLogs.map((log) => (
+                <li key={log.id} className="rounded border border-slate-200 bg-slate-50 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-semibold text-slate-900">{log.action}</p>
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] ${
+                        log.status === "approved"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : log.status === "dismissed"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {log.status}
+                    </span>
+                  </div>
+                  <p className="mt-1">{log.reason}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{log.timestamp}</p>
+                </li>
+              ))}
+              {approvalLogs.length === 0 ? <li>履歴なし</li> : null}
+            </ul>
+          </section>
+
           {approval?.required ? (
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
               承認待ちアクションがあります。画面下部の Confirmation モーダルで確定してください。
@@ -1185,7 +1495,7 @@ export function DemoWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => setApproval(null)}
+                onClick={dismissCurrentAction}
                 className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700"
               >
                 キャンセル

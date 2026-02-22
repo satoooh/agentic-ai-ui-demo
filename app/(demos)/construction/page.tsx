@@ -22,6 +22,8 @@ export default function ConstructionDemoPage() {
           id: "construction-quick-run",
           title: "現場日報の通しデモ",
           description: "音声メモ想定の入力から提出承認までを短時間で再現。",
+          outcome: "日報作成と提出確認の往復時間を短縮",
+          targetDurationSec: 50,
           steps: [
             {
               id: "construction-step-1",

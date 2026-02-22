@@ -39,6 +39,8 @@ export default function GovInsightDemoPage() {
           id: "gov-analysis-flow",
           title: "統計探索から配布前承認まで",
           description: "探索→根拠付きレポート→配布承認の流れを実行。",
+          outcome: "根拠付きレポートの初稿作成と配布確認を短縮",
+          targetDurationSec: 60,
           steps: [
             {
               id: "gov-step-1",
