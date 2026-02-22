@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SiteNav } from "@/components/common/site-nav";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "Japan Vertical Agentic Demo Lab",
@@ -16,8 +17,10 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body>
-        <SiteNav />
-        <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
+        <TooltipProvider>
+          <SiteNav />
+          <main className="mx-auto w-full max-w-7xl px-4 py-6">{children}</main>
+        </TooltipProvider>
       </body>
     </html>
   );

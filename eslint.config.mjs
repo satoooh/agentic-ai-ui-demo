@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // AI Elements generated vendor-like components.
+    "components/ai-elements/**",
   ]),
 ]);
 
