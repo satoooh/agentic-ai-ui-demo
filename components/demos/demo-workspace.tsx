@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
   Artifact as ArtifactPanel,
   ArtifactAction,
@@ -174,6 +175,13 @@ interface WorklogStep {
   description: string;
   status: "complete" | "active" | "pending";
   tags: string[];
+}
+
+interface LiveAgentStep {
+  id: string;
+  label: string;
+  detail: string;
+  status: PlanStep["status"];
 }
 
 interface AgenticLane {
@@ -512,6 +520,42 @@ function toWorklogStatus(status: PlanStep["status"]): WorklogStep["status"] {
   }
 
   return "pending";
+}
+
+function findLatestToolEvent(
+  tools: ToolEvent[],
+  predicate: (tool: ToolEvent) => boolean,
+): ToolEvent | null {
+  for (const tool of tools) {
+    if (predicate(tool)) {
+      return tool;
+    }
+  }
+  return null;
+}
+
+function ConversationAutoFollower({
+  enabled,
+  followKey,
+}: {
+  enabled: boolean;
+  followKey: string;
+}) {
+  const { scrollToBottom } = useStickToBottomContext();
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void scrollToBottom("smooth");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [enabled, followKey, scrollToBottom]);
+
+  return null;
 }
 
 function wait(ms: number) {
@@ -1027,6 +1071,11 @@ export function DemoWorkspace({
 
     return extractLatestAssistantSummary(messages);
   }, [messages, structuredInsight]);
+  const conversationFollowKey = useMemo(() => {
+    const latestMessage = messages.at(-1);
+    const latestTextLength = latestMessage ? getMessageText(latestMessage).length : 0;
+    return `${messages.length}:${latestMessage?.id ?? "none"}:${latestTextLength}:${status}:${tools.length}`;
+  }, [messages, status, tools.length]);
   const assumptionHints = useMemo(() => {
     if (!structuredInsight) {
       return [] as string[];
@@ -1181,6 +1230,107 @@ export function DemoWorkspace({
 
     return lines.join("\n");
   }, [connectorCompleted, latestToolEvents, structuredInsight?.summary, worklogSteps]);
+  const liveAgentSteps = useMemo<LiveAgentStep[]>(() => {
+    if (demo !== "meeting") {
+      return [];
+    }
+
+    const connectorSuccess = findLatestToolEvent(
+      tools,
+      (tool) => tool.status === "success" && tool.name.includes("connector"),
+    );
+    const connectorRunning = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "connector-fetch" && tool.status === "running",
+    );
+    const connectorError = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "connector-fetch" && tool.status === "error",
+    );
+
+    const modelDone = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "model-call" && tool.status === "success",
+    );
+    const modelRunning = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "model-call" && tool.status === "running",
+    );
+
+    const orchestrationDone = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "multi-agent-orchestration" && tool.status === "success",
+    );
+    const orchestrationRunning = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "multi-agent-orchestration" && tool.status === "running",
+    );
+    const orchestrationError = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "multi-agent-orchestration" && tool.status === "error",
+    );
+
+    const structuredDone = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "structured-output" && tool.status === "success",
+    );
+    const structuredRunning = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "structured-output" && tool.status === "running",
+    );
+    const structuredError = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "structured-output" && tool.status === "error",
+    );
+
+    return [
+      {
+        id: "live-intake",
+        label: "入力確定",
+        detail: meetingTranscriptConfirmed ? "議事録を確認済み。" : "議事録入力待ち。",
+        status: meetingTranscriptConfirmed ? "done" : "todo",
+      },
+      {
+        id: "live-collect",
+        label: "外部収集",
+        detail:
+          connectorSuccess?.detail ??
+          connectorRunning?.detail ??
+          connectorError?.detail ??
+          "公開データの収集を待機中。",
+        status: connectorSuccess ? "done" : connectorRunning ? "doing" : "todo",
+      },
+      {
+        id: "live-reason",
+        label: "一次推論",
+        detail:
+          modelDone?.detail ??
+          modelRunning?.detail ??
+          "会議レビュー回答を生成します。",
+        status: modelDone ? "done" : modelRunning ? "doing" : "todo",
+      },
+      {
+        id: "live-branch",
+        label: "並列検証",
+        detail:
+          orchestrationDone?.detail ??
+          orchestrationRunning?.detail ??
+          orchestrationError?.detail ??
+          "Observer / Skeptic / Operator を待機中。",
+        status: orchestrationDone ? "done" : orchestrationRunning ? "doing" : "todo",
+      },
+      {
+        id: "live-aggregate",
+        label: "構造化集約",
+        detail:
+          structuredDone?.detail ??
+          structuredRunning?.detail ??
+          structuredError?.detail ??
+          "TL;DR / 論点 / 次アクションを整形します。",
+        status: structuredDone ? "done" : structuredRunning ? "doing" : "todo",
+      },
+    ];
+  }, [demo, meetingTranscriptConfirmed, tools]);
   const agenticLanes = useMemo<AgenticLane[]>(() => {
     const observeState: AgenticLane["state"] =
       demo === "meeting"
@@ -1490,6 +1640,39 @@ export function DemoWorkspace({
       autoLoopAbortRef.current = false;
       setIsAutoLoopRunning(false);
     }
+  };
+
+  const runMeetingOneShot = async () => {
+    if (demo !== "meeting" || isStreaming || isAutoLoopRunning) {
+      return;
+    }
+    if (!ensureMeetingTranscript("ワンショット実行")) {
+      return;
+    }
+
+    const template = MEETING_OUTPUT_TEMPLATES[selectedMeetingProfile.id];
+    const prompt = [
+      "設定済みの議事録と会議タイプを使って、1回の回答で会議レビューを完了してください。",
+      "以下の順序で出力してください:",
+      "1. 要点サマリー（3行以内）",
+      "2. 重要な論点（箇条書き）",
+      `3. ${template.sections[1]}`,
+      `4. 次アクション表（${template.actionColumns.join(" / ")}）`,
+      "5. 不足データと次回確認",
+    ].join("\n");
+
+    await sendMessage(
+      { text: withDemoContext(prompt) },
+      {
+        body: buildRequestBody({
+          approved: false,
+          operation: "scenario",
+          meetingLog: meetingTranscript.trim(),
+        }),
+      },
+    );
+
+    setLoopStatus("ワンショット実行を開始しました。Live Agent Steps で進捗を確認できます。");
   };
 
   const stopAutonomousLoop = () => {
@@ -2123,19 +2306,10 @@ export function DemoWorkspace({
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
-                  disabled={Boolean(runningScenarioId) || !meetingTranscriptConfirmed}
+                  onClick={() => void runMeetingOneShot()}
+                  disabled={isStreaming || isAutoLoopRunning || !meetingTranscriptConfirmed}
                 >
-                  Run Scenario
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void runDevilsAdvocate()}
-                  disabled={isStreaming || !meetingTranscriptConfirmed}
-                >
-                  反証レビュー開始
+                  ワンショット実行
                 </Button>
               </div>
             ) : null}
@@ -2355,6 +2529,28 @@ export function DemoWorkspace({
                   ? "議事録確定後、このチャット上で要約・反証・次アクションを反復します。"
                   : "左列で開始し、ここで編集・再送して出力を固めます。"}
               </p>
+              {demo === "meeting" && showMeetingRuntimePanels ? (
+                <ChainOfThought
+                  defaultOpen
+                  className="rounded-md border border-border/70 bg-background/80 p-2"
+                >
+                  <ChainOfThoughtHeader>Live Agent Steps（現在の実行ステップ）</ChainOfThoughtHeader>
+                  <ChainOfThoughtContent>
+                    {liveAgentSteps.map((step) => (
+                      <ChainOfThoughtStep
+                        key={step.id}
+                        label={step.label}
+                        description={step.detail}
+                        status={toWorklogStatus(step.status)}
+                      >
+                        <ChainOfThoughtSearchResults>
+                          <ChainOfThoughtSearchResult>{step.status}</ChainOfThoughtSearchResult>
+                        </ChainOfThoughtSearchResults>
+                      </ChainOfThoughtStep>
+                    ))}
+                  </ChainOfThoughtContent>
+                </ChainOfThought>
+              ) : null}
               {showMeetingRuntimePanels ? (
                 <div className="grid gap-1.5 md:grid-cols-4">
                   {agenticLanes.map((lane) => (
@@ -2581,12 +2777,13 @@ export function DemoWorkspace({
               )}
             >
               <ConversationContent className="gap-4 p-4">
+                <ConversationAutoFollower enabled followKey={conversationFollowKey} />
                 {messages.length === 0 ? (
                   <ConversationEmptyState
                     title="まだ会話はありません"
                     description={
                       demo === "meeting"
-                        ? "Step 1 を確定後、Run Scenario か下の入力欄から開始してください。"
+                        ? "Step 1 を確定後、ワンショット実行または下の入力欄から開始してください。"
                         : "左のシナリオを実行するか、下の入力欄から開始してください。"
                     }
                   />
