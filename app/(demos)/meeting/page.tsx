@@ -16,44 +16,7 @@ export default function MeetingDemoPage() {
       demo="meeting"
       title="会議レビュー: Devil's Advocate Copilot"
       subtitle="会議タイプを設定し、議事録入力 → 前提抽出 → 悪魔の代弁者レビュー → 次アクション確定までを1画面で回す。"
-      suggestions={[
-        "この会議の決定事項を要約して",
-        "見落としている前提を3つ挙げて",
-        "悪魔の代弁者として反証を実行して",
-        "次回会議までの検証タスクを作成して",
-        "この議論で最も危険な意思決定を指摘して",
-      ]}
-      scenarios={[
-        {
-          id: "meeting-agentic-loop",
-          title: "会議レビュー自律ループ",
-          description: "議事録整理→反証→次アクション設計を短時間で再現。",
-          outcome: "会議後の実行漏れと判断バイアスを削減",
-          targetDurationSec: 60,
-          steps: [
-            {
-              id: "meeting-step-1",
-              label: "議事録要約",
-              prompt: "ここまでの会議ログを要約し、決定事項と保留事項を分けてください。",
-            },
-            {
-              id: "meeting-step-2",
-              label: "前提抽出",
-              prompt: "意思決定の前提を3つ抽出し、検証すべき項目を整理してください。",
-            },
-            {
-              id: "meeting-step-3",
-              label: "悪魔の代弁者",
-              prompt: "この会議の前提に対し、悪魔の代弁者として反証シナリオを提示してください。",
-            },
-            {
-              id: "meeting-step-4",
-              label: "次アクション生成",
-              prompt: "反証を踏まえて、次回会議までの実行タスクを作成してください。",
-            },
-          ],
-        },
-      ]}
+      suggestions={[]}
       initialQueue={[
         {
           id: "meeting-queue-1",

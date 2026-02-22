@@ -152,6 +152,7 @@ interface MeetingProfile {
   objective: string;
   participants: string;
   expectedOutput: string;
+  keyTopics: string[];
 }
 
 interface MeetingOutputTemplate {
@@ -167,6 +168,7 @@ const MEETING_PROFILES: MeetingProfile[] = [
     objective: "案件の進捗、失注リスク、次回打ち手を確定する",
     participants: "営業責任者, AE, CS",
     expectedOutput: "優先案件リスト、リスク対策、次回アクション",
+    keyTopics: ["案件進捗", "失注リスク", "提案修正", "次回打ち手"],
   },
   {
     id: "hiring-sync",
@@ -174,6 +176,7 @@ const MEETING_PROFILES: MeetingProfile[] = [
     objective: "採用歩留まりを確認し、詰まりを解消する",
     participants: "採用責任者, Recruiter, Hiring Manager",
     expectedOutput: "ボトルネック分析、面接改善、次探索条件",
+    keyTopics: ["歩留まり", "面接品質", "辞退要因", "再探索条件"],
   },
   {
     id: "product-planning",
@@ -181,6 +184,7 @@ const MEETING_PROFILES: MeetingProfile[] = [
     objective: "次スプリントの優先順位とリスクを整理する",
     participants: "PM, Tech Lead, Designer",
     expectedOutput: "実行順序、依存関係、意思決定メモ",
+    keyTopics: ["優先順位", "依存関係", "リリースリスク", "スコープ調整"],
   },
   {
     id: "exec-review",
@@ -188,6 +192,7 @@ const MEETING_PROFILES: MeetingProfile[] = [
     objective: "重要意思決定の前提を検証し、判断材料を固める",
     participants: "CEO, 事業責任者, 経営企画",
     expectedOutput: "判断前提、反証シナリオ、検証タスク",
+    keyTopics: ["意思決定前提", "下振れシナリオ", "投資配分", "検証タスク"],
   },
 ];
 
@@ -222,6 +227,77 @@ function buildMeetingOutputFormatInstruction(profile: MeetingProfile): string {
     ...template.sections.map((section, index) => `${index + 2}. ${section}`),
     `${template.sections.length + 2}. 次アクション表（列: ${template.actionColumns.join(" / ")}）`,
     `${template.sections.length + 3}. 不足データと次回確認事項`,
+  ].join("\n");
+}
+
+function getMeetingSuggestions(profile: MeetingProfile): string[] {
+  const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  return [
+    `${profile.label}として、この会議の決定事項と保留事項を整理して`,
+    `${profile.keyTopics[0]}と${profile.keyTopics[1]}の観点で見落としを指摘して`,
+    `${profile.label}向けに悪魔の代弁者レビューを実行して`,
+    `${template.title}の形式で次回までのアクション表を作成して`,
+    `${profile.label}で最優先に検証すべき前提を3つ挙げて`,
+  ];
+}
+
+function buildMeetingScenario(profile: MeetingProfile): DemoScenario {
+  const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  return {
+    id: `meeting-loop-${profile.id}`,
+    title: `${profile.label}シナリオ`,
+    description: `${profile.label}の主要論点に沿って、反証レビューから次アクション確定まで実行。`,
+    outcome: `${profile.expectedOutput}を短時間で作成`,
+    targetDurationSec: 62,
+    steps: [
+      {
+        id: `meeting-${profile.id}-step-1`,
+        label: "議事録要約",
+        prompt: `${profile.label}として、議事録から決定事項と保留事項を整理してください。`,
+      },
+      {
+        id: `meeting-${profile.id}-step-2`,
+        label: "主要論点抽出",
+        prompt: `主要論点（${profile.keyTopics.join(" / ")}）ごとに論点と不足データを整理してください。`,
+      },
+      {
+        id: `meeting-${profile.id}-step-3`,
+        label: "悪魔の代弁者",
+        prompt: `${profile.label}の前提に対して悪魔の代弁者レビューを実行し、反証を2件提示してください。`,
+      },
+      {
+        id: `meeting-${profile.id}-step-4`,
+        label: "次アクション確定",
+        prompt: `${template.title}の形式で、次回までのアクション表を作成してください。`,
+      },
+    ],
+  };
+}
+
+function buildMeetingDraftTemplate(profile: MeetingProfile): string {
+  const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  return [
+    `会議タイプ: ${profile.label}`,
+    "",
+    "## 会議ログ要約",
+    "- ",
+    "",
+    `## ${template.sections[0]}`,
+    "- ",
+    "",
+    `## ${template.sections[1]}`,
+    "- ",
+    "",
+    `## ${template.sections[2]}`,
+    "- ",
+    "",
+    `## 次アクション表`,
+    `| ${template.actionColumns.join(" | ")} |`,
+    `| ${template.actionColumns.map(() => "---").join(" | ")} |`,
+    `|  |  |  |  |`,
+    "",
+    "## 不足データと次回確認事項",
+    "- ",
   ].join("\n");
 }
 
@@ -343,7 +419,11 @@ function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "err
   return "bg-slate-100 text-slate-700";
 }
 
-function getAutonomousLoopPrompts(demo: DemoId, goal: string): string[] {
+function getAutonomousLoopPrompts(
+  demo: DemoId,
+  goal: string,
+  meetingProfile?: MeetingProfile,
+): string[] {
   const normalizedGoal = goal.trim();
 
   if (demo === "sales") {
@@ -365,11 +445,17 @@ function getAutonomousLoopPrompts(demo: DemoId, goal: string): string[] {
   }
 
   if (demo === "meeting") {
-    const baseGoal = normalizedGoal || "会議の結論の妥当性を検証したい";
+    const profile = meetingProfile ?? MEETING_PROFILES[0];
+    const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+    const baseGoal = normalizedGoal || `${profile.label}の結論妥当性を検証したい`;
     return [
-      `会議レビュー対象:\n${baseGoal}\n決定事項と保留事項を整理し、判断前提を3つ抽出してください。`,
-      "悪魔の代弁者として、前提が崩れる失敗シナリオを2つ挙げ、意思決定の修正案を作成してください。",
-      "修正案を反映した次回会議までのアクション（担当/期限/検証データ）を箇条書きで出してください。",
+      `会議レビュー対象:\n${baseGoal}\n${profile.label}の主要論点（${profile.keyTopics.join(
+        " / ",
+      )}）で決定事項と保留事項を整理してください。`,
+      `${profile.label}の前提に対して悪魔の代弁者レビューを実行し、失敗シナリオを2つ提示してください。`,
+      `${template.title}の形式で、次回会議までのアクション（${template.actionColumns.join(
+        " / ",
+      )}）をMarkdown tableで出してください。`,
     ];
   }
 
@@ -589,6 +675,14 @@ export function DemoWorkspace({
     () => MEETING_OUTPUT_TEMPLATES[selectedMeetingProfile.id],
     [selectedMeetingProfile.id],
   );
+  const activeSuggestions = useMemo(
+    () => (demo === "meeting" ? getMeetingSuggestions(selectedMeetingProfile) : suggestions),
+    [demo, selectedMeetingProfile, suggestions],
+  );
+  const activeScenarios = useMemo(
+    () => (demo === "meeting" ? [buildMeetingScenario(selectedMeetingProfile)] : scenarios),
+    [demo, selectedMeetingProfile, scenarios],
+  );
 
   const contextStats = useMemo(() => {
     const userText = messages
@@ -634,8 +728,8 @@ export function DemoWorkspace({
     [queue, viewMode],
   );
   const displayedScenarios = useMemo(
-    () => (viewMode === "guided" ? scenarios.slice(0, 1) : scenarios),
-    [scenarios, viewMode],
+    () => (viewMode === "guided" ? activeScenarios.slice(0, 1) : activeScenarios),
+    [activeScenarios, viewMode],
   );
 
   const planProgress = useMemo(() => {
@@ -706,6 +800,7 @@ export function DemoWorkspace({
         `- 目的: ${selectedMeetingProfile.objective}\n` +
         `- 参加者: ${selectedMeetingProfile.participants}\n` +
         `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
+        `- 主要論点: ${selectedMeetingProfile.keyTopics.join(" / ")}\n` +
         "上記設定を必ず前提にして、日本語で簡潔に回答してください。\n\n" +
         `${buildMeetingOutputFormatInstruction(selectedMeetingProfile)}\n` +
         "必ず見出し付きで出力し、次アクション表は Markdown table で記述してください。";
@@ -801,7 +896,7 @@ export function DemoWorkspace({
     try {
       const loopSeed =
         demo === "meeting" && meetingTranscript.trim().length > 0 ? meetingTranscript : draft;
-      const prompts = getAutonomousLoopPrompts(demo, loopSeed);
+      const prompts = getAutonomousLoopPrompts(demo, loopSeed, selectedMeetingProfile);
       for (const [index, prompt] of prompts.entries()) {
         if (autoLoopAbortRef.current) {
           setLoopStatus("自律ループを停止しました。");
@@ -1001,6 +1096,14 @@ export function DemoWorkspace({
 
   const applySuggestion = (suggestion: string) => {
     setDraft(suggestion);
+  };
+
+  const applyMeetingTemplate = () => {
+    if (demo !== "meeting") {
+      return;
+    }
+    setDraft(buildMeetingDraftTemplate(selectedMeetingProfile));
+    setLoopStatus("会議タイプのテンプレートを入力欄に挿入しました。");
   };
 
   const createCheckpoint = () => {
@@ -1388,7 +1491,7 @@ export function DemoWorkspace({
             </CardContent>
           </Card>
 
-          {scenarios.length > 0 ? (
+          {activeScenarios.length > 0 ? (
             <Card className="gap-3 border-border/70 py-4">
               <CardHeader className="px-4">
                 <CardTitle className="text-sm">1-click Demo Scenario</CardTitle>
@@ -1443,7 +1546,7 @@ export function DemoWorkspace({
                         ) : null}
                       </div>
                     ))}
-                    {viewMode === "guided" && scenarios.length > displayedScenarios.length ? (
+                    {viewMode === "guided" && activeScenarios.length > displayedScenarios.length ? (
                       <p className="text-[11px] text-muted-foreground">
                         他シナリオは Full 表示で確認できます。
                       </p>
@@ -1558,7 +1661,7 @@ export function DemoWorkspace({
 
             <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
               <div className="flex flex-wrap gap-2">
-                {suggestions.map((suggestion) => (
+                {activeSuggestions.map((suggestion) => (
                   <Button
                     key={suggestion}
                     type="button"
@@ -1604,6 +1707,13 @@ export function DemoWorkspace({
                   </div>
                   <div className="mt-2 rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px]">
                     <p className="font-medium">この会議タイプの出力フォーマット</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {selectedMeetingProfile.keyTopics.map((topic) => (
+                        <Badge key={topic} variant="outline" className="text-[10px]">
+                          {topic}
+                        </Badge>
+                      ))}
+                    </div>
                     <ol className="mt-1 space-y-0.5 text-muted-foreground">
                       {selectedMeetingOutputTemplate.sections.map((section, index) => (
                         <li key={section}>
@@ -1614,7 +1724,27 @@ export function DemoWorkspace({
                     <p className="mt-1 text-muted-foreground">
                       次アクション表: {selectedMeetingOutputTemplate.actionColumns.join(" / ")}
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={applyMeetingTemplate}
+                        disabled={isStreaming}
+                      >
+                        テンプレートを挿入
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void runScenario(buildMeetingScenario(selectedMeetingProfile))}
+                        disabled={Boolean(runningScenarioId)}
+                      >
+                        この会議タイプを実行
+                      </Button>
                     </div>
+                  </div>
                   </div>
               ) : null}
 
