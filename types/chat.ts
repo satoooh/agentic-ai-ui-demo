@@ -91,6 +91,7 @@ export interface StructuredWorklogStep {
 }
 
 export interface StructuredInsight {
+  headline: string;
   summary: string;
   keyPoints: string[];
   risks: StructuredRisk[];

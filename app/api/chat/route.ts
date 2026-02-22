@@ -25,6 +25,7 @@ const requestSchema = z.object({
 });
 
 const structuredInsightSchema = z.object({
+  headline: z.string().min(1).max(64),
   summary: z.string().min(1).max(280),
   keyPoints: z.array(z.string().min(1).max(140)).min(2).max(6),
   risks: z
@@ -114,6 +115,9 @@ function buildStructuredArtifactMarkdown(
   const lines: string[] = [
     "# LLM Structured Summary",
     "",
+    `## タイトル`,
+    structured.headline,
+    "",
     "## 要点サマリー",
     structured.summary,
     "",
@@ -187,6 +191,8 @@ function buildStructuredExtractionPrompt(input: {
     `デモ種別: ${input.demo}`,
     `操作種別: ${input.operation ?? "default"}`,
     operationNote,
+    "",
+    "headline は 18〜32文字程度の短いタイトルにしてください（会議なら議題＋焦点）。",
     "",
     "ユーザーの直近入力:",
     input.latestUserText,
