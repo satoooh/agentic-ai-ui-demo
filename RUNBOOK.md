@@ -43,6 +43,8 @@ npm run build
   - 成果物
   - 承認
   の4ブロックが表示されることを確認
+- 各画面で `1-click Demo Scenario` を実行し、最終ステップまで `done` になることを確認
+- `/transport` と `/gov-insight` の接続パネルで `mode: mock/live` を切り替えて `refresh` し、フォールバック表示を確認
 
 ## 5. ステータス記録テンプレ
 

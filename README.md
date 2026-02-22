@@ -29,12 +29,19 @@ npm run dev
 - `/gov-insight` : 官公庁データ活用デモ
 - `/settings` : 環境変数状態
 
+## デモ強化ポイント
+
+- 各デモに `1-click Demo Scenario` を実装（入力→進捗→成果物→承認を自動再現）
+- `Approval Ledger` で承認履歴を監査ログとして表示
+- `Input to Approval` ゲートで業務フロー達成状況を可視化
+- 各デモに `1-minute Demo Script` を常設（営業/社内説明向け）
+
 ## API雛形
 
 - `POST /api/chat` : mock/live 切替可能な会話エンドポイント
-- `GET /api/connectors/odpt` : 公共交通データ（現状はmock中心）
-- `GET /api/connectors/estat` : e-Statデータ（現状はmock中心）
-- `GET /api/connectors/egov` : e-Gov候補データ（現状はmock中心）
+- `GET /api/connectors/odpt` : 公共交通データ（`?mode=mock|live` でオーバーライド可）
+- `GET /api/connectors/estat` : e-Statデータ（`?mode=mock|live` でオーバーライド可）
+- `GET /api/connectors/egov` : e-Gov候補データ（`?mode=mock|live` でオーバーライド可）
 - `POST /api/voice/tts` : 音声生成モック
 - `POST /api/voice/transcribe` : 文字起こしモック
 
