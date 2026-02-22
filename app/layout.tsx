@@ -19,7 +19,7 @@ export default function RootLayout({
       <body>
         <TooltipProvider>
           <SiteNav />
-          <main className="mx-auto w-full max-w-[1860px] px-5 pb-12 pt-6 md:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-[1920px] px-4 pb-14 pt-6 md:px-8">{children}</main>
         </TooltipProvider>
       </body>
     </html>

@@ -154,7 +154,7 @@ export default function HomePage() {
               <p className="mt-1 text-muted-foreground">{demo.value}</p>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {demo.focus.map((item) => (
+              {demo.focus.slice(0, 4).map((item) => (
                 <Badge key={item} variant="outline" className="text-[11px]">
                   {item}
                 </Badge>

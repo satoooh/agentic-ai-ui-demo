@@ -87,7 +87,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { mockMeetingTranscriptSamples } from "@/lib/mock/meeting";
+import { meetingTranscriptSamples } from "@/lib/samples/meeting";
 import { getDefaultModel, MODEL_OPTIONS } from "@/lib/models";
 import type {
   ApprovalRequest,
@@ -488,7 +488,7 @@ export function DemoWorkspace({
   const [model, setModel] = useState(getDefaultModel("openai"));
   const [meetingProfileId, setMeetingProfileId] = useState(MEETING_PROFILES[0].id);
   const [selectedMeetingSampleId, setSelectedMeetingSampleId] = useState(
-    mockMeetingTranscriptSamples[0]?.id ?? "",
+    meetingTranscriptSamples[0]?.id ?? "",
   );
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
@@ -679,7 +679,7 @@ export function DemoWorkspace({
   );
   const meetingSamples = useMemo(
     () =>
-      mockMeetingTranscriptSamples.filter(
+      meetingTranscriptSamples.filter(
         (sample) => sample.meetingProfileId === selectedMeetingProfile.id,
       ),
     [selectedMeetingProfile.id],
@@ -1405,31 +1405,18 @@ export function DemoWorkspace({
               <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="inline-flex rounded-lg border border-border/70 bg-background/80 p-1">
-                <Button
-                  type="button"
-                  variant={viewMode === "guided" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setViewMode("guided")}
-                >
-                  Guided
-                </Button>
-                <Button
-                  type="button"
-                  variant={viewMode === "full" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setViewMode("full")}
-                >
-                  Full
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                onClick={() => setViewMode((current) => (current === "guided" ? "full" : "guided"))}
+              >
+                {viewMode === "guided" ? "詳細モード" : "シンプル表示"}
+              </Button>
               <Badge variant={isStreaming ? "default" : "secondary"}>
                 {isStreaming ? "streaming" : "ready"}
               </Badge>
-              {viewMode === "full" ? <Badge variant="outline">queue {queue.length}</Badge> : null}
-              {viewMode === "full" ? <Badge variant="outline">artifacts {artifacts.length}</Badge> : null}
             </div>
           </div>
 
@@ -1536,7 +1523,9 @@ export function DemoWorkspace({
               </CardHeader>
               <CardContent className="space-y-2 px-4 text-xs text-muted-foreground">
                 <p>Queue: critical {queueSummary.critical} / warning {queueSummary.warning}</p>
-                <p>まず Run Scenario で会話を生成し、中央で必要箇所だけ修正します。</p>
+                <p>1. `Run Scenario` で最初の会話を生成</p>
+                <p>2. 中央で内容を修正して再送</p>
+                <p>3. 下段 Artifacts から成果物をコピー</p>
                 {primaryScenario ? (
                   <Button
                     type="button"
@@ -1655,7 +1644,7 @@ export function DemoWorkspace({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                最短導線: 左列の Run Scenario で入力を生成し、ここで内容を編集して再送します。
+                左列で開始し、ここで編集・再送して出力を固めます。
               </p>
             </CardHeader>
 

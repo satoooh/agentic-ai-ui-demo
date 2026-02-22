@@ -19,8 +19,8 @@ export function SiteNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/78 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-[1860px] items-center justify-between gap-4 px-5 py-3 md:px-6">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/84 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-4 px-4 py-3 md:px-8">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           <Badge
             variant="outline"
