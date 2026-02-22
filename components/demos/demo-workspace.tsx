@@ -31,11 +31,26 @@ interface Checkpoint {
   citations: CitationItem[];
 }
 
+interface DemoScenarioStep {
+  id: string;
+  label: string;
+  prompt: string;
+  approved?: boolean;
+}
+
+interface DemoScenario {
+  id: string;
+  title: string;
+  description: string;
+  steps: DemoScenarioStep[];
+}
+
 interface DemoWorkspaceProps {
   demo: DemoId;
   title: string;
   subtitle: string;
   suggestions: string[];
+  scenarios?: DemoScenario[];
   initialQueue: QueueItem[];
   initialPlan: PlanStep[];
   initialTasks: TaskItem[];
@@ -111,11 +126,18 @@ function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
   return "bg-slate-200 text-slate-700";
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 export function DemoWorkspace({
   demo,
   title,
   subtitle,
   suggestions,
+  scenarios = [],
   initialQueue,
   initialPlan,
   initialTasks,
@@ -144,6 +166,8 @@ export function DemoWorkspace({
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "error">("idle");
   const [ttsVoice, setTtsVoice] = useState("ja-JP-default");
   const [ttsNote, setTtsNote] = useState<string | null>(null);
+  const [runningScenarioId, setRunningScenarioId] = useState<string | null>(null);
+  const [scenarioStatus, setScenarioStatus] = useState<string | null>(null);
   const [sessions, setSessions] = useState<
     Array<Pick<DemoSessionSnapshot, "id" | "title" | "updatedAt" | "modelProvider" | "modelId">>
   >([]);
@@ -310,6 +334,47 @@ export function DemoWorkspace({
 
     setDraft("");
     setAttachmentNames([]);
+  };
+
+  const runScenario = async (scenario: DemoScenario) => {
+    if (runningScenarioId) {
+      return;
+    }
+
+    setRunningScenarioId(scenario.id);
+    setScenarioStatus(`シナリオ「${scenario.title}」を実行中...`);
+
+    try {
+      for (const [index, step] of scenario.steps.entries()) {
+        setScenarioStatus(
+          `シナリオ実行中 (${index + 1}/${scenario.steps.length}): ${step.label}`,
+        );
+
+        await sendMessage(
+          { text: step.prompt },
+          {
+            body: {
+              demo,
+              provider,
+              model,
+              approved: step.approved ?? false,
+            },
+          },
+        );
+
+        await wait(240);
+      }
+
+      setScenarioStatus(`シナリオ「${scenario.title}」が完了しました。`);
+    } catch (scenarioError) {
+      setScenarioStatus(
+        `シナリオ実行に失敗しました: ${
+          scenarioError instanceof Error ? scenarioError.message : "unknown error"
+        }`,
+      );
+    } finally {
+      setRunningScenarioId(null);
+    }
   };
 
   const approveCurrentAction = async () => {
@@ -709,6 +774,32 @@ export function DemoWorkspace({
               </div>
             ) : null}
           </div>
+
+          {scenarios.length > 0 ? (
+            <section className="rounded border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-slate-900">1-click Demo Scenario</h3>
+                {scenarioStatus ? <span className="text-[11px] text-slate-600">{scenarioStatus}</span> : null}
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                {scenarios.map((scenario) => (
+                  <div key={scenario.id} className="rounded border border-slate-200 bg-white p-2">
+                    <p className="text-xs font-semibold text-slate-900">{scenario.title}</p>
+                    <p className="mt-1 text-[11px] text-slate-600">{scenario.description}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">steps: {scenario.steps.length}</p>
+                    <button
+                      type="button"
+                      onClick={() => void runScenario(scenario)}
+                      disabled={Boolean(runningScenarioId)}
+                      className="mt-2 rounded bg-slate-900 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+                    >
+                      {runningScenarioId === scenario.id ? "running..." : "Run"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             {suggestions.map((suggestion) => (

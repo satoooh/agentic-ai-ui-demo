@@ -13,6 +13,36 @@ export default function TransportDemoPage() {
         "駅放送向けに30秒以内のスクリプトを作成",
         "掲出UIのHTML案を生成してください",
       ]}
+      scenarios={[
+        {
+          id: "transport-delay-ops",
+          title: "遅延発生時の運行デスク対応",
+          description: "監視→案内文→公開承認までを再現。",
+          steps: [
+            {
+              id: "transport-step-1",
+              label: "影響要約",
+              prompt: "中央線快速の遅延影響を要約してください。",
+            },
+            {
+              id: "transport-step-2",
+              label: "案内文生成",
+              prompt: "駅掲出文、放送文、CS回答の3種を作成してください。",
+            },
+            {
+              id: "transport-step-3",
+              label: "公開要求",
+              prompt: "この案内文を公開してください。",
+            },
+            {
+              id: "transport-step-4",
+              label: "公開承認",
+              prompt: "公開処理を承認します。",
+              approved: true,
+            },
+          ],
+        },
+      ]}
       initialQueue={mockOperationEvents.map((event, index) => ({
         id: `transport-initial-queue-${index}`,
         title: `${event.line} ${event.status}`,

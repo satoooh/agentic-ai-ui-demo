@@ -34,6 +34,36 @@ export default function GovInsightDemoPage() {
         "出典URL付きでサマリを生成して",
         "定期実行用のコネクタ雛形コードを出して",
       ]}
+      scenarios={[
+        {
+          id: "gov-analysis-flow",
+          title: "統計探索から配布前承認まで",
+          description: "探索→根拠付きレポート→配布承認の流れを実行。",
+          steps: [
+            {
+              id: "gov-step-1",
+              label: "候補探索",
+              prompt: "人口推計に関連する候補データセットを整理してください。",
+            },
+            {
+              id: "gov-step-2",
+              label: "根拠付きレポート",
+              prompt: "出典URL付きで要約レポートを作成してください。",
+            },
+            {
+              id: "gov-step-3",
+              label: "配布要求",
+              prompt: "このレポートを配布してください。",
+            },
+            {
+              id: "gov-step-4",
+              label: "配布承認",
+              prompt: "配布処理を承認します。",
+              approved: true,
+            },
+          ],
+        },
+      ]}
       initialQueue={mockDatasetCandidates.map((candidate, index) => ({
         id: `gov-initial-queue-${index}`,
         title: candidate.title,

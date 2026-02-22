@@ -17,6 +17,36 @@ export default function ConstructionDemoPage() {
         "写真台帳を工程タグ別に分類して",
         "明日の段取りを3ステップで提案して",
       ]}
+      scenarios={[
+        {
+          id: "construction-quick-run",
+          title: "現場日報の通しデモ",
+          description: "音声メモ想定の入力から提出承認までを短時間で再現。",
+          steps: [
+            {
+              id: "construction-step-1",
+              label: "日報ドラフト生成",
+              prompt: "本日の作業内容から日報ドラフトを作ってください。",
+            },
+            {
+              id: "construction-step-2",
+              label: "写真台帳整理",
+              prompt: "写真台帳を配筋・型枠・仕上げタグで整理してください。",
+            },
+            {
+              id: "construction-step-3",
+              label: "提出要求",
+              prompt: "元請提出用に確定して提出してください。",
+            },
+            {
+              id: "construction-step-4",
+              label: "提出承認",
+              prompt: "提出処理を承認します。",
+              approved: true,
+            },
+          ],
+        },
+      ]}
       initialQueue={[
         {
           id: "construction-initial-queue-1",
