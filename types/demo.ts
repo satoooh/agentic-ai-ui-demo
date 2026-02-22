@@ -43,12 +43,21 @@ export interface CandidateBrief {
 
 export interface ResearchSignal {
   id: string;
-  source: "hn" | "github";
+  source: "edinet" | "sec" | "gdelt" | "mock";
+  kind: "ir_filing" | "public_news" | "regulatory_note";
   title: string;
   summary: string;
   url: string;
   score: number;
   publishedAt: string;
+}
+
+export interface CorporateResearchSnapshot {
+  query: string;
+  requestedAt: string;
+  filings: ResearchSignal[];
+  news: ResearchSignal[];
+  notes: string[];
 }
 
 export interface WorkflowNode {

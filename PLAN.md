@@ -24,8 +24,8 @@
 
 ### M3: リサーチデモ
 
-- HN + GitHub シグナル連携（live/mock）
-- 根拠付きブリーフ生成
+- EDINET + SEC + GDELT 連携（live/mock）
+- 企業IR根拠付きブリーフ生成
 - Connector IDE（Terminal/Test/StackTrace）で検証導線を提供
 
 ## 2. 実装順序

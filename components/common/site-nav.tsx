@@ -10,7 +10,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/sales", label: "営業" },
   { href: "/recruiting", label: "採用" },
-  { href: "/research", label: "リサーチ" },
+  { href: "/research", label: "企業調査" },
   { href: "/settings", label: "Settings" },
 ];
 

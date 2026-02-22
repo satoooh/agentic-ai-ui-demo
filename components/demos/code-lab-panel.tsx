@@ -113,7 +113,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
         "$ npm run test",
         "Running connector tests...",
         "✗ connectors/research-signal.test.ts",
-        "TypeError: Failed to parse HN response payload",
+        "TypeError: Failed to parse EDINET response payload",
       ]);
       return;
     }
@@ -122,7 +122,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
       "$ npm run test",
       "Running connector tests...",
       "✓ connectors/research-signal.test.ts",
-      "✓ pipelines/weekly-report.test.ts",
+      "✓ pipelines/company-brief.test.ts",
       "All tests passed.",
     ]);
   };
@@ -151,14 +151,14 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
           <SchemaDisplay
             method="GET"
             path="/api/connectors/research-signal?query={query}&mode={mode}"
-            description="Research signal connector schema (MVP)."
+            description="Corporate research connector schema (MVP)."
             parameters={[
               {
                 name: "query",
                 type: "string",
                 required: true,
                 location: "query",
-                description: "検索トピック",
+                description: "企業名またはティッカー",
               },
               {
                 name: "mode",
@@ -254,9 +254,9 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
 
           {failed ? (
             <StackTrace
-              trace={`TypeError: Failed to parse HN response payload
-  at fetchResearchSignals (connectors/research-signal.ts:18:22)
-  at runWeeklyPipeline (pipelines/weekly-report.ts:12:15)`}
+              trace={`TypeError: Failed to parse EDINET response payload
+  at fetchEdinetSignals (connectors/research-signal.ts:126:18)
+  at runCompanyBriefPipeline (pipelines/company-brief.ts:14:9)`}
               defaultOpen
             >
               <StackTraceHeader>
@@ -280,8 +280,8 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
           <Commit defaultOpen>
             <CommitHeader>
               <CommitInfo>
-                <CommitHash>f98c1a3</CommitHash>
-                <CommitMessage>feat(research): harden signal connector error handling</CommitMessage>
+                <CommitHash>c18d2f4</CommitHash>
+                <CommitMessage>feat(research): add EDINET/SEC/GDELT fallback handling</CommitMessage>
                 <CommitMetadata>
                   <span>ai-agent</span>
                   <CommitSeparator />
@@ -289,7 +289,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
                 </CommitMetadata>
               </CommitInfo>
               <CommitActions>
-                <CommitCopyButton hash="f98c1a3" />
+                <CommitCopyButton hash="c18d2f4" />
               </CommitActions>
             </CommitHeader>
             <CommitContent>

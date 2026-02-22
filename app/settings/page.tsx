@@ -14,7 +14,19 @@ const rows = [
     key: "GITHUB_TOKEN",
     required: false,
     value: env.GITHUB_TOKEN ? "*** configured ***" : "(unset)",
-    description: "営業/リサーチデモのGitHub APIレート上限緩和に利用",
+    description: "営業デモのGitHub APIレート上限緩和に利用",
+  },
+  {
+    key: "EDINET_API_KEY",
+    required: false,
+    value: env.EDINET_API_KEY ? "*** configured ***" : "(unset)",
+    description: "企業調査デモでEDINET API（日本IR）をlive取得するための認証キー",
+  },
+  {
+    key: "SEC_USER_AGENT",
+    required: false,
+    value: env.SEC_USER_AGENT,
+    description: "企業調査デモでSEC EDGAR API呼び出し時に送信するUser-Agent",
   },
   {
     key: "OPENAI_API_KEY",
@@ -67,7 +79,7 @@ export default function SettingsPage() {
           <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
             <p className="font-medium">運用メモ</p>
             <p className="mt-1 text-muted-foreground">
-              `DEMO_MODE=mock` を既定にし、`GITHUB_TOKEN` は live 取得のレート上限対策として必要時のみ設定してください。
+              `DEMO_MODE=mock` を既定にし、企業IRをliveで扱う場合のみ `EDINET_API_KEY` を追加設定してください。
             </p>
           </div>
         </CardContent>

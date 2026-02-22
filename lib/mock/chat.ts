@@ -241,57 +241,70 @@ function buildRecruitingReply(text: string): MockReply {
 }
 
 function buildResearchReply(text: string): MockReply {
-  const signals = text.includes("採用")
-    ? mockResearchSignals.map((signal, index) =>
-        index === 0 ? { ...signal, title: `採用領域: ${signal.title}` } : signal,
-      )
-    : mockResearchSignals;
+  const normalized = text.toLowerCase();
+  const targetCompany = normalized.includes("sony")
+    ? "SONY"
+    : normalized.includes("toyota") || text.includes("トヨタ")
+      ? "TOYOTA"
+      : "MICROSOFT";
+
+  const signals = mockResearchSignals.map((signal) =>
+    signal.kind === "ir_filing"
+      ? {
+          ...signal,
+          title: `${targetCompany}: ${signal.title}`,
+        }
+      : signal,
+  );
 
   return {
-    message: "リサーチ用の外部シグナルを要約し、根拠付きブリーフとコネクタ草案を更新しました。",
+    message:
+      "企業IRと公開情報を収集し、根拠付きブリーフ・提出書類一覧・配布向け要点を更新しました。",
     approval: { required: false, action: "", reason: "" },
     queue: [
       {
         id: "research-alert-1",
-        title: "根拠URL確認",
-        description: "配布前に参照URLのアクセス可否を再検証してください。",
+        title: "提出書類リンク確認",
+        description: "配布前にIR提出書類のリンク有効性と提出日を再確認してください。",
         severity: "warning",
         timestamp: now(),
       },
       {
         id: "research-alert-2",
-        title: "週次レポート予約",
-        description: "次回生成スケジュールを設定すると継続運用できます。",
+        title: "企業同名の誤判定注意",
+        description: "社名だけでなくティッカー/証券コードで再検索してください。",
         severity: "info",
         timestamp: now(),
       },
     ],
     plan: [
-      { id: "q-plan-1", title: "トピック分解", status: "done" },
-      { id: "q-plan-2", title: "ソース収集", status: "done" },
-      { id: "q-plan-3", title: "要約と配布準備", status: "doing" },
+      { id: "q-plan-1", title: "対象企業の識別", status: "done" },
+      { id: "q-plan-2", title: "IR提出書類の収集", status: "done" },
+      { id: "q-plan-3", title: "公開ニュース要約", status: "doing" },
+      { id: "q-plan-4", title: "配布承認", status: "todo" },
     ],
     tasks: [
-      { id: "q-task-1", label: "引用根拠の確認", done: false },
-      { id: "q-task-2", label: "結論スライドへの反映", done: false },
-      { id: "q-task-3", label: "配布承認の取得", done: false },
+      { id: "q-task-1", label: "IR根拠リンクの確認", done: false },
+      { id: "q-task-2", label: "公開情報との整合確認", done: false },
+      { id: "q-task-3", label: "懸念点の優先度付け", done: false },
+      { id: "q-task-4", label: "配布承認の取得", done: false },
     ],
     tools: getCommonToolEvents("research-brief-agent"),
     artifacts: [
       {
         id: "research-brief",
-        name: "research-brief.md",
+        name: "company-ir-brief.md",
         kind: "markdown",
         content:
-          "# Weekly IT Ops Brief\n\n" +
-          "- 主要テーマ: IT業務効率化\n" +
-          "- 主要シグナル: OSS更新・コミュニティ議論・採用市況\n" +
-          "- 次アクション: 営業提案テンプレと採用面接テンプレへ反映",
+          `# Company IR Brief: ${targetCompany}\n\n` +
+          "- 収集対象: EDINET / SEC / 公開ニュース\n" +
+          "- 主要示唆: 財務開示の直近変化と外部報道の論点を接続\n" +
+          "- 次アクション: 競合比較・リスク監視・商談仮説へ展開",
         updatedAt: now(),
       },
       {
         id: "research-signals",
-        name: "research-signals.json",
+        name: "ir-public-signals.json",
         kind: "json",
         content: JSON.stringify(signals, null, 2),
         updatedAt: now(),
@@ -301,6 +314,17 @@ function buildResearchReply(text: string): MockReply {
         name: "connector-project.json",
         kind: "json",
         content: JSON.stringify(mockResearchConnectorProject, null, 2),
+        updatedAt: now(),
+      },
+      {
+        id: "risk-register",
+        name: "risk-register.md",
+        kind: "markdown",
+        content:
+          "# Risk Register\n\n" +
+          "1. 開示遅延: 最新提出書類の取得遅延に注意\n" +
+          "2. 情報鮮度: ニュース速報とIR確定情報を分離して解釈\n" +
+          "3. 同名企業: 識別子（ticker/secCode）で照合",
         updatedAt: now(),
       },
     ],

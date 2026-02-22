@@ -4,7 +4,7 @@
 
 **Japan Vertical Agentic Demo Lab** を、IT企業で汎用性の高い業務領域に再定義する。
 
-- 対象ドメイン: 営業 / 採用 / ITリサーチ
+- 対象ドメイン: 営業 / 採用 / 企業調査（IR/公開情報）
 - 目的: 「この業務のどこが短縮されるか」を3分で説明できるデモにする
 - 前提: `DEMO_MODE=mock` で常時動作し、`live` は段階連携
 
@@ -33,11 +33,11 @@
 - 課題: 候補者要約、面接調整、評価回収、オファー承認が遅延する
 - 成果物: candidate brief / interview plan / market signals
 
-### 3.3 リサーチ: IT Research Agent Studio
+### 3.3 企業調査: Public Intelligence Studio
 
 - 主役要素: Sources / InlineCitation / Terminal / TestResults / StackTrace / Commit
-- 課題: 情報収集から共有資料化までが属人化し、根拠確認に時間がかかる
-- 成果物: research brief / research signals / connector project
+- 課題: 企業IRの収集と公開情報分析が手作業で、根拠確認に時間がかかる
+- 成果物: company IR brief / filings list / connector project
 
 ## 4. 共通UX要件
 
@@ -53,7 +53,7 @@
 
 - 営業: GitHub組織情報（`/api/connectors/sales-account`）
 - 採用: Arbeitnow Job API（`/api/connectors/recruiting-market`）
-- リサーチ: HN Algolia + GitHub Search（`/api/connectors/research-signal`）
+- 企業調査: EDINET + SEC EDGAR + GDELT（`/api/connectors/research-signal`）
 - すべて live 失敗時は mock へフォールバック
 
 ## 6. 受け入れ基準

@@ -28,10 +28,10 @@ const demos = [
   },
   {
     href: "/research",
-    title: "リサーチ: IT Research Agent Studio",
-    summary: "外部シグナル収集 → 根拠付き要約 → コネクタIDE検証 → 配布承認の一連を実演。",
+    title: "企業調査: Public Intelligence Studio",
+    summary: "企業指定 → IR書類収集（EDINET/SEC）→ 公開情報分析 → 配布承認の一連を実演。",
     focus: ["Sources", "InlineCitation", "Terminal", "TestResults", "StackTrace", "Commit"],
-    value: "調査メモを意思決定用アウトプットへ即変換",
+    value: "初回企業調査を根拠付きアウトプットへ即変換",
   },
 ];
 
