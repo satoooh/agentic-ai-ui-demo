@@ -84,10 +84,28 @@ export async function POST(request: Request) {
 
   const messages = (parsed.data.messages ?? []) as DemoUIMessage[];
   const latestText = extractLatestText(messages);
-  const modelResult = resolveLanguageModel({
-    provider: parsed.data.provider as ModelProvider,
+  const requestedProvider = parsed.data.provider as ModelProvider;
+  let resolvedProvider = requestedProvider;
+  let modelResult = resolveLanguageModel({
+    provider: requestedProvider,
     model: parsed.data.model,
   });
+  let providerFallbackNote: string | null = null;
+
+  if (!modelResult.ok) {
+    const fallbackProvider: ModelProvider =
+      requestedProvider === "openai" ? "gemini" : "openai";
+    const fallbackResult = resolveLanguageModel({
+      provider: fallbackProvider,
+      model: undefined,
+    });
+
+    if (fallbackResult.ok) {
+      resolvedProvider = fallbackProvider;
+      modelResult = fallbackResult;
+      providerFallbackNote = `${requestedProvider} が未設定のため ${fallbackProvider} に自動切替しました。`;
+    }
+  }
 
   if (!modelResult.ok) {
     return new Response(
@@ -117,7 +135,9 @@ export async function POST(request: Request) {
           id: `tool-model-${Date.now()}`,
           name: "model-call",
           status: "running",
-          detail: `${parsed.data.provider}/${modelResult.resolvedModel} で推論を開始しました。`,
+          detail: `${resolvedProvider}/${modelResult.resolvedModel} で推論を開始しました。${
+            providerFallbackNote ?? ""
+          }`,
           timestamp: new Date().toISOString(),
         },
         transient: true,

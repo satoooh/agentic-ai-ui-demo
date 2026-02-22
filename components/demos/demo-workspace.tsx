@@ -573,6 +573,7 @@ export function DemoWorkspace({
   >([]);
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
   const [runtimeStatus, setRuntimeStatus] = useState<string | null>(null);
+  const [providerHint, setProviderHint] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [loopStatus, setLoopStatus] = useState<string | null>(null);
   const [isAutoLoopRunning, setIsAutoLoopRunning] = useState(false);
@@ -716,6 +717,31 @@ export function DemoWorkspace({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!runtimeInfo) {
+      return;
+    }
+
+    if (!runtimeInfo.hasOpenAIKey && runtimeInfo.hasGeminiKey && provider === "openai") {
+      setProvider("gemini");
+      setProviderHint("OpenAIキー未設定のため、Geminiへ自動切替しました。");
+      return;
+    }
+
+    if (!runtimeInfo.hasGeminiKey && runtimeInfo.hasOpenAIKey && provider === "gemini") {
+      setProvider("openai");
+      setProviderHint("Geminiキー未設定のため、OpenAIへ自動切替しました。");
+      return;
+    }
+
+    if (!runtimeInfo.hasOpenAIKey && !runtimeInfo.hasGeminiKey) {
+      setProviderHint("OpenAI/GeminiのAPIキーが未設定です。Settingsで設定してください。");
+      return;
+    }
+
+    setProviderHint(null);
+  }, [provider, runtimeInfo]);
 
   const selectedArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0],
@@ -2262,6 +2288,7 @@ export function DemoWorkspace({
                   <div className="mt-1 space-y-1 text-muted-foreground">
                     <p>OpenAI key: {runtimeInfo.hasOpenAIKey ? "configured" : "missing"}</p>
                     <p>Gemini key: {runtimeInfo.hasGeminiKey ? "configured" : "missing"}</p>
+                    {providerHint ? <p className="text-amber-700">{providerHint}</p> : null}
                   </div>
                 ) : (
                   <p className="mt-1 text-muted-foreground">{runtimeStatus ?? "loading..."}</p>
