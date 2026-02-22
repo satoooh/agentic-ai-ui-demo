@@ -37,12 +37,14 @@ function toStatSeries(payload: Record<string, unknown>, statsDataId: string): St
   };
 }
 
-export async function getEstatSeries() {
-  if (env.DEMO_MODE !== "live" || !env.ESTAT_APP_ID) {
+export async function getEstatSeries(options?: { modeOverride?: "mock" | "live" }) {
+  const mode = options?.modeOverride ?? env.DEMO_MODE;
+
+  if (mode !== "live" || !env.ESTAT_APP_ID) {
     return {
       mode: "mock" as const,
       series: mockStatSeries,
-      note: "ESTAT_APP_ID 未設定または DEMO_MODE=mock のためモックデータを返しています。",
+      note: "ESTAT_APP_ID 未設定または mock モード指定のためモックデータを返しています。",
     };
   }
 

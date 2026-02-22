@@ -33,12 +33,14 @@ function toOperationEvent(item: Record<string, unknown>): OperationEvent {
   };
 }
 
-export async function getOdptOperationEvents() {
-  if (env.DEMO_MODE !== "live" || !env.ODPT_TOKEN) {
+export async function getOdptOperationEvents(options?: { modeOverride?: "mock" | "live" }) {
+  const mode = options?.modeOverride ?? env.DEMO_MODE;
+
+  if (mode !== "live" || !env.ODPT_TOKEN) {
     return {
       mode: "mock" as const,
       events: mockOperationEvents,
-      note: "ODPT_TOKEN 未設定または DEMO_MODE=mock のためモックデータを返しています。",
+      note: "ODPT_TOKEN 未設定または mock モード指定のためモックデータを返しています。",
     };
   }
 

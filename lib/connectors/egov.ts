@@ -21,12 +21,14 @@ function normalizeCandidate(item: Record<string, unknown>): DatasetCandidate {
   };
 }
 
-export async function getEgovDatasetCandidates() {
-  if (env.DEMO_MODE !== "live") {
+export async function getEgovDatasetCandidates(options?: { modeOverride?: "mock" | "live" }) {
+  const mode = options?.modeOverride ?? env.DEMO_MODE;
+
+  if (mode !== "live") {
     return {
       mode: "mock" as const,
       candidates: mockDatasetCandidates,
-      note: "DEMO_MODE=mock のためモックデータを返しています。",
+      note: "mock モード指定のためモックデータを返しています。",
     };
   }
 
