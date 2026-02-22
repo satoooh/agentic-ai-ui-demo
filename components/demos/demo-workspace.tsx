@@ -140,6 +140,12 @@ interface ApprovalLogItem {
   timestamp: string;
 }
 
+interface RuntimeInfo {
+  demoMode: "mock" | "live";
+  hasOpenAIKey: boolean;
+  hasGeminiKey: boolean;
+}
+
 interface DemoWorkspaceProps {
   demo: DemoId;
   title: string;
@@ -258,6 +264,35 @@ function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "err
   return "bg-slate-100 text-slate-700";
 }
 
+function getAutonomousLoopPrompts(demo: DemoId, goal: string): string[] {
+  const normalizedGoal = goal.trim();
+
+  if (demo === "sales") {
+    const baseGoal = normalizedGoal || "IT企業向けに提案骨子を作成したい";
+    return [
+      `営業ゴール: ${baseGoal}\n公開情報からアカウント要点を3点で要約してください。`,
+      "ここまでの提案案に対して悪魔の代弁者として反証ポイントを3つ出し、修正案を提示してください。",
+      "修正後の提案として、次回商談までの実行タスクと追加調査クエリを3つ出してください。",
+    ];
+  }
+
+  if (demo === "recruiting") {
+    const baseGoal = normalizedGoal || "採用のミスマッチを減らしたい";
+    return [
+      `採用ゴール: ${baseGoal}\n候補者評価の観点を強み/懸念で整理してください。`,
+      "悪魔の代弁者として、採用後ミスマッチのシナリオを2つ作り、面接質問へ反映してください。",
+      "次の探索条件と、面接官が確認すべきチェック項目を箇条書きで生成してください。",
+    ];
+  }
+
+  const baseGoal = normalizedGoal || "企業の公開情報を使って意思決定に使える示唆を得たい";
+  return [
+    `調査ゴール: ${baseGoal}\n公開IR/ニュースから事実ベースの示唆を3点に要約してください。`,
+    "悪魔の代弁者として、示唆の前提が崩れるシナリオを2件と確認すべき根拠を挙げてください。",
+    "次の調査ループとして、競合比較や追加検証に使える探索クエリを3つ作ってください。",
+  ];
+}
+
 export function DemoWorkspace({
   demo,
   title,
@@ -274,10 +309,12 @@ export function DemoWorkspace({
   topPanel,
   bottomPanel,
 }: DemoWorkspaceProps) {
+  const [viewMode, setViewMode] = useState<"guided" | "full">("guided");
   const [chatModeOverride, setChatModeOverride] = useState<"auto" | "mock" | "live">("auto");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
   const [draft, setDraft] = useState("");
+  const [meetingTranscript, setMeetingTranscript] = useState("");
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>(initialQueue);
   const [plan, setPlan] = useState<PlanStep[]>(initialPlan);
@@ -305,10 +342,15 @@ export function DemoWorkspace({
   const [sessions, setSessions] = useState<
     Array<Pick<DemoSessionSnapshot, "id" | "title" | "updatedAt" | "modelProvider" | "modelId">>
   >([]);
+  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+  const [loopStatus, setLoopStatus] = useState<string | null>(null);
+  const [isAutoLoopRunning, setIsAutoLoopRunning] = useState(false);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
+  const autoLoopAbortRef = useRef(false);
   const scenarioStartRef = useRef<number | null>(null);
 
   const {
@@ -416,6 +458,36 @@ export function DemoWorkspace({
     return () => window.clearInterval(timerId);
   }, [runningScenarioId]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadRuntimeInfo = async () => {
+      try {
+        const response = await fetch("/api/runtime");
+        if (!response.ok) {
+          throw new Error(`status ${response.status}`);
+        }
+        const payload = (await response.json()) as RuntimeInfo;
+        if (!active) {
+          return;
+        }
+        setRuntimeInfo(payload);
+        setRuntimeStatus(null);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setRuntimeStatus("runtime情報の取得に失敗しました。");
+      }
+    };
+
+    void loadRuntimeInfo();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selectedArtifact = useMemo(
     () => artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts[0],
     [artifacts, selectedArtifactId],
@@ -458,6 +530,15 @@ export function DemoWorkspace({
         { info: 0, warning: 0, critical: 0 },
       ),
     [queue],
+  );
+
+  const displayedQueue = useMemo(
+    () => (viewMode === "guided" ? queue.slice(0, 2) : queue),
+    [queue, viewMode],
+  );
+  const displayedScenarios = useMemo(
+    () => (viewMode === "guided" ? scenarios.slice(0, 1) : scenarios),
+    [scenarios, viewMode],
   );
 
   const planProgress = useMemo(() => {
@@ -544,6 +625,7 @@ export function DemoWorkspace({
     }
 
     const transcript = buildConversationTranscript(messages);
+    const meetingLog = meetingTranscript.trim();
     const notes = draft.trim();
 
     const basePrompt =
@@ -551,7 +633,11 @@ export function DemoWorkspace({
       "前提の穴・反証シナリオ・失敗時の影響・追加で取るべき検証データを、日本語で簡潔に出してください。";
     const promptSections = [
       basePrompt,
-      transcript ? `会話ログ:\n${transcript}` : "会話ログ: (まだ会話がないため、現在のタスク前提から反証を出すこと)",
+      meetingLog
+        ? `会議ログ:\n${meetingLog}`
+        : transcript
+          ? `会話ログ:\n${transcript}`
+          : "会話ログ: (まだ会話がないため、現在のタスク前提から反証を出すこと)",
       notes ? `追加メモ:\n${notes}` : "",
       "出力形式:\n1. 反証ポイント(3件)\n2. 失敗シナリオ(2件)\n3. 追加検証クエリ(3件)",
     ].filter(Boolean);
@@ -568,6 +654,65 @@ export function DemoWorkspace({
         },
       },
     );
+
+    setLoopStatus("悪魔の代弁者レビューを実行しました。");
+  };
+
+  const runAutonomousLoop = async () => {
+    if (isStreaming || isAutoLoopRunning) {
+      return;
+    }
+
+    autoLoopAbortRef.current = false;
+    setIsAutoLoopRunning(true);
+    setLoopStatus("自律ループを開始しました。");
+
+    try {
+      const prompts = getAutonomousLoopPrompts(demo, draft);
+      for (const [index, prompt] of prompts.entries()) {
+        if (autoLoopAbortRef.current) {
+          setLoopStatus("自律ループを停止しました。");
+          break;
+        }
+
+        setLoopStatus(`自律ループ実行中 (${index + 1}/${prompts.length})`);
+        await sendMessage(
+          { text: prompt },
+          {
+            body: {
+              demo,
+              provider,
+              model,
+              ...(chatModeOverride !== "auto" ? { modeOverride: chatModeOverride } : {}),
+              approved: false,
+            },
+          },
+        );
+        await wait(220);
+      }
+
+      if (!autoLoopAbortRef.current) {
+        setLoopStatus("自律ループが完了しました。次ループ候補をArtifactsで確認してください。");
+      }
+    } catch (loopError) {
+      setLoopStatus(
+        `自律ループでエラーが発生しました: ${
+          loopError instanceof Error ? loopError.message : "unknown error"
+        }`,
+      );
+    } finally {
+      autoLoopAbortRef.current = false;
+      setIsAutoLoopRunning(false);
+    }
+  };
+
+  const stopAutonomousLoop = () => {
+    if (!isAutoLoopRunning) {
+      return;
+    }
+    autoLoopAbortRef.current = true;
+    stop();
+    setLoopStatus("停止要求を受け付けました。");
   };
 
   const runScenario = async (scenario: DemoScenario) => {
@@ -963,7 +1108,27 @@ export function DemoWorkspace({
               <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
               <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="inline-flex rounded-lg border border-border/70 bg-background/80 p-1">
+                <Button
+                  type="button"
+                  variant={viewMode === "guided" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setViewMode("guided")}
+                >
+                  Guided
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "full" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setViewMode("full")}
+                >
+                  Full
+                </Button>
+              </div>
               <Badge variant={isStreaming ? "default" : "secondary"}>
                 {isStreaming ? "streaming" : "ready"}
               </Badge>
@@ -972,22 +1137,32 @@ export function DemoWorkspace({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-4">
-            {stageGates.map((stage) => (
-              <div
-                key={stage.id}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-xs",
-                  stage.done
-                    ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
-                    : "border-border/70 bg-background/80 text-muted-foreground",
-                )}
-              >
-                <p className="text-[11px] uppercase tracking-wide">{stage.label}</p>
-                <p className="mt-1 font-semibold">{stage.done ? "done" : "waiting"}</p>
-              </div>
-            ))}
-          </div>
+          {viewMode === "full" ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              {stageGates.map((stage) => (
+                <div
+                  key={stage.id}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-xs",
+                    stage.done
+                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+                      : "border-border/70 bg-background/80 text-muted-foreground",
+                  )}
+                >
+                  <p className="text-[11px] uppercase tracking-wide">{stage.label}</p>
+                  <p className="mt-1 font-semibold">{stage.done ? "done" : "waiting"}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {stageGates.map((stage) => (
+                <Badge key={stage.id} variant={stage.done ? "default" : "outline"}>
+                  {stage.label}: {stage.done ? "done" : "waiting"}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2.5 px-5 py-3">
@@ -998,11 +1173,13 @@ export function DemoWorkspace({
             <span>{gateProgress}%</span>
           </div>
           <Progress value={gateProgress} />
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">plan {planProgress}%</Badge>
-            <Badge variant="outline">task {taskProgress}%</Badge>
-            <Badge variant="outline">interventions {approvalLogs.length}</Badge>
-          </div>
+          {viewMode === "full" ? (
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">plan {planProgress}%</Badge>
+              <Badge variant="outline">task {taskProgress}%</Badge>
+              <Badge variant="outline">interventions {approvalLogs.length}</Badge>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -1021,7 +1198,14 @@ export function DemoWorkspace({
         </Card>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+      <div
+        className={cn(
+          "grid gap-4",
+          viewMode === "guided"
+            ? "xl:grid-cols-[240px_minmax(0,1fr)_320px]"
+            : "xl:grid-cols-[280px_minmax(0,1fr)_360px]",
+        )}
+      >
         <aside className="space-y-4">
           <Card className="overflow-hidden border-border/70 py-0">
             <CardHeader className="border-b border-border/70 bg-muted/20 px-4 py-3">
@@ -1036,8 +1220,13 @@ export function DemoWorkspace({
             </CardHeader>
             <CardContent className="p-0">
               <QueuePanel className="border-none p-0 shadow-none">
-                <QueueList className="mt-0 p-3 [&>div]:max-h-[260px]">
-                  {queue.map((item) => (
+                <QueueList
+                  className={cn(
+                    "mt-0 p-3",
+                    viewMode === "guided" ? "[&>div]:max-h-[220px]" : "[&>div]:max-h-[280px]",
+                  )}
+                >
+                  {displayedQueue.map((item) => (
                     <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
                       <div className="flex items-center gap-2">
                         <QueueItemIndicator completed={item.severity === "info"} />
@@ -1046,10 +1235,21 @@ export function DemoWorkspace({
                           {item.severity}
                         </Badge>
                       </div>
-                      <QueueItemDescription>{item.description}</QueueItemDescription>
-                      <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
+                      {viewMode === "full" ? (
+                        <QueueItemDescription>{item.description}</QueueItemDescription>
+                      ) : (
+                        <p className="ml-6 text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
+                      )}
+                      {viewMode === "full" ? (
+                        <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
+                      ) : null}
                     </QueueEntry>
                   ))}
+                  {viewMode === "guided" && queue.length > displayedQueue.length ? (
+                    <p className="px-2 text-[11px] text-muted-foreground">
+                      +{queue.length - displayedQueue.length} 件は Full 表示で確認
+                    </p>
+                  ) : null}
                 </QueueList>
               </QueuePanel>
             </CardContent>
@@ -1063,7 +1263,7 @@ export function DemoWorkspace({
               <CardContent className="space-y-2 px-4">
                 <ScrollArea className="h-[350px] pr-2">
                   <div className="space-y-2">
-                    {scenarios.map((scenario) => (
+                    {displayedScenarios.map((scenario) => (
                       <div key={scenario.id} className="rounded-lg border border-border/70 bg-background p-2.5">
                         <p className="text-xs font-semibold">{scenario.title}</p>
                         <p className="mt-1 text-[11px] text-muted-foreground">{scenario.description}</p>
@@ -1081,19 +1281,25 @@ export function DemoWorkspace({
                                 )
                           }
                         />
-                        <ul className="mt-2 space-y-1">
-                          {scenario.steps.map((step) => {
-                            const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
-                            return (
-                              <li key={step.id} className="flex items-center justify-between text-[11px]">
-                                <span className="truncate">{step.label}</span>
-                                <span className={`rounded px-1.5 py-0.5 ${getScenarioStepBadgeStyle(stepStatus)}`}>
-                                  {stepStatus}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                        {viewMode === "full" ? (
+                          <ul className="mt-2 space-y-1">
+                            {scenario.steps.map((step) => {
+                              const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
+                              return (
+                                <li key={step.id} className="flex items-center justify-between text-[11px]">
+                                  <span className="truncate">{step.label}</span>
+                                  <span className={`rounded px-1.5 py-0.5 ${getScenarioStepBadgeStyle(stepStatus)}`}>
+                                    {stepStatus}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            主要ステップ: {scenario.steps[0]?.label} → {scenario.steps[1]?.label ?? "..." }
+                          </p>
+                        )}
                         <Button type="button" size="sm" className="mt-2 w-full" onClick={() => void runScenario(scenario)} disabled={Boolean(runningScenarioId)}>
                           {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
                         </Button>
@@ -1104,6 +1310,11 @@ export function DemoWorkspace({
                         ) : null}
                       </div>
                     ))}
+                    {viewMode === "guided" && scenarios.length > displayedScenarios.length ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        他シナリオは Full 表示で確認できます。
+                      </p>
+                    ) : null}
                   </div>
                 </ScrollArea>
                 {runningScenarioId ? (
@@ -1154,7 +1365,7 @@ export function DemoWorkspace({
               </p>
             </CardHeader>
 
-            <Conversation className="h-[500px] bg-muted/20">
+            <Conversation className={cn("bg-muted/20", viewMode === "guided" ? "h-[420px]" : "h-[540px]")}>
               <ConversationContent className="gap-4 p-4">
                 {messages.length === 0 ? (
                   <ConversationEmptyState
@@ -1228,6 +1439,44 @@ export function DemoWorkspace({
                 ))}
               </div>
 
+              <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold">Meeting Red-Team Agent</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      議事録を貼り付けると、悪魔の代弁者として反証ポイントを抽出します。
+                    </p>
+                  </div>
+                  <Badge variant="outline">devil&apos;s advocate</Badge>
+                </div>
+                <Textarea
+                  value={meetingTranscript}
+                  onChange={(event) => setMeetingTranscript(event.target.value)}
+                  placeholder="ここに会議ログを貼り付けると、会話履歴より優先して反証レビューを実行します。"
+                  className="mt-2 min-h-24 bg-background"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void runDevilsAdvocate()}
+                    disabled={isStreaming}
+                  >
+                    議事録で反証実行
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setMeetingTranscript("")}
+                    disabled={isStreaming || meetingTranscript.length === 0}
+                  >
+                    クリア
+                  </Button>
+                </div>
+              </div>
+
               <Textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -1258,12 +1507,24 @@ export function DemoWorkspace({
                   <Button
                     type="button"
                     variant="secondary"
+                    onClick={() => void runAutonomousLoop()}
+                    disabled={isStreaming || isAutoLoopRunning}
+                  >
+                    {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => void runDevilsAdvocate()}
                     disabled={isStreaming}
                   >
                     悪魔の代弁者
                   </Button>
-                  <Button type="button" variant="outline" onClick={stop}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
+                  >
                     停止
                   </Button>
                   <Button type="button" variant="outline" onClick={createCheckpoint}>
@@ -1271,6 +1532,7 @@ export function DemoWorkspace({
                   </Button>
                 </div>
               </div>
+              {loopStatus ? <p className="text-xs text-muted-foreground">{loopStatus}</p> : null}
 
               {(enableVoice || enableTts) ? (
                 <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 md:grid-cols-2">
@@ -1400,14 +1662,26 @@ export function DemoWorkspace({
                 </ContextContent>
               </ContextMeter>
               <p className="text-xs text-muted-foreground">status: {status}</p>
+              <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-2 text-xs">
+                <p className="font-medium">Runtime</p>
+                {runtimeInfo ? (
+                  <div className="mt-1 space-y-1 text-muted-foreground">
+                    <p>server mode: {runtimeInfo.demoMode}</p>
+                    <p>OpenAI key: {runtimeInfo.hasOpenAIKey ? "configured" : "missing"}</p>
+                    <p>Gemini key: {runtimeInfo.hasGeminiKey ? "configured" : "missing"}</p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-muted-foreground">{runtimeStatus ?? "loading..."}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
           <Tabs defaultValue="execution">
             <TabsList className="w-full bg-muted/40">
               <TabsTrigger value="execution">Execution</TabsTrigger>
-              <TabsTrigger value="ops">Ops</TabsTrigger>
-              <TabsTrigger value="audit">Audit</TabsTrigger>
+              {viewMode === "full" ? <TabsTrigger value="ops">Ops</TabsTrigger> : null}
+              {viewMode === "full" ? <TabsTrigger value="audit">Audit</TabsTrigger> : null}
             </TabsList>
 
             <TabsContent value="execution" className="space-y-4">
@@ -1438,35 +1712,43 @@ export function DemoWorkspace({
                   <CardTitle className="text-sm">Task Checklist</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4">
-                  <Task defaultOpen>
-                    <TaskTrigger title="Checklist" />
-                    <TaskContent>
-                      {tasks.map((task) => (
-                        <TaskEntry key={task.id}>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={task.done}
-                              onChange={(event) => {
-                                const done = event.target.checked;
-                                setTasks((prev) =>
-                                  prev.map((current) =>
-                                    current.id === task.id ? { ...current, done } : current,
-                                  ),
-                                );
-                              }}
-                            />
-                            <span>{task.label}</span>
-                          </label>
-                        </TaskEntry>
-                      ))}
-                    </TaskContent>
-                  </Task>
+                  {viewMode === "full" ? (
+                    <Task defaultOpen>
+                      <TaskTrigger title="Checklist" />
+                      <TaskContent>
+                        {tasks.map((task) => (
+                          <TaskEntry key={task.id}>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={task.done}
+                                onChange={(event) => {
+                                  const done = event.target.checked;
+                                  setTasks((prev) =>
+                                    prev.map((current) =>
+                                      current.id === task.id ? { ...current, done } : current,
+                                    ),
+                                  );
+                                }}
+                              />
+                              <span>{task.label}</span>
+                            </label>
+                          </TaskEntry>
+                        ))}
+                      </TaskContent>
+                    </Task>
+                  ) : (
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p>未完了: {tasks.filter((task) => !task.done).length}</p>
+                      <p>完了: {tasks.filter((task) => task.done).length}</p>
+                      <p>詳細なチェック更新は Full 表示で編集できます。</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="ops" className="space-y-4">
+            {viewMode === "full" ? <TabsContent value="ops" className="space-y-4">
               <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Tool Logs</CardTitle>
@@ -1490,9 +1772,9 @@ export function DemoWorkspace({
                   </ScrollArea>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> : null}
 
-            <TabsContent value="audit" className="space-y-4">
+            {viewMode === "full" ? <TabsContent value="audit" className="space-y-4">
               <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
                   <CardTitle className="text-sm">Checkpoint</CardTitle>
@@ -1587,8 +1869,13 @@ export function DemoWorkspace({
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent> : null}
           </Tabs>
+          {viewMode === "guided" ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setViewMode("full")}>
+              Ops / Audit を表示
+            </Button>
+          ) : null}
         </aside>
       </div>
 

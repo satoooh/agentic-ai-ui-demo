@@ -15,7 +15,7 @@ const demos = [
   {
     href: "/sales",
     title: "営業: Sales Agentic Loop",
-    summary: "アカウント収集 → 提案生成 → 反証探索 → 次アクション生成を1画面で反復。",
+    summary: "アカウント収集 → 提案生成 → 悪魔の代弁者レビュー → 次アクション生成を1画面で反復。",
     focus: ["Queue", "Plan", "Tool", "Artifact", "Workflow", "OpenInChat"],
     value: "提案の初稿作成と改善ループを短縮",
   },
@@ -37,8 +37,8 @@ const demos = [
 
 const quickStartSteps = [
   "任意のデモを開き、左列の Run Scenario を押す",
-  "中央 Conversation で入力文を編集し再送する",
-  "右列 Execution/Ops/Audit で進捗・ツール・介入履歴を確認する",
+  "中央 Conversation で入力文を編集し、自律ループ実行または悪魔の代弁者を押す",
+  "右列 Execution（必要に応じて Full表示）で進捗・ツール・監査を確認する",
   "下段 Artifacts で成果物を preview/copy/download する",
 ];
 

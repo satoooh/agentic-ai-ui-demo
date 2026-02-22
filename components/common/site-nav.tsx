@@ -19,7 +19,7 @@ export function SiteNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/92 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-3 md:px-6">
+      <div className="mx-auto flex w-full max-w-[1860px] items-center justify-between gap-4 px-5 py-3 md:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           <Badge variant="outline" className="hidden h-6 rounded-full px-2.5 text-[11px] text-muted-foreground sm:inline-flex">
             AI Elements

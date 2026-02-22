@@ -44,10 +44,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 560px at 100% -14%, color-mix(in oklab, var(--color-chart-2) 15%, white 85%) 0%, transparent 73%),
-    radial-gradient(980px 460px at -10% 12%, color-mix(in oklab, var(--color-chart-1) 9%, white 91%) 0%, transparent 70%),
-    linear-gradient(180deg, #f8fafd 0%, #f5f8fc 48%, #f2f6fb 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #f5f7fa 52%, #f2f5f9 100%);
   color: var(--color-text);
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
 }
