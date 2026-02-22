@@ -52,11 +52,6 @@ body {
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
 code,
 pre {
   font-family: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -143,5 +138,8 @@ pre {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  a {
+    @apply text-inherit no-underline;
   }
 }

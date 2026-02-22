@@ -71,6 +71,7 @@ import {
   TaskItem as TaskEntry,
   TaskTrigger,
 } from "@/components/ai-elements/task";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -943,7 +944,20 @@ export function DemoWorkspace({
         </div>
       </header>
 
-      {topPanel}
+      {topPanel ? (
+        <Card className="py-0">
+          <Accordion type="single" collapsible>
+            <AccordionItem value="guide" className="border-b-0">
+              <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
+                Demo Guide & Data Source
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                {topPanel}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
         <aside className="space-y-4">
@@ -1066,29 +1080,32 @@ export function DemoWorkspace({
                 セッション保存
               </Button>
               {sessionStatus ? <p className="text-xs text-muted-foreground">{sessionStatus}</p> : null}
-              <ScrollArea className="h-[210px]">
-                <div className="space-y-2 pr-2">
-                  {sessions.map((session) => (
-                    <div key={session.id} className="rounded-lg border p-2 text-xs">
-                      <p className="font-semibold">{session.title}</p>
-                      <p className="text-muted-foreground">
-                        {session.modelProvider} / {session.modelId}
-                      </p>
-                      <p className="text-muted-foreground">{session.updatedAt}</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="mt-1 w-full"
-                        onClick={() => void restoreSession(session.id)}
-                      >
-                        復元
-                      </Button>
-                    </div>
-                  ))}
-                  {sessions.length === 0 ? <p className="text-xs text-muted-foreground">保存済みセッションなし</p> : null}
-                </div>
-              </ScrollArea>
+              {sessions.length > 0 ? (
+                <ScrollArea className="h-[170px]">
+                  <div className="space-y-2 pr-2">
+                    {sessions.map((session) => (
+                      <div key={session.id} className="rounded-lg border p-2 text-xs">
+                        <p className="font-semibold">{session.title}</p>
+                        <p className="text-muted-foreground">
+                          {session.modelProvider} / {session.modelId}
+                        </p>
+                        <p className="text-muted-foreground">{session.updatedAt}</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="mt-1 w-full"
+                          onClick={() => void restoreSession(session.id)}
+                        >
+                          復元
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <p className="text-xs text-muted-foreground">保存済みセッションなし</p>
+              )}
             </CardContent>
           </Card>
         </aside>
