@@ -19,6 +19,14 @@ interface BuildReplyInput {
   approved?: boolean;
 }
 
+interface MeetingTemplate {
+  label: string;
+  queue: Array<Pick<QueueItem, "title" | "description" | "severity">>;
+  assumptions: string[];
+  counterArguments: string[];
+  actions: Array<{ task: string; owner: string; due: string; metric: string }>;
+}
+
 export interface MockReply {
   message: string;
   approval: ApprovalRequest;
@@ -31,6 +39,143 @@ export interface MockReply {
 }
 
 const now = () => new Date().toISOString();
+
+const MEETING_TEMPLATES: MeetingTemplate[] = [
+  {
+    label: "営業週次",
+    queue: [
+      {
+        title: "失注リスクの裏取り不足",
+        description: "感覚的判断が多く、案件別の根拠データが不足しています。",
+        severity: "critical",
+      },
+      {
+        title: "次回打ち手の優先順位未定",
+        description: "案件ごとの優先順位が曖昧です。",
+        severity: "warning",
+      },
+    ],
+    assumptions: [
+      "既存顧客への追加提案は現場負荷を増やさない",
+      "商談停滞の主因は提案内容であり実行速度ではない",
+      "四半期内の予算確保は現状維持で進む",
+    ],
+    counterArguments: [
+      "提案追加はCS対応を増やし、短期的に現場負荷を悪化させる可能性がある",
+      "停滞原因は提案内容ではなく意思決定者への接触不足かもしれない",
+      "競合の価格変更で前提ROIが崩れる可能性がある",
+    ],
+    actions: [
+      { task: "優先案件トップ3の失注シナリオ再評価", owner: "AE", due: "今週金曜", metric: "失注リスク更新率" },
+      { task: "提案修正案のA/B比較", owner: "Sales Ops", due: "来週火曜", metric: "商談化率" },
+      { task: "競合価格変動の週次監視", owner: "RevOps", due: "毎週月曜", metric: "価格差アラート件数" },
+    ],
+  },
+  {
+    label: "採用進捗",
+    queue: [
+      {
+        title: "面接歩留まり低下",
+        description: "書類通過後の面接辞退率が高い状態です。",
+        severity: "critical",
+      },
+      {
+        title: "評価基準の不一致",
+        description: "面接官ごとに採用判断基準が異なっています。",
+        severity: "warning",
+      },
+    ],
+    assumptions: [
+      "候補者不足が採用停滞の主因である",
+      "面接回数は現状のままで妥当",
+      "オファー条件は市場競争力がある",
+    ],
+    counterArguments: [
+      "候補者不足ではなく面接体験の悪化が辞退の主因かもしれない",
+      "面接回数の多さが離脱要因になっている可能性がある",
+      "競合と比較して提示条件が弱い可能性がある",
+    ],
+    actions: [
+      { task: "歩留まりを選考段階別に再計測", owner: "Recruiter", due: "今週木曜", metric: "段階別CVR" },
+      { task: "面接質問セットの統一", owner: "Hiring Manager", due: "来週月曜", metric: "評価軸一致率" },
+      { task: "辞退理由の定量集計", owner: "People Ops", due: "来週水曜", metric: "辞退理由分類率" },
+    ],
+  },
+  {
+    label: "プロダクト計画",
+    queue: [
+      {
+        title: "依存関係の見落とし",
+        description: "優先機能の前提実装が抜けています。",
+        severity: "critical",
+      },
+      {
+        title: "スコープ肥大化",
+        description: "次スプリントの作業量が過大です。",
+        severity: "warning",
+      },
+    ],
+    assumptions: [
+      "主要機能は想定工数で完了できる",
+      "外部API変更は発生しない",
+      "優先度高の要件は仕様変更しない",
+    ],
+    counterArguments: [
+      "外部依存の遅延でスケジュールが崩れる可能性がある",
+      "仕様変更が生じると優先機能の着地が難しい",
+      "QA負荷が想定より大きくなる可能性がある",
+    ],
+    actions: [
+      { task: "依存関係マップの更新", owner: "PM", due: "今週金曜", metric: "依存漏れ件数" },
+      { task: "スプリントスコープ再調整", owner: "Tech Lead", due: "来週月曜", metric: "見積もり超過率" },
+      { task: "仕様変更リスクの事前整理", owner: "Designer", due: "来週火曜", metric: "変更要求件数" },
+    ],
+  },
+  {
+    label: "経営レビュー",
+    queue: [
+      {
+        title: "判断前提の裏付け不足",
+        description: "意思決定の根拠データが不足しています。",
+        severity: "critical",
+      },
+      {
+        title: "代替シナリオ未検討",
+        description: "下振れケースの検討が不足しています。",
+        severity: "warning",
+      },
+    ],
+    assumptions: [
+      "市場成長は計画通り推移する",
+      "リソース配分の変更は短期成果に影響しない",
+      "既存施策の再現性は維持される",
+    ],
+    counterArguments: [
+      "市場成長鈍化で前提KPIが崩れる可能性がある",
+      "リソース再配分で既存売上が毀損する可能性がある",
+      "再現性の前提が外れた場合に備えた代替案が不足",
+    ],
+    actions: [
+      { task: "主要前提の感度分析", owner: "経営企画", due: "来週水曜", metric: "前提検証完了率" },
+      { task: "下振れシナリオの対策設計", owner: "事業責任者", due: "来週金曜", metric: "対策カバレッジ" },
+      { task: "代替投資案の比較資料作成", owner: "Finance", due: "翌週月曜", metric: "比較案数" },
+    ],
+  },
+];
+
+function extractMeetingProfileLabel(text: string): string {
+  const match = text.match(/会議タイプ:\s*([^\n]+)/);
+  return match?.[1]?.trim() ?? "経営レビュー";
+}
+
+function extractUserRequest(text: string): string {
+  const marker = "ユーザー依頼:\n";
+  const index = text.lastIndexOf(marker);
+  if (index === -1) {
+    return text.trim();
+  }
+  return text.slice(index + marker.length).trim();
+}
 
 function resolveApprovalAction(text: string): string | null {
   if (text.includes("本番送信") || text.includes("本番送付")) {
@@ -329,41 +474,33 @@ function buildRecruitingReply(text: string): MockReply {
 }
 
 function buildMeetingReply(text: string): MockReply {
-  const normalizedText = text.trim();
+  const profileLabel = extractMeetingProfileLabel(text);
+  const template =
+    MEETING_TEMPLATES.find((item) => item.label === profileLabel) ??
+    MEETING_TEMPLATES.find((item) => item.label === "経営レビュー")!;
+  const userRequest = extractUserRequest(text);
   const meetingSummary =
-    normalizedText.length > 0
-      ? normalizedText
-      : `${mockMeetingTranscript.title}: ${mockMeetingTranscript.excerpt}`;
+    userRequest.length > 0 ? userRequest : `${mockMeetingTranscript.title}: ${mockMeetingTranscript.excerpt}`;
 
   return {
-    message:
-      "会議ログから前提・反証・次アクションを更新しました。悪魔の代弁者レビューの結果を基に意思決定を修正してください。",
+    message: `${template.label}として会議ログをレビューし、反証・修正案・次アクション表を更新しました。`,
     approval: { required: false, action: "", reason: "" },
-    queue: [
-      {
-        id: "meeting-alert-1",
-        title: "前提検証が不足",
-        description: "意思決定前提の裏取りが完了していません。",
-        severity: "critical",
-        timestamp: now(),
-      },
-      {
-        id: "meeting-alert-2",
-        title: "担当未確定タスク",
-        description: "次回までのアクションに担当未設定の項目があります。",
-        severity: "warning",
-        timestamp: now(),
-      },
-    ],
+    queue: template.queue.map((item, index) => ({
+      id: `meeting-alert-${index + 1}`,
+      title: item.title,
+      description: item.description,
+      severity: item.severity,
+      timestamp: now(),
+    })),
     plan: [
       { id: "m-plan-1", title: "議事録の要点抽出", status: "done" },
-      { id: "m-plan-2", title: "前提と意思決定の整理", status: "done" },
+      { id: "m-plan-2", title: `${template.label}の前提整理`, status: "done" },
       { id: "m-plan-3", title: "悪魔の代弁者レビュー", status: "doing" },
       { id: "m-plan-4", title: "次回までのタスク生成", status: "todo" },
     ],
-    tasks: mockMeetingReview.nextActions.map((action, index) => ({
+    tasks: template.actions.map((action, index) => ({
       id: `m-task-${index}`,
-      label: action,
+      label: action.task,
       done: false,
     })),
     tools: getCommonToolEvents("meeting-red-team-agent"),
@@ -373,16 +510,29 @@ function buildMeetingReply(text: string): MockReply {
         name: "meeting-minutes.md",
         kind: "markdown",
         content:
-          `# 会議ログ要約\n\n${meetingSummary}\n\n` +
-          "## 決定事項\n- 採用と営業の優先順位を週次で再評価\n\n" +
-          "## 保留事項\n- どの施策を今月実行するかの閾値定義",
+          `# 会議レビュー結果 (${template.label})\n\n${meetingSummary}\n\n` +
+          "## 会議要約\n- 本会議の主要論点を抽出\n- 前提とリスクを再評価\n\n" +
+          "## 反証ポイント\n" +
+          template.counterArguments.map((item) => `- ${item}`).join("\n") +
+          "\n\n## 修正案\n" +
+          template.assumptions.map((item) => `- ${item}`).join("\n"),
         updatedAt: now(),
       },
       {
         id: "meeting-review",
         name: "meeting-review.json",
         kind: "json",
-        content: JSON.stringify(mockMeetingReview, null, 2),
+        content: JSON.stringify(
+          {
+            ...mockMeetingReview,
+            profile: template.label,
+            assumptions: template.assumptions,
+            counterArguments: template.counterArguments,
+            nextActions: template.actions.map((action) => action.task),
+          },
+          null,
+          2,
+        ),
         updatedAt: now(),
       },
       {
@@ -390,8 +540,12 @@ function buildMeetingReply(text: string): MockReply {
         name: "meeting-next-actions.md",
         kind: "markdown",
         content:
-          "# Next Actions\n\n" +
-          mockMeetingReview.nextActions.map((action, index) => `${index + 1}. ${action}`).join("\n"),
+          `# Next Actions (${template.label})\n\n` +
+          "| タスク | 担当 | 期限 | 検証指標 |\n" +
+          "| --- | --- | --- | --- |\n" +
+          template.actions
+            .map((action) => `| ${action.task} | ${action.owner} | ${action.due} | ${action.metric} |`)
+            .join("\n"),
         updatedAt: now(),
       },
     ],

@@ -154,6 +154,12 @@ interface MeetingProfile {
   expectedOutput: string;
 }
 
+interface MeetingOutputTemplate {
+  title: string;
+  sections: string[];
+  actionColumns: string[];
+}
+
 const MEETING_PROFILES: MeetingProfile[] = [
   {
     id: "sales-weekly",
@@ -184,6 +190,40 @@ const MEETING_PROFILES: MeetingProfile[] = [
     expectedOutput: "判断前提、反証シナリオ、検証タスク",
   },
 ];
+
+const MEETING_OUTPUT_TEMPLATES: Record<MeetingProfile["id"], MeetingOutputTemplate> = {
+  "sales-weekly": {
+    title: "営業週次レビュー",
+    sections: ["案件進捗サマリ", "失注リスク（悪魔の代弁者）", "打ち手の修正案"],
+    actionColumns: ["案件", "担当", "期限", "検証指標"],
+  },
+  "hiring-sync": {
+    title: "採用進捗レビュー",
+    sections: ["採用歩留まりサマリ", "ミスマッチ仮説（悪魔の代弁者）", "選考改善案"],
+    actionColumns: ["候補者/施策", "担当", "期限", "検証指標"],
+  },
+  "product-planning": {
+    title: "プロダクト計画レビュー",
+    sections: ["優先順位サマリ", "計画破綻リスク（悪魔の代弁者）", "依存関係の修正案"],
+    actionColumns: ["タスク", "担当", "期限", "ブロッカー"],
+  },
+  "exec-review": {
+    title: "経営レビュー",
+    sections: ["意思決定サマリ", "前提崩壊シナリオ（悪魔の代弁者）", "判断条件の修正案"],
+    actionColumns: ["意思決定項目", "担当", "期限", "検証データ"],
+  },
+};
+
+function buildMeetingOutputFormatInstruction(profile: MeetingProfile): string {
+  const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  return [
+    `出力フォーマット（${template.title}）:`,
+    "1. 会議要約（3行以内）",
+    ...template.sections.map((section, index) => `${index + 2}. ${section}`),
+    `${template.sections.length + 2}. 次アクション表（列: ${template.actionColumns.join(" / ")}）`,
+    `${template.sections.length + 3}. 不足データと次回確認事項`,
+  ].join("\n");
+}
 
 interface DemoWorkspaceProps {
   demo: DemoId;
@@ -545,6 +585,10 @@ export function DemoWorkspace({
     () => MEETING_PROFILES.find((profile) => profile.id === meetingProfileId) ?? MEETING_PROFILES[0],
     [meetingProfileId],
   );
+  const selectedMeetingOutputTemplate = useMemo(
+    () => MEETING_OUTPUT_TEMPLATES[selectedMeetingProfile.id],
+    [selectedMeetingProfile.id],
+  );
 
   const contextStats = useMemo(() => {
     const userText = messages
@@ -662,7 +706,9 @@ export function DemoWorkspace({
         `- 目的: ${selectedMeetingProfile.objective}\n` +
         `- 参加者: ${selectedMeetingProfile.participants}\n` +
         `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
-        "上記設定を必ず前提にして、日本語で簡潔に回答してください。";
+        "上記設定を必ず前提にして、日本語で簡潔に回答してください。\n\n" +
+        `${buildMeetingOutputFormatInstruction(selectedMeetingProfile)}\n` +
+        "必ず見出し付きで出力し、次アクション表は Markdown table で記述してください。";
 
       return `${contextBlock}\n\nユーザー依頼:\n${trimmed}`;
     },
@@ -1553,9 +1599,23 @@ export function DemoWorkspace({
                     <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
                       <p>目的: {selectedMeetingProfile.objective}</p>
                       <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
+                      <p className="mt-1">期待成果: {selectedMeetingProfile.expectedOutput}</p>
                     </div>
                   </div>
-                </div>
+                  <div className="mt-2 rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px]">
+                    <p className="font-medium">この会議タイプの出力フォーマット</p>
+                    <ol className="mt-1 space-y-0.5 text-muted-foreground">
+                      {selectedMeetingOutputTemplate.sections.map((section, index) => (
+                        <li key={section}>
+                          {index + 1}. {section}
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="mt-1 text-muted-foreground">
+                      次アクション表: {selectedMeetingOutputTemplate.actionColumns.join(" / ")}
+                    </p>
+                    </div>
+                  </div>
               ) : null}
 
               {demo === "meeting" ? (
