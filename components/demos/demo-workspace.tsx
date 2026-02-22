@@ -683,6 +683,10 @@ export function DemoWorkspace({
     () => (demo === "meeting" ? [buildMeetingScenario(selectedMeetingProfile)] : scenarios),
     [demo, selectedMeetingProfile, scenarios],
   );
+  const displayedSuggestions = useMemo(
+    () => (viewMode === "guided" ? activeSuggestions.slice(0, 3) : activeSuggestions),
+    [activeSuggestions, viewMode],
+  );
 
   const contextStats = useMemo(() => {
     const userText = messages
@@ -723,14 +727,11 @@ export function DemoWorkspace({
     [queue],
   );
 
-  const displayedQueue = useMemo(
-    () => (viewMode === "guided" ? queue.slice(0, 2) : queue),
-    [queue, viewMode],
-  );
   const displayedScenarios = useMemo(
     () => (viewMode === "guided" ? activeScenarios.slice(0, 1) : activeScenarios),
     [activeScenarios, viewMode],
   );
+  const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
   const planProgress = useMemo(() => {
     if (plan.length === 0) {
@@ -1419,7 +1420,7 @@ export function DemoWorkspace({
         </div>
       </header>
 
-      {topPanel ? (
+      {topPanel && viewMode === "full" ? (
         <Card className="border-border/70 py-0">
           <Accordion type="single" collapsible>
             <AccordionItem value="guide" className="border-b-0">
@@ -1438,60 +1439,67 @@ export function DemoWorkspace({
         className={cn(
           "grid gap-4",
           viewMode === "guided"
-            ? "xl:grid-cols-[240px_minmax(0,1fr)_320px]"
+            ? "xl:grid-cols-[280px_minmax(0,1fr)]"
             : "xl:grid-cols-[280px_minmax(0,1fr)_360px]",
         )}
       >
         <aside className="space-y-4">
-          <Card className="overflow-hidden border-border/70 py-0">
-            <CardHeader className="border-b border-border/70 bg-muted/20 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Queue</CardTitle>
-                <div className="flex gap-1 text-xs">
-                  <Badge variant="outline">i {queueSummary.info}</Badge>
-                  <Badge variant="outline">w {queueSummary.warning}</Badge>
-                  <Badge variant="outline">c {queueSummary.critical}</Badge>
+          {viewMode === "full" ? (
+            <Card className="overflow-hidden border-border/70 py-0">
+              <CardHeader className="border-b border-border/70 bg-muted/20 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Queue</CardTitle>
+                  <div className="flex gap-1 text-xs">
+                    <Badge variant="outline">i {queueSummary.info}</Badge>
+                    <Badge variant="outline">w {queueSummary.warning}</Badge>
+                    <Badge variant="outline">c {queueSummary.critical}</Badge>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <QueuePanel className="border-none p-0 shadow-none">
-                <QueueList
-                  className={cn(
-                    "mt-0 p-3",
-                    viewMode === "guided" ? "[&>div]:max-h-[220px]" : "[&>div]:max-h-[280px]",
-                  )}
-                >
-                  {displayedQueue.map((item) => (
-                    <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
-                      <div className="flex items-center gap-2">
-                        <QueueItemIndicator completed={item.severity === "info"} />
-                        <QueueItemContent>{item.title}</QueueItemContent>
-                        <Badge variant="secondary" className="ml-auto text-[10px]">
-                          {item.severity}
-                        </Badge>
-                      </div>
-                      {viewMode === "full" ? (
+              </CardHeader>
+              <CardContent className="p-0">
+                <QueuePanel className="border-none p-0 shadow-none">
+                  <QueueList className="mt-0 p-3 [&>div]:max-h-[280px]">
+                    {queue.map((item) => (
+                      <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
+                        <div className="flex items-center gap-2">
+                          <QueueItemIndicator completed={item.severity === "info"} />
+                          <QueueItemContent>{item.title}</QueueItemContent>
+                          <Badge variant="secondary" className="ml-auto text-[10px]">
+                            {item.severity}
+                          </Badge>
+                        </div>
                         <QueueItemDescription>{item.description}</QueueItemDescription>
-                      ) : (
-                        <p className="ml-6 text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
-                      )}
-                      {viewMode === "full" ? (
                         <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
-                      ) : null}
-                    </QueueEntry>
-                  ))}
-                  {viewMode === "guided" && queue.length > displayedQueue.length ? (
-                    <p className="px-2 text-[11px] text-muted-foreground">
-                      +{queue.length - displayedQueue.length} 件は Full 表示で確認
-                    </p>
-                  ) : null}
-                </QueueList>
-              </QueuePanel>
-            </CardContent>
-          </Card>
+                      </QueueEntry>
+                    ))}
+                  </QueueList>
+                </QueuePanel>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-border/70 py-4">
+              <CardHeader className="px-4">
+                <CardTitle className="text-sm">Quick Start</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 px-4 text-xs text-muted-foreground">
+                <p>Queue: critical {queueSummary.critical} / warning {queueSummary.warning}</p>
+                <p>まず Run Scenario で会話を生成し、中央で必要箇所だけ修正します。</p>
+                {primaryScenario ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => void runScenario(primaryScenario)}
+                    disabled={Boolean(runningScenarioId)}
+                  >
+                    {runningScenarioId === primaryScenario.id ? "running..." : "Run Scenario"}
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
 
-          {activeScenarios.length > 0 ? (
+          {viewMode === "full" && activeScenarios.length > 0 ? (
             <Card className="gap-3 border-border/70 py-4">
               <CardHeader className="px-4">
                 <CardTitle className="text-sm">1-click Demo Scenario</CardTitle>
@@ -1546,11 +1554,6 @@ export function DemoWorkspace({
                         ) : null}
                       </div>
                     ))}
-                    {viewMode === "guided" && activeScenarios.length > displayedScenarios.length ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        他シナリオは Full 表示で確認できます。
-                      </p>
-                    ) : null}
                   </div>
                 </ScrollArea>
                 {runningScenarioId ? (
@@ -1584,16 +1587,18 @@ export function DemoWorkspace({
                   <Badge variant={isStreaming ? "default" : "secondary"}>
                     {isStreaming ? "streaming..." : "ready"}
                   </Badge>
-                  <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
-                    <OpenInTrigger />
-                    <OpenInContent>
-                      <OpenInLabel>Open in</OpenInLabel>
-                      <OpenInSeparator />
-                      <OpenInChatGPT />
-                      <OpenInClaude />
-                      <OpenInv0 />
-                    </OpenInContent>
-                  </OpenIn>
+                  {viewMode === "full" ? (
+                    <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
+                      <OpenInTrigger />
+                      <OpenInContent>
+                        <OpenInLabel>Open in</OpenInLabel>
+                        <OpenInSeparator />
+                        <OpenInChatGPT />
+                        <OpenInClaude />
+                        <OpenInv0 />
+                      </OpenInContent>
+                    </OpenIn>
+                  ) : null}
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -1661,7 +1666,7 @@ export function DemoWorkspace({
 
             <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
               <div className="flex flex-wrap gap-2">
-                {activeSuggestions.map((suggestion) => (
+                {displayedSuggestions.map((suggestion) => (
                   <Button
                     key={suggestion}
                     type="button"
@@ -1699,14 +1704,29 @@ export function DemoWorkspace({
                         ))}
                       </SelectContent>
                     </Select>
-                    <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
-                      <p>目的: {selectedMeetingProfile.objective}</p>
-                      <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
-                      <p className="mt-1">期待成果: {selectedMeetingProfile.expectedOutput}</p>
-                    </div>
+                    {viewMode === "full" ? (
+                      <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
+                        <p>目的: {selectedMeetingProfile.objective}</p>
+                        <p className="mt-1">参加者: {selectedMeetingProfile.participants}</p>
+                        <p className="mt-1">期待成果: {selectedMeetingProfile.expectedOutput}</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
+                        <p>主要論点:</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {selectedMeetingProfile.keyTopics.slice(0, 3).map((topic) => (
+                            <Badge key={topic} variant="outline" className="text-[10px]">
+                              {topic}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 rounded-md border border-border/70 bg-background px-2.5 py-2 text-[11px]">
-                    <p className="font-medium">この会議タイプの出力フォーマット</p>
+                    <p className="font-medium">
+                      {viewMode === "full" ? "この会議タイプの出力フォーマット" : "出力テンプレート"}
+                    </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {selectedMeetingProfile.keyTopics.map((topic) => (
                         <Badge key={topic} variant="outline" className="text-[10px]">
@@ -1714,16 +1734,24 @@ export function DemoWorkspace({
                         </Badge>
                       ))}
                     </div>
-                    <ol className="mt-1 space-y-0.5 text-muted-foreground">
-                      {selectedMeetingOutputTemplate.sections.map((section, index) => (
-                        <li key={section}>
-                          {index + 1}. {section}
-                        </li>
-                      ))}
-                    </ol>
-                    <p className="mt-1 text-muted-foreground">
-                      次アクション表: {selectedMeetingOutputTemplate.actionColumns.join(" / ")}
-                    </p>
+                    {viewMode === "full" ? (
+                      <>
+                        <ol className="mt-1 space-y-0.5 text-muted-foreground">
+                          {selectedMeetingOutputTemplate.sections.map((section, index) => (
+                            <li key={section}>
+                              {index + 1}. {section}
+                            </li>
+                          ))}
+                        </ol>
+                        <p className="mt-1 text-muted-foreground">
+                          次アクション表: {selectedMeetingOutputTemplate.actionColumns.join(" / ")}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-muted-foreground">
+                        まずテンプレート挿入、次にこの会議タイプを実行すると最短で開始できます。
+                      </p>
+                    )}
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -1800,21 +1828,55 @@ export function DemoWorkspace({
                 className="min-h-24 resize-y"
               />
 
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <label className="inline-flex cursor-pointer items-center">
-                    <input
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => handleFileSelection(event.target.files)}
-                    />
-                    <Button type="button" size="sm" variant="outline" asChild>
-                      <span>添付</span>
+              {viewMode === "full" ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <label className="inline-flex cursor-pointer items-center">
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => handleFileSelection(event.target.files)}
+                      />
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <span>添付</span>
+                      </Button>
+                    </label>
+                    <span>{attachmentNames.length > 0 ? attachmentNames.join(", ") : "添付なし"}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={() => void send()} disabled={isStreaming}>
+                      送信
                     </Button>
-                  </label>
-                  <span>{attachmentNames.length > 0 ? attachmentNames.join(", ") : "添付なし"}</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void runAutonomousLoop()}
+                      disabled={isStreaming || isAutoLoopRunning}
+                    >
+                      {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void runDevilsAdvocate()}
+                      disabled={isStreaming}
+                    >
+                      悪魔の代弁者
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
+                    >
+                      停止
+                    </Button>
+                    <Button type="button" variant="outline" onClick={createCheckpoint}>
+                      Checkpoint保存
+                    </Button>
+                  </div>
                 </div>
+              ) : (
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" onClick={() => void send()} disabled={isStreaming}>
                     送信
@@ -1835,21 +1897,20 @@ export function DemoWorkspace({
                   >
                     悪魔の代弁者
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
-                  >
-                    停止
-                  </Button>
-                  <Button type="button" variant="outline" onClick={createCheckpoint}>
-                    Checkpoint保存
-                  </Button>
+                  {isStreaming || isAutoLoopRunning ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
+                    >
+                      停止
+                    </Button>
+                  ) : null}
                 </div>
-              </div>
+              )}
               {loopStatus ? <p className="text-xs text-muted-foreground">{loopStatus}</p> : null}
 
-              {(enableVoice || enableTts) ? (
+              {(enableVoice || enableTts) && viewMode === "full" ? (
                 <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 md:grid-cols-2">
                   {enableVoice ? (
                     <div>
@@ -1892,7 +1953,8 @@ export function DemoWorkspace({
           </Card>
         </section>
 
-        <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+        {viewMode === "full" ? (
+          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
           <Card className="gap-3 border-border/70 py-4">
             <CardHeader className="px-4">
               <CardTitle className="text-sm">Model & Context</CardTitle>
@@ -1992,7 +2054,8 @@ export function DemoWorkspace({
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="execution">
+          {viewMode === "full" ? (
+            <Tabs defaultValue="execution">
             <TabsList className="w-full bg-muted/40">
               <TabsTrigger value="execution">Execution</TabsTrigger>
               {viewMode === "full" ? <TabsTrigger value="ops">Ops</TabsTrigger> : null}
@@ -2185,87 +2248,141 @@ export function DemoWorkspace({
                 </CardContent>
               </Card>
             </TabsContent> : null}
-          </Tabs>
-          {viewMode === "guided" ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setViewMode("full")}>
-              Ops / Audit を表示
-            </Button>
-          ) : null}
-        </aside>
+            </Tabs>
+          ) : (
+            <Card className="gap-3 border-border/70 py-4">
+              <CardHeader className="px-4">
+                <CardTitle className="text-sm">Execution Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 px-4 text-xs">
+                {plan.slice(0, 3).map((step) => (
+                  <div key={step.id} className="flex items-center justify-between rounded-md border px-2 py-1">
+                    <span>{step.title}</span>
+                    <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(step.status)}`}>
+                      {step.status}
+                    </span>
+                  </div>
+                ))}
+                <p className="text-muted-foreground">未完了タスク: {tasks.filter((task) => !task.done).length}</p>
+                <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setViewMode("full")}>
+                  詳細を表示
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          </aside>
+        ) : null}
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
-        <Card className="gap-3 border-border/70 py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="text-sm">Artifacts</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-            <ScrollArea className="h-[220px]">
-              <div className="space-y-1 pr-2">
-                {artifacts.map((artifact) => (
-                  <Button
-                    key={artifact.id}
-                    type="button"
-                    variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => setSelectedArtifactId(artifact.id)}
-                  >
-                    {artifact.name}
-                  </Button>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+      {viewMode === "full" ? (
+        <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
+          <Card className="gap-3 border-border/70 py-4">
+            <CardHeader className="px-4">
+              <CardTitle className="text-sm">Artifacts</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4">
+              <ScrollArea className="h-[220px]">
+                <div className="space-y-1 pr-2">
+                  {artifacts.map((artifact) => (
+                    <Button
+                      key={artifact.id}
+                      type="button"
+                      variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setSelectedArtifactId(artifact.id)}
+                    >
+                      {artifact.name}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
-        <ArtifactPanel>
-          <ArtifactHeader>
-            <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
-            <ArtifactActions>
-              <ArtifactAction
-                onClick={() => setArtifactViewMode("rendered")}
-                tooltip="Preview"
-                disabled={!selectedArtifact}
-              >
-                preview
-              </ArtifactAction>
-              <ArtifactAction
-                onClick={() => setArtifactViewMode("raw")}
-                tooltip="Raw"
-                disabled={!selectedArtifact}
-              >
-                raw
-              </ArtifactAction>
-              <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
-                {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
-              </ArtifactAction>
-              <ArtifactAction onClick={downloadArtifact} tooltip="Download" disabled={!selectedArtifact}>
-                download
-              </ArtifactAction>
-            </ArtifactActions>
-          </ArtifactHeader>
-          <ArtifactContent>
-            {selectedArtifact ? (
-              artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
-                <iframe
-                  title={selectedArtifact.name}
-                  srcDoc={selectedArtifact.content}
-                  className="h-72 w-full rounded-lg border"
-                />
+          <ArtifactPanel>
+            <ArtifactHeader>
+              <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
+              <ArtifactActions>
+                <ArtifactAction
+                  onClick={() => setArtifactViewMode("rendered")}
+                  tooltip="Preview"
+                  disabled={!selectedArtifact}
+                >
+                  preview
+                </ArtifactAction>
+                <ArtifactAction
+                  onClick={() => setArtifactViewMode("raw")}
+                  tooltip="Raw"
+                  disabled={!selectedArtifact}
+                >
+                  raw
+                </ArtifactAction>
+                <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
+                  {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+                </ArtifactAction>
+                <ArtifactAction onClick={downloadArtifact} tooltip="Download" disabled={!selectedArtifact}>
+                  download
+                </ArtifactAction>
+              </ArtifactActions>
+            </ArtifactHeader>
+            <ArtifactContent>
+              {selectedArtifact ? (
+                artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
+                  <iframe
+                    title={selectedArtifact.name}
+                    srcDoc={selectedArtifact.content}
+                    className="h-72 w-full rounded-lg border"
+                  />
+                ) : (
+                  <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                    {selectedArtifact.content}
+                  </pre>
+                )
               ) : (
-                <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
+              )}
+            </ArtifactContent>
+          </ArtifactPanel>
+        </section>
+      ) : (
+        <section className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {artifacts.slice(0, 4).map((artifact) => (
+              <Button
+                key={artifact.id}
+                type="button"
+                variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedArtifactId(artifact.id)}
+              >
+                {artifact.name}
+              </Button>
+            ))}
+          </div>
+          <ArtifactPanel>
+            <ArtifactHeader>
+              <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
+              <ArtifactActions>
+                <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
+                  {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+                </ArtifactAction>
+              </ArtifactActions>
+            </ArtifactHeader>
+            <ArtifactContent>
+              {selectedArtifact ? (
+                <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
                   {selectedArtifact.content}
                 </pre>
-              )
-            ) : (
-              <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
-            )}
-          </ArtifactContent>
-        </ArtifactPanel>
-      </section>
+              ) : (
+                <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
+              )}
+            </ArtifactContent>
+          </ArtifactPanel>
+        </section>
+      )}
 
-      {citations.length > 0 ? (
+      {viewMode === "full" && citations.length > 0 ? (
         <Sources>
           <SourcesTrigger count={citations.length} />
           <SourcesContent>
@@ -2281,7 +2398,7 @@ export function DemoWorkspace({
         </Sources>
       ) : null}
 
-      {bottomPanel}
+      {viewMode === "full" ? bottomPanel : null}
 
       {approval?.required ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
