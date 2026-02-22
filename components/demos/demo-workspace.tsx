@@ -338,6 +338,58 @@ function getMessageText(message: DemoUIMessage): string {
     .trim();
 }
 
+function normalizeSummaryLine(line: string): string {
+  return line.replace(/^[-*•]\s+/, "").replace(/^\d+\.\s+/, "").trim();
+}
+
+function extractLatestAssistantSummary(messages: DemoUIMessage[]): {
+  summary: string;
+  bullets: string[];
+} | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    const text = getMessageText(message);
+    if (!text) {
+      continue;
+    }
+
+    const lines = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .filter((line) => !line.startsWith("```"))
+      .filter((line) => !line.startsWith("|"))
+      .filter((line) => !line.startsWith(">"));
+
+    if (lines.length === 0) {
+      continue;
+    }
+
+    const normalized = lines.map(normalizeSummaryLine).filter((line) => line.length > 0);
+    if (normalized.length === 0) {
+      continue;
+    }
+
+    const summary =
+      normalized.find(
+        (line) =>
+          !line.startsWith("#") &&
+          !line.includes("要点サマリー") &&
+          !line.includes("重要な論点") &&
+          !line.includes("次アクション"),
+      ) ?? normalized[0];
+
+    const bullets = normalized.filter((line) => line !== summary).slice(0, 3);
+    return { summary, bullets };
+  }
+
+  return null;
+}
+
 function buildConversationTranscript(messages: DemoUIMessage[]): string {
   return messages
     .map((message) => {
@@ -756,6 +808,7 @@ export function DemoWorkspace({
     () => (viewMode === "guided" ? activeScenarios.slice(0, 1) : activeScenarios),
     [activeScenarios, viewMode],
   );
+  const latestAssistantSummary = useMemo(() => extractLatestAssistantSummary(messages), [messages]);
   const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
   const planProgress = useMemo(() => {
@@ -1646,6 +1699,30 @@ export function DemoWorkspace({
               <p className="text-xs text-muted-foreground">
                 左列で開始し、ここで編集・再送して出力を固めます。
               </p>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-primary">LLM回答サマリ（固定表示）</p>
+                  <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
+                    {isStreaming ? "更新中" : "最新"}
+                  </Badge>
+                </div>
+                {latestAssistantSummary ? (
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-xs font-medium text-foreground">{latestAssistantSummary.summary}</p>
+                    {latestAssistantSummary.bullets.length > 0 ? (
+                      <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+                        {latestAssistantSummary.bullets.map((line, lineIndex) => (
+                          <li key={`${line}-${lineIndex}`}>• {line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    まだ回答がありません。Run Scenarioまたは送信で回答を生成すると、ここに要点を固定表示します。
+                  </p>
+                )}
+              </div>
             </CardHeader>
 
             <Conversation className={cn("bg-muted/20", viewMode === "guided" ? "h-[420px]" : "h-[540px]")}>
