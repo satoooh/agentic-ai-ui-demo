@@ -13,7 +13,7 @@ npm run dev
 ## 技術スタック（現時点）
 
 - Core: Next.js 16 / TypeScript / React 19
-- UI: Tailwind CSS v4 + daisyUI
+- UI: Tailwind CSS v4 + shadcn/ui + AI Elements
 - AI: AI SDK (`ai`, `@ai-sdk/openai`)
 - LLM Providers: OpenAI / Gemini
 - Data: Drizzle ORM + libsql (`@libsql/client`) + Turso 想定
@@ -35,6 +35,14 @@ npm run dev
 - `Approval Ledger` で承認履歴を監査ログとして表示
 - `Input to Approval` ゲートで業務フロー達成状況を可視化
 - 各デモに `1-minute Demo Script` を常設（営業/社内説明向け）
+- 左列は実行系（Queue / Scenario）、監査系（Saved Sessions）は `Audit` タブへ集約して情報密度を整理
+- ホーム画面を説明中心から `Quick Start` 導線中心へ再設計
+
+## UX設計メモ（参照方針）
+
+- 余白とレイアウト: デジタル庁デザインシステムの「一貫したレイアウト設計」と「リキッドレイアウト」方針を参照
+- 可読性: デジタル庁のアクセシブルカラー方針に合わせ、状態表現を色だけに依存しない設計
+- 操作性: ソシオメディアのUIガイドライン（シンプル化・ユーザー主導権・一貫性）を参考に情報優先度を調整
 
 ## API雛形
 
