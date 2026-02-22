@@ -74,6 +74,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { getDefaultModel, MODEL_OPTIONS } from "@/lib/models";
 import type {
   ApprovalRequest,
@@ -473,6 +485,8 @@ export function DemoWorkspace({
     ],
     [messages, plan.length, tasks.length, tools.length, artifacts.length, approvalLogs],
   );
+  const completedGateCount = stageGates.filter((stage) => stage.done).length;
+  const gateProgress = Math.round((completedGateCount / stageGates.length) * 100);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -887,54 +901,83 @@ export function DemoWorkspace({
   return (
     <div className="space-y-5">
       <header className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-zinc-700 p-6 text-white">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-200">{subtitle}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Badge variant="secondary">{queue.length} queue</Badge>
-            <Badge variant="secondary">plan {planProgress}%</Badge>
-            <Badge variant="secondary">task {taskProgress}%</Badge>
-            <Badge variant="secondary">{isStreaming ? "streaming" : "ready"}</Badge>
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-700 p-6 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-200">{subtitle}</p>
+            </div>
+            <Badge variant="secondary" className="bg-white/15 text-white shadow-none">
+              {isStreaming ? "streaming" : "ready"}
+            </Badge>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-4">
+            {stageGates.map((stage) => (
+              <div
+                key={stage.id}
+                className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs backdrop-blur-sm"
+              >
+                <p className="text-[11px] uppercase tracking-wide text-white/80">{stage.label}</p>
+                <p className="mt-1 font-semibold">{stage.done ? "done" : "waiting"}</p>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 border-t bg-muted/30 px-4 py-3">
-          {stageGates.map((stage) => (
-            <Badge key={stage.id} variant={stage.done ? "default" : "outline"}>
-              {stage.label}: {stage.done ? "done" : "waiting"}
-            </Badge>
-          ))}
+
+        <div className="space-y-3 border-t bg-muted/25 px-4 py-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Stage completion: {completedGateCount}/{stageGates.length}
+            </span>
+            <span>{gateProgress}%</span>
+          </div>
+          <Progress value={gateProgress} />
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">queue {queue.length}</Badge>
+            <Badge variant="outline">plan {planProgress}%</Badge>
+            <Badge variant="outline">task {taskProgress}%</Badge>
+            <Badge variant="outline">artifacts {artifacts.length}</Badge>
+            <Badge variant="outline">approval {approvalLogs.length}</Badge>
+          </div>
         </div>
       </header>
 
       {topPanel}
 
-      <div className="grid gap-4 xl:grid-cols-[280px_1fr_320px]">
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
         <aside className="space-y-4">
-          <QueuePanel>
-            <div className="flex items-center justify-between">
-              <p className="font-medium text-sm">Queue</p>
-              <div className="flex gap-1 text-xs">
-                <Badge variant="outline">i {queueSummary.info}</Badge>
-                <Badge variant="outline">w {queueSummary.warning}</Badge>
-                <Badge variant="outline">c {queueSummary.critical}</Badge>
+          <Card className="overflow-hidden py-0">
+            <CardHeader className="border-b bg-muted/20 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Queue</CardTitle>
+                <div className="flex gap-1 text-xs">
+                  <Badge variant="outline">i {queueSummary.info}</Badge>
+                  <Badge variant="outline">w {queueSummary.warning}</Badge>
+                  <Badge variant="outline">c {queueSummary.critical}</Badge>
+                </div>
               </div>
-            </div>
-            <QueueList className="mt-1">
-              {queue.map((item) => (
-                <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
-                  <div className="flex items-center gap-2">
-                    <QueueItemIndicator completed={item.severity === "info"} />
-                    <QueueItemContent>{item.title}</QueueItemContent>
-                    <Badge variant="secondary" className="ml-auto text-[10px]">
-                      {item.severity}
-                    </Badge>
-                  </div>
-                  <QueueItemDescription>{item.description}</QueueItemDescription>
-                  <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
-                </QueueEntry>
-              ))}
-            </QueueList>
-          </QueuePanel>
+            </CardHeader>
+            <CardContent className="p-0">
+              <QueuePanel className="border-none p-0 shadow-none">
+                <QueueList className="mt-0 p-3 [&>div]:max-h-[320px]">
+                  {queue.map((item) => (
+                    <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
+                      <div className="flex items-center gap-2">
+                        <QueueItemIndicator completed={item.severity === "info"} />
+                        <QueueItemContent>{item.title}</QueueItemContent>
+                        <Badge variant="secondary" className="ml-auto text-[10px]">
+                          {item.severity}
+                        </Badge>
+                      </div>
+                      <QueueItemDescription>{item.description}</QueueItemDescription>
+                      <p className="ml-6 text-[11px] text-muted-foreground">{item.timestamp}</p>
+                    </QueueEntry>
+                  ))}
+                </QueueList>
+              </QueuePanel>
+            </CardContent>
+          </Card>
 
           {scenarios.length > 0 ? (
             <Card className="gap-3 py-4">
@@ -942,15 +985,15 @@ export function DemoWorkspace({
                 <CardTitle className="text-sm">1-click Demo Scenario</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 px-4">
-                {scenarios.map((scenario) => (
-                  <div key={scenario.id} className="rounded-lg border bg-background p-2">
-                    <p className="text-xs font-semibold">{scenario.title}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">{scenario.description}</p>
-                    <div className="mt-2 h-1.5 rounded bg-muted">
-                      <div
-                        className="h-1.5 rounded bg-primary"
-                        style={{
-                          width: `${
+                <ScrollArea className="h-[300px] pr-2">
+                  <div className="space-y-2">
+                    {scenarios.map((scenario) => (
+                      <div key={scenario.id} className="rounded-lg border bg-background p-2">
+                        <p className="text-xs font-semibold">{scenario.title}</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">{scenario.description}</p>
+                        <Progress
+                          className="mt-2 h-1.5"
+                          value={
                             scenario.steps.length === 0
                               ? 0
                               : Math.round(
@@ -960,39 +1003,39 @@ export function DemoWorkspace({
                                     scenario.steps.length) *
                                     100,
                                 )
-                          }%`,
-                        }}
-                      />
-                    </div>
-                    <ul className="mt-2 space-y-1">
-                      {scenario.steps.map((step) => {
-                        const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
-                        return (
-                          <li key={step.id} className="flex items-center justify-between text-[11px]">
-                            <span className="truncate">{step.label}</span>
-                            <span className={`rounded px-1.5 py-0.5 ${getScenarioStepBadgeStyle(stepStatus)}`}>
-                              {stepStatus}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-2 w-full"
-                      onClick={() => void runScenario(scenario)}
-                      disabled={Boolean(runningScenarioId)}
-                    >
-                      {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
-                    </Button>
-                    {scenarioDurations[scenario.id] ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        last run: {scenarioDurations[scenario.id]}s
-                      </p>
-                    ) : null}
+                          }
+                        />
+                        <ul className="mt-2 space-y-1">
+                          {scenario.steps.map((step) => {
+                            const stepStatus = scenarioStepStates[scenario.id]?.[step.id] ?? "pending";
+                            return (
+                              <li key={step.id} className="flex items-center justify-between text-[11px]">
+                                <span className="truncate">{step.label}</span>
+                                <span className={`rounded px-1.5 py-0.5 ${getScenarioStepBadgeStyle(stepStatus)}`}>
+                                  {stepStatus}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={() => void runScenario(scenario)}
+                          disabled={Boolean(runningScenarioId)}
+                        >
+                          {runningScenarioId === scenario.id ? "running..." : "Run Scenario"}
+                        </Button>
+                        {scenarioDurations[scenario.id] ? (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            last run: {scenarioDurations[scenario.id]}s
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </ScrollArea>
                 {runningScenarioId ? (
                   <div className="rounded-md border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">
                     <div className="flex items-center justify-between gap-2">
@@ -1023,27 +1066,29 @@ export function DemoWorkspace({
                 セッション保存
               </Button>
               {sessionStatus ? <p className="text-xs text-muted-foreground">{sessionStatus}</p> : null}
-              <div className="space-y-2">
-                {sessions.map((session) => (
-                  <div key={session.id} className="rounded-lg border p-2 text-xs">
-                    <p className="font-semibold">{session.title}</p>
-                    <p className="text-muted-foreground">
-                      {session.modelProvider} / {session.modelId}
-                    </p>
-                    <p className="text-muted-foreground">{session.updatedAt}</p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="mt-1 w-full"
-                      onClick={() => void restoreSession(session.id)}
-                    >
-                      復元
-                    </Button>
-                  </div>
-                ))}
-                {sessions.length === 0 ? <p className="text-xs text-muted-foreground">保存済みセッションなし</p> : null}
-              </div>
+              <ScrollArea className="h-[210px]">
+                <div className="space-y-2 pr-2">
+                  {sessions.map((session) => (
+                    <div key={session.id} className="rounded-lg border p-2 text-xs">
+                      <p className="font-semibold">{session.title}</p>
+                      <p className="text-muted-foreground">
+                        {session.modelProvider} / {session.modelId}
+                      </p>
+                      <p className="text-muted-foreground">{session.updatedAt}</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-1 w-full"
+                        onClick={() => void restoreSession(session.id)}
+                      >
+                        復元
+                      </Button>
+                    </div>
+                  ))}
+                  {sessions.length === 0 ? <p className="text-xs text-muted-foreground">保存済みセッションなし</p> : null}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </aside>
@@ -1069,7 +1114,7 @@ export function DemoWorkspace({
               </div>
             </CardHeader>
 
-            <Conversation className="h-[430px] bg-muted/25">
+            <Conversation className="h-[460px] bg-muted/25">
               <ConversationContent className="gap-4 p-4">
                 {messages.length === 0 ? (
                   <ConversationEmptyState
@@ -1141,13 +1186,15 @@ export function DemoWorkspace({
                   </Button>
                 ))}
               </div>
-              <textarea
+
+              <Textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleDraftKeyDown}
                 placeholder="メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
-                className="h-28 w-full rounded-lg border bg-background p-3 text-sm outline-none ring-0 focus-visible:border-primary"
+                className="min-h-28 resize-y"
               />
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <label className="inline-flex cursor-pointer items-center">
@@ -1177,7 +1224,7 @@ export function DemoWorkspace({
               </div>
 
               {(enableVoice || enableTts) ? (
-                <div className="grid gap-2 rounded-lg border bg-muted/40 p-3 md:grid-cols-2">
+                <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 md:grid-cols-2">
                   {enableVoice ? (
                     <div>
                       <p className="text-xs font-semibold">Voice Input</p>
@@ -1195,15 +1242,16 @@ export function DemoWorkspace({
                   {enableTts ? (
                     <div>
                       <p className="text-xs font-semibold">TTS Preview</p>
-                      <select
-                        value={ttsVoice}
-                        onChange={(event) => setTtsVoice(event.target.value)}
-                        className="mt-2 w-full rounded-md border bg-background px-2 py-1 text-xs"
-                      >
-                        <option value="ja-JP-default">ja-JP-default</option>
-                        <option value="ja-JP-clear">ja-JP-clear</option>
-                        <option value="ja-JP-station">ja-JP-station</option>
-                      </select>
+                      <Select value={ttsVoice} onValueChange={setTtsVoice}>
+                        <SelectTrigger className="mt-2 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ja-JP-default">ja-JP-default</SelectItem>
+                          <SelectItem value="ja-JP-clear">ja-JP-clear</SelectItem>
+                          <SelectItem value="ja-JP-station">ja-JP-station</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button type="button" size="sm" className="mt-2" onClick={() => void previewTts()}>
                         読み上げ確認
                       </Button>
@@ -1224,25 +1272,33 @@ export function DemoWorkspace({
               <CardTitle className="text-sm">Model & Context</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 px-4">
-              <select
-                value={provider}
-                onChange={(event) => setProvider(event.target.value as ModelProvider)}
-                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-              </select>
-              <select
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                className="w-full rounded-md border bg-background px-2 py-1 text-sm"
-              >
-                {MODEL_OPTIONS[provider].map((modelOption) => (
-                  <option key={modelOption} value={modelOption}>
-                    {modelOption}
-                  </option>
-                ))}
-              </select>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Select
+                  value={provider}
+                  onValueChange={(value) => setProvider(value as ModelProvider)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="gemini">Gemini</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODEL_OPTIONS[provider].map((modelOption) => (
+                      <SelectItem key={modelOption} value={modelOption}>
+                        {modelOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <ContextMeter
                 usedTokens={contextStats.inputTokens + contextStats.outputTokens}
                 maxTokens={32000}
@@ -1276,148 +1332,179 @@ export function DemoWorkspace({
             </CardContent>
           </Card>
 
-          <Plan defaultOpen isStreaming={isStreaming}>
-            <PlanHeader>
-              <div>
-                <PlanTitle>Execution Plan</PlanTitle>
-                <PlanDescription>進捗を見ながら承認ポイントを管理します。</PlanDescription>
-              </div>
-              <PlanAction>
-                <PlanTrigger />
-              </PlanAction>
-            </PlanHeader>
-            <PlanContent className="space-y-2">
-              {plan.map((step) => (
-                <div key={step.id} className="flex items-center justify-between rounded-md border px-2 py-1 text-xs">
-                  <span>{step.title}</span>
-                  <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(step.status)}`}>
-                    {step.status}
-                  </span>
-                </div>
-              ))}
-            </PlanContent>
-          </Plan>
+          <Tabs defaultValue="execution">
+            <TabsList className="w-full">
+              <TabsTrigger value="execution">Execution</TabsTrigger>
+              <TabsTrigger value="ops">Ops</TabsTrigger>
+              <TabsTrigger value="audit">Audit</TabsTrigger>
+            </TabsList>
 
-          <Card className="gap-3 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Task</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4">
-              <Task defaultOpen>
-                <TaskTrigger title="Checklist" />
-                <TaskContent>
-                  {tasks.map((task) => (
-                    <TaskEntry key={task.id}>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={task.done}
-                          onChange={(event) => {
-                            const done = event.target.checked;
-                            setTasks((prev) =>
-                              prev.map((current) =>
-                                current.id === task.id ? { ...current, done } : current,
-                              ),
-                            );
-                          }}
-                        />
-                        <span>{task.label}</span>
-                      </label>
-                    </TaskEntry>
+            <TabsContent value="execution" className="space-y-4">
+              <Plan defaultOpen isStreaming={isStreaming}>
+                <PlanHeader>
+                  <div>
+                    <PlanTitle>Execution Plan</PlanTitle>
+                    <PlanDescription>進捗を見ながら承認ポイントを管理します。</PlanDescription>
+                  </div>
+                  <PlanAction>
+                    <PlanTrigger />
+                  </PlanAction>
+                </PlanHeader>
+                <PlanContent className="space-y-2">
+                  {plan.map((step) => (
+                    <div key={step.id} className="flex items-center justify-between rounded-md border px-2 py-1 text-xs">
+                      <span>{step.title}</span>
+                      <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(step.status)}`}>
+                        {step.status}
+                      </span>
+                    </div>
                   ))}
-                </TaskContent>
-              </Task>
-            </CardContent>
-          </Card>
+                </PlanContent>
+              </Plan>
 
-          <Card className="gap-3 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Tool Logs</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-4 text-xs">
-              {tools.map((tool) => (
-                <div key={tool.id} className="rounded-md border bg-muted/30 p-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{tool.name}</p>
-                    <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(tool.status)}`}>
-                      {tool.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-muted-foreground">{tool.detail}</p>
-                </div>
-              ))}
-              {tools.length === 0 ? <p className="text-muted-foreground">ログなし</p> : null}
-            </CardContent>
-          </Card>
+              <Card className="gap-3 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm">Task Checklist</CardTitle>
+                </CardHeader>
+                <CardContent className="px-4">
+                  <Task defaultOpen>
+                    <TaskTrigger title="Checklist" />
+                    <TaskContent>
+                      {tasks.map((task) => (
+                        <TaskEntry key={task.id}>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={task.done}
+                              onChange={(event) => {
+                                const done = event.target.checked;
+                                setTasks((prev) =>
+                                  prev.map((current) =>
+                                    current.id === task.id ? { ...current, done } : current,
+                                  ),
+                                );
+                              }}
+                            />
+                            <span>{task.label}</span>
+                          </label>
+                        </TaskEntry>
+                      ))}
+                    </TaskContent>
+                  </Task>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          <Card className="gap-3 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Checkpoint</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-4">
-              <CheckpointBar>
-                <CheckpointTrigger onClick={createCheckpoint} tooltip="現時点を保存">
-                  <CheckpointIcon />
-                  save current
-                </CheckpointTrigger>
-              </CheckpointBar>
-              {checkpoints.map((checkpoint) => (
-                <Button
-                  key={checkpoint.id}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start"
-                  onClick={() => restoreCheckpoint(checkpoint)}
-                >
-                  {checkpoint.label}
-                </Button>
-              ))}
-              {checkpoints.length === 0 ? <p className="text-xs text-muted-foreground">保存済みなし</p> : null}
-            </CardContent>
-          </Card>
+            <TabsContent value="ops" className="space-y-4">
+              <Card className="gap-3 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm">Tool Logs</CardTitle>
+                </CardHeader>
+                <CardContent className="px-4">
+                  <ScrollArea className="h-[320px]">
+                    <div className="space-y-2 pr-2 text-xs">
+                      {tools.map((tool) => (
+                        <div key={tool.id} className="rounded-md border bg-muted/30 p-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold">{tool.name}</p>
+                            <span className={`rounded px-1.5 py-0.5 ${getStatusBadgeStyle(tool.status)}`}>
+                              {tool.status}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-muted-foreground">{tool.detail}</p>
+                        </div>
+                      ))}
+                      {tools.length === 0 ? <p className="text-muted-foreground">ログなし</p> : null}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          <Card className="gap-3 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Approval Ledger</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-4 text-xs">
-              {approvalLogs.map((log) => (
-                <div key={log.id} className="rounded-md border bg-muted/20 p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold">{log.action}</p>
-                    <Badge variant={log.status === "approved" ? "default" : "outline"}>
-                      {log.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-muted-foreground">{log.reason}</p>
-                  <p className="mt-1 text-muted-foreground">{log.timestamp}</p>
-                </div>
-              ))}
-              {approvalLogs.length === 0 ? <p className="text-muted-foreground">履歴なし</p> : null}
-            </CardContent>
-          </Card>
+            <TabsContent value="audit" className="space-y-4">
+              <Card className="gap-3 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm">Checkpoint</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-4">
+                  <CheckpointBar>
+                    <CheckpointTrigger onClick={createCheckpoint} tooltip="現時点を保存">
+                      <CheckpointIcon />
+                      save current
+                    </CheckpointTrigger>
+                  </CheckpointBar>
+                  <Separator />
+                  <ScrollArea className="h-[140px]">
+                    <div className="space-y-2 pr-2">
+                      {checkpoints.map((checkpoint) => (
+                        <Button
+                          key={checkpoint.id}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          onClick={() => restoreCheckpoint(checkpoint)}
+                        >
+                          {checkpoint.label}
+                        </Button>
+                      ))}
+                      {checkpoints.length === 0 ? <p className="text-xs text-muted-foreground">保存済みなし</p> : null}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card className="gap-3 py-4">
+                <CardHeader className="px-4">
+                  <CardTitle className="text-sm">Approval Ledger</CardTitle>
+                </CardHeader>
+                <CardContent className="px-4">
+                  <ScrollArea className="h-[210px]">
+                    <div className="space-y-2 pr-2 text-xs">
+                      {approvalLogs.map((log) => (
+                        <div key={log.id} className="rounded-md border bg-muted/20 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold">{log.action}</p>
+                            <Badge variant={log.status === "approved" ? "default" : "outline"}>
+                              {log.status}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-muted-foreground">{log.reason}</p>
+                          <p className="mt-1 text-muted-foreground">{log.timestamp}</p>
+                        </div>
+                      ))}
+                      {approvalLogs.length === 0 ? <p className="text-muted-foreground">履歴なし</p> : null}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </aside>
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
+      <section className="grid gap-4 xl:grid-cols-[250px_1fr]">
         <Card className="gap-3 py-4">
           <CardHeader className="px-4">
             <CardTitle className="text-sm">Artifacts</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 px-4">
-            {artifacts.map((artifact) => (
-              <Button
-                key={artifact.id}
-                type="button"
-                variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => setSelectedArtifactId(artifact.id)}
-              >
-                {artifact.name}
-              </Button>
-            ))}
+          <CardContent className="px-4">
+            <ScrollArea className="h-[220px]">
+              <div className="space-y-1 pr-2">
+                {artifacts.map((artifact) => (
+                  <Button
+                    key={artifact.id}
+                    type="button"
+                    variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setSelectedArtifactId(artifact.id)}
+                  >
+                    {artifact.name}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
 

@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CopyIcon, TimerIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 interface DemoScriptStep {
   id: string;
@@ -36,37 +41,39 @@ export function DemoScriptPanel({ title, summary, durationSec, steps }: DemoScri
   };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">1-minute Demo Script</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-900">{title}</p>
-          <p className="mt-1 text-xs text-slate-600">{summary}</p>
+    <Card className="border-border/80 bg-card/95">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm">1-minute Demo Script</CardTitle>
+            <p className="mt-1 text-sm font-semibold">{title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{summary}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">
+              <TimerIcon className="size-3.5" />
+              {durationSec}s
+            </Badge>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copyScript()}>
+              <CopyIcon className="size-3.5" />
+              {copied ? "copied" : "copy script"}
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded border border-slate-300 px-2 py-0.5 text-[11px] text-slate-700">
-            {durationSec}s
-          </span>
-          <button
-            type="button"
-            onClick={() => void copyScript()}
-            className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700"
-          >
-            {copied ? "copied" : "copy script"}
-          </button>
-        </div>
-      </div>
+        <Progress value={copied ? 100 : 0} className="h-1.5" />
+      </CardHeader>
 
-      <ol className="mt-3 grid gap-2 md:grid-cols-2">
+      <CardContent className="grid gap-2 md:grid-cols-2">
         {steps.map((step) => (
-          <li key={step.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs">
-            <p className="font-semibold text-slate-900">
+          <div key={step.id} className="rounded-lg border bg-muted/25 p-2.5 text-xs">
+            <p className="font-semibold">
               {step.at} {step.cue}
             </p>
-            <p className="mt-1 text-slate-700">{step.value}</p>
-          </li>
+            <p className="mt-1 text-muted-foreground">{step.value}</p>
+          </div>
         ))}
-      </ol>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
+

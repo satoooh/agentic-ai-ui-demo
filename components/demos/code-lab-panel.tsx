@@ -1,6 +1,83 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { BundledLanguage } from "shiki";
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockCopyButton,
+  CodeBlockFilename,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ai-elements/code-block";
+import {
+  Commit,
+  CommitActions,
+  CommitContent,
+  CommitCopyButton,
+  CommitFile,
+  CommitFileAdditions,
+  CommitFileChanges,
+  CommitFileDeletions,
+  CommitFileIcon,
+  CommitFileInfo,
+  CommitFilePath,
+  CommitFileStatus,
+  CommitFiles,
+  CommitHash,
+  CommitHeader,
+  CommitInfo,
+  CommitMessage,
+  CommitMetadata,
+  CommitSeparator,
+} from "@/components/ai-elements/commit";
+import {
+  EnvironmentVariable,
+  EnvironmentVariableCopyButton,
+  EnvironmentVariableGroup,
+  EnvironmentVariableName,
+  EnvironmentVariableValue,
+  EnvironmentVariables,
+  EnvironmentVariablesContent,
+  EnvironmentVariablesHeader,
+  EnvironmentVariablesTitle,
+  EnvironmentVariablesToggle,
+} from "@/components/ai-elements/environment-variables";
+import {
+  FileTree,
+  FileTreeFile,
+  FileTreeFolder,
+} from "@/components/ai-elements/file-tree";
+import { PackageInfo } from "@/components/ai-elements/package-info";
+import { SchemaDisplay } from "@/components/ai-elements/schema-display";
+import {
+  StackTrace,
+  StackTraceActions,
+  StackTraceContent,
+  StackTraceCopyButton,
+  StackTraceError,
+  StackTraceErrorMessage,
+  StackTraceErrorType,
+  StackTraceExpandButton,
+  StackTraceFrames,
+  StackTraceHeader,
+} from "@/components/ai-elements/stack-trace";
+import { Terminal } from "@/components/ai-elements/terminal";
+import {
+  TestResults,
+  TestResultsContent,
+  TestResultsHeader,
+  TestResultsProgress,
+  TestResultsSummary,
+  TestSuite,
+  TestSuiteContent,
+  TestSuiteName,
+  TestSuiteStats,
+} from "@/components/ai-elements/test-results";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import type { CodeSnippet } from "@/types/chat";
 
 interface CodeLabPanelProps {
@@ -20,6 +97,11 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
   const selectedSnippet = useMemo(
     () => snippets.find((snippet) => snippet.id === selectedSnippetId) ?? snippets[0],
     [selectedSnippetId, snippets],
+  );
+
+  const folders = useMemo(
+    () => Array.from(new Set(snippets.map((snippet) => snippet.fileName.split("/")[0] ?? "root"))),
+    [snippets],
   );
 
   const runTests = () => {
@@ -48,85 +130,191 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
   const failed = runCount === 1;
   const passed = runCount >= 2;
 
+  const testSummary =
+    runCount === 0
+      ? undefined
+      : failed
+        ? { passed: 0, failed: 1, skipped: 0, total: 1, duration: 1450 }
+        : { passed: 2, failed: 0, skipped: 0, total: 2, duration: 980 };
+
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">Schema / FileTree / Terminal / TestResults / StackTrace の最小体験。</p>
+    <Card className="border-border/80 bg-card/95">
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>{title}</CardTitle>
+          <Badge variant="secondary">Code / Terminal / Test / StackTrace</Badge>
+        </div>
+      </CardHeader>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[220px_1fr]">
-        <aside className="rounded border border-slate-200 p-3">
-          <p className="text-sm font-semibold text-slate-900">FileTree</p>
-          <ul className="mt-2 space-y-1 text-xs text-slate-700">
-            {snippets.map((snippet) => (
-              <li key={snippet.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedSnippetId(snippet.id)}
-                  className={`w-full rounded px-2 py-1 text-left ${
-                    selectedSnippet?.id === snippet.id ? "bg-slate-900 text-white" : "bg-slate-100"
-                  }`}
-                >
-                  {snippet.fileName}
-                </button>
-              </li>
-            ))}
-          </ul>
+      <CardContent className="grid gap-4 xl:grid-cols-[280px_1fr]">
+        <div className="space-y-3">
+          <SchemaDisplay
+            method="GET"
+            path="/api/connectors/estat?statsDataId={statsDataId}&appId={appId}"
+            description="e-Stat connector call schema (MVP)."
+            parameters={[
+              {
+                name: "statsDataId",
+                type: "string",
+                required: true,
+                location: "query",
+                description: "統計表ID",
+              },
+              {
+                name: "appId",
+                type: "string",
+                required: true,
+                location: "query",
+                description: "e-Stat API key",
+              },
+            ]}
+          />
 
-          <p className="mt-4 text-sm font-semibold text-slate-900">EnvironmentVariables</p>
-          <ul className="mt-1 list-inside list-disc text-xs text-slate-700">
-            {envVars.map((envVar) => (
-              <li key={envVar}>{envVar}</li>
+          <FileTree
+            defaultExpanded={new Set(folders)}
+            selectedPath={selectedSnippet?.id}
+            onSelect={(path) => setSelectedSnippetId(typeof path === "string" ? path : selectedSnippetId)}
+            className="text-xs"
+          >
+            {folders.map((folder) => (
+              <FileTreeFolder key={folder} path={folder} name={folder}>
+                {snippets
+                  .filter((snippet) => snippet.fileName.startsWith(`${folder}/`))
+                  .map((snippet) => (
+                    <FileTreeFile key={snippet.id} path={snippet.id} name={snippet.fileName.split("/").slice(1).join("/")} />
+                  ))}
+              </FileTreeFolder>
             ))}
-          </ul>
-        </aside>
+          </FileTree>
+
+          <EnvironmentVariables defaultShowValues={false}>
+            <EnvironmentVariablesHeader>
+              <EnvironmentVariablesTitle />
+              <EnvironmentVariablesToggle />
+            </EnvironmentVariablesHeader>
+            <EnvironmentVariablesContent>
+              {envVars.map((envVar) => (
+                <EnvironmentVariable key={envVar} name={envVar} value={`\${${envVar}}`}>
+                  <EnvironmentVariableGroup>
+                    <EnvironmentVariableName />
+                    <Badge variant="outline" className="text-[10px]">
+                      required
+                    </Badge>
+                  </EnvironmentVariableGroup>
+                  <EnvironmentVariableGroup>
+                    <EnvironmentVariableValue />
+                    <EnvironmentVariableCopyButton size="icon-xs" />
+                  </EnvironmentVariableGroup>
+                </EnvironmentVariable>
+              ))}
+            </EnvironmentVariablesContent>
+          </EnvironmentVariables>
+        </div>
 
         <div className="space-y-3">
-          <div className="rounded border border-slate-200 p-3">
-            <p className="text-sm font-semibold text-slate-900">CodeBlock</p>
-            <pre className="mt-2 max-h-52 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">
-              {selectedSnippet?.content ?? ""}
-            </pre>
-          </div>
+          <CodeBlock
+            code={selectedSnippet?.content ?? ""}
+            language={(selectedSnippet?.language ?? "ts") as BundledLanguage}
+            showLineNumbers
+          >
+            <CodeBlockHeader>
+              <CodeBlockTitle>
+                <CodeBlockFilename>{selectedSnippet?.fileName}</CodeBlockFilename>
+              </CodeBlockTitle>
+              <CodeBlockActions>
+                <CodeBlockCopyButton />
+              </CodeBlockActions>
+            </CodeBlockHeader>
+          </CodeBlock>
 
-          <div className="rounded border border-slate-200 p-3">
-            <p className="text-sm font-semibold text-slate-900">Terminal / Sandbox</p>
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">
-              {logs.join("\n")}
-            </pre>
-            <button
-              type="button"
-              onClick={runTests}
-              className="mt-2 rounded bg-slate-900 px-3 py-1 text-sm font-medium text-white"
-            >
+          <Terminal output={logs.join("\n")} isStreaming={runCount > 0 && !passed} />
+
+          <div className="flex justify-end">
+            <Button type="button" onClick={runTests}>
               Run tests
-            </button>
+            </Button>
           </div>
 
-          <div className="rounded border border-slate-200 p-3">
-            <p className="text-sm font-semibold text-slate-900">TestResults</p>
-            {runCount === 0 ? <p className="text-xs text-slate-600">未実行</p> : null}
-            {failed ? <p className="text-xs text-red-600">1 failed / 0 passed</p> : null}
-            {passed ? <p className="text-xs text-emerald-700">0 failed / 2 passed</p> : null}
+          <TestResults summary={testSummary}>
+            <TestResultsHeader>
+              <TestResultsSummary />
+            </TestResultsHeader>
+            <TestResultsContent>
+              {testSummary ? <TestResultsProgress /> : <p className="text-xs text-muted-foreground">未実行</p>}
+              {testSummary ? (
+                <TestSuite name="connectors" status={failed ? "failed" : "passed"} defaultOpen>
+                  <TestSuiteName />
+                  <TestSuiteContent>
+                    <TestSuiteStats passed={passed ? 2 : 0} failed={failed ? 1 : 0} />
+                  </TestSuiteContent>
+                </TestSuite>
+              ) : null}
+            </TestResultsContent>
+          </TestResults>
 
-            {failed ? (
-              <div className="mt-2 rounded border border-red-200 bg-red-50 p-2">
-                <p className="text-xs font-semibold text-red-700">StackTrace</p>
-                <pre className="mt-1 overflow-auto text-[11px] text-red-700">
-{`TypeError: Cannot read properties of undefined (reading 'GET_STATS_DATA')
+          {failed ? (
+            <StackTrace
+              trace={`TypeError: Cannot read properties of undefined (reading 'GET_STATS_DATA')
   at fetchEstat (connectors/estat.ts:18:22)
   at runWeeklyPipeline (pipelines/weekly-report.ts:12:15)`}
-                </pre>
-              </div>
-            ) : null}
-          </div>
+              defaultOpen
+            >
+              <StackTraceHeader>
+                <StackTraceError>
+                  <StackTraceErrorType />
+                  <StackTraceErrorMessage />
+                </StackTraceError>
+                <StackTraceActions>
+                  <StackTraceCopyButton />
+                  <StackTraceExpandButton />
+                </StackTraceActions>
+              </StackTraceHeader>
+              <StackTraceContent>
+                <StackTraceFrames />
+              </StackTraceContent>
+            </StackTrace>
+          ) : null}
 
-          <div className="rounded border border-slate-200 p-3 text-xs text-slate-700">
-            <p className="font-semibold text-slate-900">Commit / PackageInfo</p>
-            <p className="mt-1">feat(gov): add connector pipeline mock and tests</p>
-            <p className="mt-1">dependencies: drizzle-orm, @libsql/client</p>
+          <Separator />
+
+          <Commit defaultOpen>
+            <CommitHeader>
+              <CommitInfo>
+                <CommitHash>f98c1a3</CommitHash>
+                <CommitMessage>feat(gov): harden estat connector error handling</CommitMessage>
+                <CommitMetadata>
+                  <span>ai-agent</span>
+                  <CommitSeparator />
+                  <span>just now</span>
+                </CommitMetadata>
+              </CommitInfo>
+              <CommitActions>
+                <CommitCopyButton hash="f98c1a3" />
+              </CommitActions>
+            </CommitHeader>
+            <CommitContent>
+              <CommitFiles>
+                <CommitFile>
+                  <CommitFileInfo>
+                    <CommitFileStatus status="modified" />
+                    <CommitFileIcon />
+                    <CommitFilePath>connectors/estat.ts</CommitFilePath>
+                  </CommitFileInfo>
+                  <CommitFileChanges>
+                    <CommitFileAdditions count={8} />
+                    <CommitFileDeletions count={2} />
+                  </CommitFileChanges>
+                </CommitFile>
+              </CommitFiles>
+            </CommitContent>
+          </Commit>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <PackageInfo name="drizzle-orm" currentVersion="0.44.0" newVersion="0.45.1" changeType="minor" />
+            <PackageInfo name="@libsql/client" currentVersion="0.16.0" newVersion="0.17.0" changeType="minor" />
           </div>
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
