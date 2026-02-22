@@ -1,3 +1,4 @@
+import { AgenticHighlightsPanel } from "@/components/demos/agentic-highlights-panel";
 import { CodeLabPanel } from "@/components/demos/code-lab-panel";
 import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
@@ -15,46 +16,40 @@ export default function ResearchDemoPage() {
     <DemoWorkspace
       demo="research"
       title="企業リサーチデモ: Public Intelligence Studio"
-      subtitle="企業指定 → 公開IR/ニュース/企業属性収集 → 根拠付き分析 → 配布承認までを、実務向けリサーチ導線で実演する。"
+      subtitle="目的入力 → 自律リサーチループ（収集/要約/再探索）→ 根拠付きアウトプット生成までを、Agentic UIとして実演する。"
       suggestions={[
         "トヨタ自動車のIRと公開ニュースから懸念点を要約して",
         "MSFTの最新10-K/10-Qの示唆を営業提案向けに抽出して",
         "SONYの企業プロフィールをWikidataで補完して",
-        "この企業調査レポートを配布承認に回して",
+        "この結果を使って競合比較の探索クエリを自動提案して",
       ]}
       scenarios={[
         {
-          id: "research-company-brief",
-          title: "企業IRクイックブリーフ生成",
-          description: "企業名入力→IR/公開情報収集→承認配布までを再現。",
+          id: "research-agentic-loop",
+          title: "自律リサーチループ",
+          description: "目標入力→情報収集→根拠付き要約→次ループ提案までを再現。",
           outcome: "初回調査の立ち上がりを30分以内に短縮",
-          targetDurationSec: 75,
+          targetDurationSec: 85,
           steps: [
             {
               id: "research-step-1",
-              label: "企業指定",
-              prompt: "Microsoftを対象に企業調査を開始してください。",
+              label: "目的入力",
+              prompt: "Microsoftを対象に、AI投資トレンド観点で企業調査を開始してください。",
             },
             {
               id: "research-step-2",
               label: "IR収集",
-              prompt: "SECの提出書類から直近の重要ポイントを抽出してください。",
+              prompt: "SEC提出書類から、財務と戦略の変化点を3つ抽出してください。",
             },
             {
               id: "research-step-3",
-              label: "公開情報分析",
-              prompt: "公開ニュースとWikidataの企業属性も合わせてリスクと機会を3点ずつ整理してください。",
+              label: "外部シグナル統合",
+              prompt: "GDELTニュースとWikidata属性を統合し、リスクと機会を3点ずつ整理してください。",
             },
             {
               id: "research-step-4",
-              label: "配布要求",
-              prompt: "この企業調査ブリーフを社内へ配布してください。",
-            },
-            {
-              id: "research-step-5",
-              label: "配布承認",
-              prompt: "企業調査ブリーフの配布を承認します。",
-              approved: true,
+              label: "次ループ生成",
+              prompt: "この結果を使って、競合比較の次探索クエリを3案作ってください。",
             },
           ],
         },
@@ -62,15 +57,15 @@ export default function ResearchDemoPage() {
       initialQueue={[
         {
           id: "research-queue-1",
-          title: "IR根拠リンク確認",
-          description: "配布前に提出書類リンクと日付の整合性を確認してください。",
+          title: "根拠リンク確認",
+          description: "提出書類リンクとニュース発生日の整合性を確認してください。",
           severity: "warning",
           timestamp: new Date().toISOString(),
         },
         {
           id: "research-queue-2",
-          title: "企業同名注意",
-          description: "ティッカーと法人名の一致確認が必要です。",
+          title: "競合比較へ展開",
+          description: "次ループで同業他社（例: GOOGL, AMZN）へ展開してください。",
           severity: "info",
           timestamp: new Date().toISOString(),
         },
@@ -84,7 +79,7 @@ export default function ResearchDemoPage() {
         { id: "research-task-1", label: "対象企業の識別子確定（社名/ティッカー）", done: false },
         { id: "research-task-2", label: "IR提出書類の差分確認", done: false },
         { id: "research-task-3", label: "ニュース由来リスクの一次評価", done: false },
-        { id: "research-task-4", label: "配布承認", done: false },
+        { id: "research-task-4", label: "次探索クエリの設計", done: false },
       ]}
       initialArtifacts={[
         {
@@ -136,26 +131,26 @@ export default function ResearchDemoPage() {
       topPanel={
         <div className="space-y-4">
           <DemoScriptPanel
-            title="企業リサーチ: 収集から配布承認まで"
-            summary="企業名を起点にIRと公開情報を統合収集し、根拠付きで配布判断まで実行。"
-            durationSec={75}
+            title="企業リサーチ: 自律ループ実演"
+            summary="入力した目的に対し、エージェントが収集→統合→要約→次探索提案を反復。"
+            durationSec={85}
             steps={[
               {
                 id: "research-script-1",
                 at: "00:00",
-                cue: "Target",
-                value: "対象企業（社名/ティッカー）を指定",
+                cue: "Goal",
+                value: "目的（例: AI投資トレンド）を入力",
               },
               {
                 id: "research-script-2",
                 at: "00:18",
-                cue: "Collect",
+                cue: "Plan",
                 value: "SEC/GDELT/WikidataからIR・公開情報を取得",
               },
               {
                 id: "research-script-3",
                 at: "00:42",
-                cue: "Analyze",
+                cue: "Synthesize",
                 value: "根拠リンク付きで示唆と懸念点を整理",
               },
               {
@@ -166,12 +161,13 @@ export default function ResearchDemoPage() {
               },
               {
                 id: "research-script-5",
-                at: "01:10",
-                cue: "Approve",
-                value: "配布操作をConfirmationで承認",
+                at: "01:20",
+                cue: "Iterate",
+                value: "次探索クエリを生成し、比較調査へ展開",
               },
             ]}
           />
+          <AgenticHighlightsPanel />
           <ResearchSourcePanel />
         </div>
       }

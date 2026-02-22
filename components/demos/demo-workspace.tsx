@@ -480,12 +480,15 @@ export function DemoWorkspace({
         done: artifacts.length > 0,
       },
       {
-        id: "approval",
-        label: "Approval",
-        done: approvalLogs.some((log) => log.status === "approved"),
+        id: "iteration",
+        label: "Iteration",
+        done:
+          checkpoints.length > 0 ||
+          tools.length >= 2 ||
+          messages.filter((message) => message.role === "assistant").length >= 2,
       },
     ],
-    [messages, plan.length, tasks.length, tools.length, artifacts.length, approvalLogs],
+    [messages, plan.length, tasks.length, tools.length, artifacts.length, checkpoints.length],
   );
   const completedGateCount = stageGates.filter((stage) => stage.done).length;
   const gateProgress = Math.round((completedGateCount / stageGates.length) * 100);
@@ -947,7 +950,7 @@ export function DemoWorkspace({
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">plan {planProgress}%</Badge>
             <Badge variant="outline">task {taskProgress}%</Badge>
-            <Badge variant="outline">approval {approvalLogs.length}</Badge>
+            <Badge variant="outline">interventions {approvalLogs.length}</Badge>
           </div>
         </div>
       </header>
@@ -1331,7 +1334,7 @@ export function DemoWorkspace({
                 <PlanHeader>
                   <div>
                     <PlanTitle>Execution Plan</PlanTitle>
-                    <PlanDescription>進捗を見ながら承認ポイントを管理します。</PlanDescription>
+                    <PlanDescription>進捗を見ながら介入ポイントと反復を管理します。</PlanDescription>
                   </div>
                   <PlanAction>
                     <PlanTrigger />
@@ -1443,7 +1446,7 @@ export function DemoWorkspace({
 
               <Card className="gap-3 border-border/70 py-4">
                 <CardHeader className="px-4">
-                  <CardTitle className="text-sm">Approval Ledger</CardTitle>
+                  <CardTitle className="text-sm">Intervention Ledger</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4">
                   <ScrollArea className="h-[210px]">
@@ -1460,7 +1463,7 @@ export function DemoWorkspace({
                           <p className="mt-1 text-muted-foreground">{log.timestamp}</p>
                         </div>
                       ))}
-                      {approvalLogs.length === 0 ? <p className="text-muted-foreground">履歴なし</p> : null}
+                      {approvalLogs.length === 0 ? <p className="text-muted-foreground">介入履歴なし</p> : null}
                     </div>
                   </ScrollArea>
                 </CardContent>

@@ -259,7 +259,7 @@ function buildResearchReply(text: string): MockReply {
 
   return {
     message:
-      "企業IRと公開情報を収集し、根拠付きブリーフ・提出書類一覧・配布向け要点を更新しました。",
+      "企業IRと公開情報を収集し、根拠付きブリーフ・提出書類一覧・次探索クエリ案を更新しました。",
     approval: { required: false, action: "", reason: "" },
     queue: [
       {
@@ -281,13 +281,13 @@ function buildResearchReply(text: string): MockReply {
       { id: "q-plan-1", title: "対象企業の識別", status: "done" },
       { id: "q-plan-2", title: "IR提出書類の収集", status: "done" },
       { id: "q-plan-3", title: "公開ニュース要約", status: "doing" },
-      { id: "q-plan-4", title: "配布承認", status: "todo" },
+      { id: "q-plan-4", title: "次探索クエリ生成", status: "todo" },
     ],
     tasks: [
       { id: "q-task-1", label: "IR根拠リンクの確認", done: false },
       { id: "q-task-2", label: "公開情報との整合確認", done: false },
       { id: "q-task-3", label: "懸念点の優先度付け", done: false },
-      { id: "q-task-4", label: "配布承認の取得", done: false },
+      { id: "q-task-4", label: "次探索クエリの設計", done: false },
     ],
     tools: getCommonToolEvents("research-brief-agent"),
     artifacts: [
@@ -325,6 +325,17 @@ function buildResearchReply(text: string): MockReply {
           "1. 開示遅延: 最新提出書類の取得遅延に注意\n" +
           "2. 情報鮮度: ニュース速報とIR確定情報を分離して解釈\n" +
           "3. 同名企業: 識別子（ticker/secCode）で照合",
+        updatedAt: now(),
+      },
+      {
+        id: "next-queries",
+        name: "next-queries.md",
+        kind: "markdown",
+        content:
+          "# Next Query Proposals\n\n" +
+          "- Compare with GOOGL: `Google AI capital allocation 10-K 10-Q risk opportunity`\n" +
+          "- Compare with AMZN: `Amazon generative AI investment filing signal`\n" +
+          "- Regional: `Japan listed AI investment disclosure trend 2025 2026`",
         updatedAt: now(),
       },
     ],
