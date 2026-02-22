@@ -87,6 +87,30 @@ function estimateCostUsd({
   return inputTokens * 0.0000005 + outputTokens * 0.000002;
 }
 
+function getSeverityStyle(severity: QueueItem["severity"]) {
+  if (severity === "critical") {
+    return "border-red-200 bg-red-50 text-red-800";
+  }
+
+  if (severity === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  return "border-sky-200 bg-sky-50 text-sky-800";
+}
+
+function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
+  if (status === "done" || status === "success") {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (status === "doing" || status === "running") {
+    return "bg-amber-100 text-amber-800";
+  }
+
+  return "bg-slate-200 text-slate-700";
+}
+
 export function DemoWorkspace({
   demo,
   title,
@@ -114,6 +138,8 @@ export function DemoWorkspace({
   const [citations, setCitations] = useState<CitationItem[]>(initialCitations);
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [selectedArtifactId, setSelectedArtifactId] = useState(initialArtifacts[0]?.id ?? "");
+  const [artifactViewMode, setArtifactViewMode] = useState<"rendered" | "raw">("rendered");
+  const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null);
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [voiceStatus, setVoiceStatus] = useState<"idle" | "listening" | "error">("idle");
   const [ttsVoice, setTtsVoice] = useState("ja-JP-default");
@@ -221,6 +247,44 @@ export function DemoWorkspace({
       costUsd: estimateCostUsd({ provider, inputTokens, outputTokens }),
     };
   }, [messages, provider]);
+
+  const queueSummary = useMemo(
+    () =>
+      queue.reduce(
+        (summary, item) => {
+          if (item.severity === "critical") {
+            summary.critical += 1;
+          } else if (item.severity === "warning") {
+            summary.warning += 1;
+          } else {
+            summary.info += 1;
+          }
+          return summary;
+        },
+        { info: 0, warning: 0, critical: 0 },
+      ),
+    [queue],
+  );
+
+  const planProgress = useMemo(() => {
+    if (plan.length === 0) {
+      return 0;
+    }
+
+    const doneCount = plan.filter((step) => step.status === "done").length;
+    return Math.round((doneCount / plan.length) * 100);
+  }, [plan]);
+
+  const taskProgress = useMemo(() => {
+    if (tasks.length === 0) {
+      return 0;
+    }
+
+    const doneCount = tasks.filter((task) => task.done).length;
+    return Math.round((doneCount / tasks.length) * 100);
+  }, [tasks]);
+
+  const isStreaming = status === "streaming" || status === "submitted";
 
   const send = async () => {
     const trimmed = draft.trim();
@@ -380,6 +444,32 @@ export function DemoWorkspace({
     setAttachmentNames(Array.from(files).map((file) => file.name));
   };
 
+  const copyArtifact = async () => {
+    if (!selectedArtifact) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(selectedArtifact.content);
+    setCopiedArtifactId(selectedArtifact.id);
+    window.setTimeout(() => {
+      setCopiedArtifactId((current) => (current === selectedArtifact.id ? null : current));
+    }, 1200);
+  };
+
+  const downloadArtifact = () => {
+    if (!selectedArtifact) {
+      return;
+    }
+
+    const blob = new Blob([selectedArtifact.content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = selectedArtifact.name;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   const loadSessions = useCallback(async () => {
     try {
       const response = await fetch(`/api/sessions?demo=${demo}&limit=6`);
@@ -469,9 +559,29 @@ export function DemoWorkspace({
 
   return (
     <div className="space-y-4">
-      <header className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-        <p className="mt-2 text-sm text-slate-700">{subtitle}</p>
+      <header className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 p-6 text-white">
+          <h1 className="text-2xl font-bold">{title}</h1>
+          <p className="mt-2 text-sm text-slate-200">{subtitle}</p>
+        </div>
+        <div className="grid gap-2 border-t border-slate-200 bg-slate-50 p-4 md:grid-cols-4">
+          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
+            <p className="text-slate-500">Queue</p>
+            <p className="text-sm font-semibold text-slate-900">{queue.length} items</p>
+          </div>
+          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
+            <p className="text-slate-500">Plan Progress</p>
+            <p className="text-sm font-semibold text-slate-900">{planProgress}%</p>
+          </div>
+          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
+            <p className="text-slate-500">Task Progress</p>
+            <p className="text-sm font-semibold text-slate-900">{taskProgress}%</p>
+          </div>
+          <div className="rounded border border-slate-200 bg-white p-2 text-xs">
+            <p className="text-slate-500">Streaming Status</p>
+            <p className="text-sm font-semibold text-slate-900">{status}</p>
+          </div>
+        </div>
       </header>
 
       {topPanel}
@@ -480,9 +590,23 @@ export function DemoWorkspace({
         <aside className="space-y-4">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Queue</h2>
+            <div className="mt-2 flex flex-wrap gap-1 text-[11px]">
+              <span className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-800">
+                info: {queueSummary.info}
+              </span>
+              <span className="rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-800">
+                warning: {queueSummary.warning}
+              </span>
+              <span className="rounded border border-red-200 bg-red-50 px-2 py-0.5 text-red-800">
+                critical: {queueSummary.critical}
+              </span>
+            </div>
             <ul className="mt-2 space-y-2">
               {queue.map((item) => (
-                <li key={item.id} className="rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
+                <li
+                  key={item.id}
+                  className={`rounded border p-2 text-xs ${getSeverityStyle(item.severity)}`}
+                >
                   <p className="font-semibold text-slate-900">{item.title}</p>
                   <p>{item.description}</p>
                   <p className="mt-1 text-[11px] text-slate-500">{item.severity} / {item.timestamp}</p>
@@ -522,7 +646,16 @@ export function DemoWorkspace({
         </aside>
 
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Conversation</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">Conversation</h2>
+            <span
+              className={`rounded px-2 py-0.5 text-[11px] font-medium ${
+                isStreaming ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              {isStreaming ? "streaming..." : "ready"}
+            </span>
+          </div>
           <div className="max-h-[360px] space-y-2 overflow-auto rounded border border-slate-200 bg-slate-50 p-3">
             {messages.length === 0 ? <p className="text-xs text-slate-600">まだ会話はありません。</p> : null}
             {messages.map((message) => (
@@ -568,6 +701,13 @@ export function DemoWorkspace({
                 })}
               </article>
             ))}
+            {isStreaming ? (
+              <div className="space-y-2">
+                <div className="h-3 w-2/3 animate-pulse rounded bg-slate-300" />
+                <div className="h-3 w-4/5 animate-pulse rounded bg-slate-300" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-slate-300" />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -607,7 +747,7 @@ export function DemoWorkspace({
             <button
               type="button"
               onClick={() => void send()}
-              disabled={status === "streaming" || status === "submitted"}
+              disabled={isStreaming}
               className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               送信
@@ -707,14 +847,44 @@ export function DemoWorkspace({
               ))}
             </select>
             <p className="mt-1 text-xs text-slate-600">status: {status}</p>
+            <div className="mt-3 rounded border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700">
+              <p className="font-semibold text-slate-900">Agent</p>
+              <p>provider: {provider}</p>
+              <p>model: {model}</p>
+              <p>instructions: B2B workflow optimization</p>
+              <p>tools: connectors / approval / artifacts</p>
+            </div>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-900">Plan / Task</h2>
+            <div className="mt-2 space-y-2">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Plan</span>
+                  <span>{planProgress}%</span>
+                </div>
+                <div className="h-2 rounded bg-slate-200">
+                  <div className="h-2 rounded bg-slate-900" style={{ width: `${planProgress}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Task</span>
+                  <span>{taskProgress}%</span>
+                </div>
+                <div className="h-2 rounded bg-slate-200">
+                  <div className="h-2 rounded bg-emerald-600" style={{ width: `${taskProgress}%` }} />
+                </div>
+              </div>
+            </div>
             <ul className="mt-2 space-y-1 text-xs text-slate-700">
               {plan.map((step) => (
-                <li key={step.id}>
-                  [{step.status}] {step.title}
+                <li key={step.id} className="flex items-center justify-between rounded border border-slate-200 px-2 py-1">
+                  <span>{step.title}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${getStatusBadgeStyle(step.status)}`}>
+                    {step.status}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -747,8 +917,13 @@ export function DemoWorkspace({
             <ul className="mt-2 space-y-2 text-xs text-slate-700">
               {tools.map((tool) => (
                 <li key={tool.id} className="rounded border border-slate-200 bg-slate-50 p-2">
-                  <p className="font-semibold text-slate-900">{tool.name}</p>
-                  <p>{tool.status}: {tool.detail}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-slate-900">{tool.name}</p>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${getStatusBadgeStyle(tool.status)}`}>
+                      {tool.status}
+                    </span>
+                  </div>
+                  <p>{tool.detail}</p>
                 </li>
               ))}
               {tools.length === 0 ? <li>ログなし</li> : null}
@@ -760,6 +935,20 @@ export function DemoWorkspace({
             <p className="mt-1 text-xs text-slate-700">input tokens: {contextStats.inputTokens}</p>
             <p className="text-xs text-slate-700">output tokens: {contextStats.outputTokens}</p>
             <p className="text-xs text-slate-700">est. cost: ${contextStats.costUsd.toFixed(5)}</p>
+            <div className="mt-2 space-y-1">
+              <div className="h-1.5 w-full rounded bg-slate-200">
+                <div
+                  className="h-1.5 rounded bg-sky-600"
+                  style={{ width: `${Math.min(100, Math.max(8, contextStats.inputTokens / 2))}%` }}
+                />
+              </div>
+              <div className="h-1.5 w-full rounded bg-slate-200">
+                <div
+                  className="h-1.5 rounded bg-violet-600"
+                  style={{ width: `${Math.min(100, Math.max(8, contextStats.outputTokens / 2))}%` }}
+                />
+              </div>
+            </div>
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -781,16 +970,8 @@ export function DemoWorkspace({
           </section>
 
           {approval?.required ? (
-            <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-amber-900">Confirmation</h2>
-              <p className="mt-1 text-xs text-amber-800">{approval.reason}</p>
-              <button
-                type="button"
-                onClick={() => void approveCurrentAction()}
-                className="mt-2 rounded bg-amber-700 px-3 py-1 text-xs font-medium text-white"
-              >
-                {approval.action}を承認
-              </button>
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
+              承認待ちアクションがあります。画面下部の Confirmation モーダルで確定してください。
             </section>
           ) : null}
         </aside>
@@ -820,9 +1001,47 @@ export function DemoWorkspace({
           <div className="rounded border border-slate-200 p-3">
             {selectedArtifact ? (
               <>
-                <p className="text-sm font-semibold text-slate-900">{selectedArtifact.name}</p>
-                <p className="text-xs text-slate-500">updated: {selectedArtifact.updatedAt}</p>
-                {selectedArtifact.kind === "html" ? (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{selectedArtifact.name}</p>
+                    <p className="text-xs text-slate-500">updated: {selectedArtifact.updatedAt}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setArtifactViewMode("rendered")}
+                      className={`rounded px-2 py-1 text-[11px] ${
+                        artifactViewMode === "rendered" ? "bg-slate-900 text-white" : "border border-slate-300"
+                      }`}
+                    >
+                      preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setArtifactViewMode("raw")}
+                      className={`rounded px-2 py-1 text-[11px] ${
+                        artifactViewMode === "raw" ? "bg-slate-900 text-white" : "border border-slate-300"
+                      }`}
+                    >
+                      raw
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copyArtifact}
+                      className="rounded border border-slate-300 px-2 py-1 text-[11px]"
+                    >
+                      {copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadArtifact}
+                      className="rounded border border-slate-300 px-2 py-1 text-[11px]"
+                    >
+                      download
+                    </button>
+                  </div>
+                </div>
+                {artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
                   <iframe
                     title={selectedArtifact.name}
                     srcDoc={selectedArtifact.content}
@@ -858,6 +1077,32 @@ export function DemoWorkspace({
       </section>
 
       {bottomPanel}
+
+      {approval?.required ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
+          <div className="w-full max-w-md rounded-xl border border-amber-200 bg-white p-5 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Confirmation</p>
+            <h3 className="mt-1 text-lg font-semibold text-slate-900">{approval.action}</h3>
+            <p className="mt-2 text-sm text-slate-700">{approval.reason}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void approveCurrentAction()}
+                className="rounded bg-amber-700 px-3 py-1.5 text-sm font-medium text-white"
+              >
+                承認して実行
+              </button>
+              <button
+                type="button"
+                onClick={() => setApproval(null)}
+                className="rounded border border-slate-300 px-3 py-1.5 text-sm text-slate-700"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
