@@ -228,6 +228,76 @@ pre {
       0 0 0 1px color-mix(in oklab, var(--primary) 50%, transparent),
       0 0 0 4px color-mix(in oklab, var(--ring) 35%, transparent);
   }
+
+  .agentic-markdown {
+    color: var(--foreground);
+    line-height: 1.72;
+  }
+
+  .agentic-markdown h1 {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .agentic-markdown h2 {
+    margin-top: 0.65rem;
+    font-size: 0.94rem;
+    font-weight: 700;
+  }
+
+  .agentic-markdown ul,
+  .agentic-markdown ol {
+    margin: 0.5rem 0;
+    padding-left: 1.2rem;
+  }
+
+  .agentic-markdown li {
+    margin: 0.2rem 0;
+  }
+
+  .agentic-markdown pre {
+    margin: 0.55rem 0;
+    overflow-x: auto;
+    border: 1px solid color-mix(in oklab, var(--border) 78%, var(--foreground) 22%);
+    border-radius: 0.6rem;
+    background: rgb(15 23 42 / 0.96);
+    color: rgb(226 232 240);
+    padding: 0.75rem;
+  }
+
+  .agentic-markdown table {
+    width: 100%;
+    margin: 0.75rem 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid color-mix(in oklab, var(--border) 84%, var(--foreground) 16%);
+    border-radius: 0.6rem;
+    overflow: hidden;
+  }
+
+  .agentic-markdown thead th {
+    background: color-mix(in oklab, var(--muted) 86%, white 14%);
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  .agentic-markdown th,
+  .agentic-markdown td {
+    padding: 0.5rem 0.55rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--border) 84%, var(--foreground) 16%);
+    vertical-align: top;
+    text-align: left;
+  }
+
+  .agentic-markdown th + th,
+  .agentic-markdown td + td {
+    border-left: 1px solid color-mix(in oklab, var(--border) 84%, var(--foreground) 16%);
+  }
+
+  .agentic-markdown tbody tr:last-child td {
+    border-bottom: none;
+  }
 }
 
 @keyframes soft-enter {

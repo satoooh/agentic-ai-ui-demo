@@ -907,6 +907,7 @@ export function DemoWorkspace({
     viewMode === "full" && (demo !== "meeting" || showMeetingRuntimeSummary);
   const showPrimaryChatWorkspace = demo !== "meeting" || meetingTranscriptConfirmed;
   const showStickySummary = isChatFocusedDemo && hasConversationStarted;
+  const showSummaryRail = showStickySummary;
   const transcriptHeadline = useMemo(() => {
     if (structuredInsight?.headline?.trim()) {
       return structuredInsight.headline.trim();
@@ -1366,20 +1367,20 @@ export function DemoWorkspace({
     }
     if (demo === "meeting" && showMeetingRuntimeSummary) {
       if (liveAgentCurrentStepLabel === "構造化集約") {
-        return "構造化集約を反映しています...";
+        return "回答を整形中（構造化集約）";
       }
       if (liveAgentCurrentStepLabel === "並列検証") {
-        return "並列レビューを実行しています...";
+        return "回答を検証中（並列レビュー）";
       }
       if (liveAgentCurrentStepLabel === "一次推論") {
-        return "回答を生成しています...";
+        return "回答を作成中";
       }
-      return `${liveAgentCurrentStepLabel} を実行しています...`;
+      return `${liveAgentCurrentStepLabel} を実行中`;
     }
     if (currentRunningTool) {
       return `${currentRunningTool.name}: ${compactUiText(currentRunningTool.detail, 56)}`;
     }
-    return "回答を生成しています...";
+    return "回答を作成中";
   }, [currentRunningTool, demo, isStreaming, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
   const streamingStatusDetail = useMemo(() => {
     if (!isStreaming) {
@@ -2066,6 +2067,7 @@ export function DemoWorkspace({
     (demo === "meeting"
       ? meetingDetailRailOpen
       : !isChatFocusedDemo);
+  const showRightRail = showDetailRail || showSummaryRail;
 
   const workspaceGridClass = cn("grid gap-4", {
     "xl:grid-cols-[280px_minmax(0,1fr)]":
@@ -2073,9 +2075,9 @@ export function DemoWorkspace({
     "xl:grid-cols-[280px_minmax(0,1fr)_360px]":
       showMeetingPrimaryRail && viewMode === "full",
     "xl:grid-cols-[minmax(0,1fr)]":
-      !showMeetingPrimaryRail && !showDetailRail,
+      !showMeetingPrimaryRail && !showRightRail,
     "xl:grid-cols-[minmax(0,1fr)_360px]":
-      !showMeetingPrimaryRail && showDetailRail && viewMode === "full",
+      !showMeetingPrimaryRail && showRightRail,
   });
   return (
     <div className="space-y-4">
@@ -2449,69 +2451,6 @@ export function DemoWorkspace({
         </aside> : null}
 
         <section className="space-y-4">
-            {showStickySummary ? (
-              <Card className="sticky top-20 z-30 border-border/80 bg-card/96 py-0 backdrop-blur">
-                <CardContent className="space-y-2 px-4 py-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold text-primary">最新サマリ（TL;DR）</p>
-                      <p className="mt-1 line-clamp-2 text-sm font-medium">
-                        {latestAssistantSummary?.summary ??
-                          "最初の回答後に、ここへ最新サマリを固定表示します。"}
-                      </p>
-                      {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
-                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                          {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
-                        {isStreaming ? "updating" : "latest"}
-                      </Badge>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-7 gap-1.5 px-2 text-[11px]"
-                        onClick={() => setThinkingSidebarOpen(true)}
-                      >
-                        <ChevronRightIcon className="size-3.5" />
-                        Thinkingログ
-                      </Button>
-                    </div>
-                  </div>
-                  {isStreaming ? (
-                    <div className="space-y-1.5">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 px-0 text-left text-xs text-primary hover:text-primary/80"
-                        onClick={() => setThinkingSidebarOpen(true)}
-                      >
-                        <Shimmer>{streamingStatusLabel}</Shimmer>
-                        <ChevronRightIcon className="size-3.5" />
-                      </button>
-                      {streamingStatusDetail ? (
-                        <p className="text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {structuredReflectionStatus ? (
-                    <div
-                      className={cn(
-                        "rounded-md px-2.5 py-1.5 text-[11px]",
-                        structuredReflectionStatus.tone === "processing"
-                          ? "border border-primary/20 bg-primary/5 text-primary"
-                          : "border border-emerald-200 bg-emerald-50/80 text-emerald-900",
-                      )}
-                    >
-                      {structuredReflectionStatus.text}
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : null}
-
             <Card className="gap-0 overflow-hidden border-border/80 py-0">
               <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
@@ -2778,7 +2717,7 @@ export function DemoWorkspace({
                   isStreaming={isStreaming}
                 >
                   <ReasoningTrigger className="text-[11px]">
-                    Agent Working Trace（推論・実行ログ）
+                    思考プロセスを表示
                   </ReasoningTrigger>
                   <ReasoningContent className="text-[11px] leading-6">
                     {reasoningTraceMarkdown}
@@ -2818,7 +2757,7 @@ export function DemoWorkspace({
                           return (
                             <MessageResponse
                               key={`${message.id}-${index}`}
-                              className="leading-7 [&_h1]:mt-3 [&_h1]:text-base [&_h1]:font-semibold [&_h2]:mt-2 [&_h2]:text-sm [&_h2]:font-semibold [&_li]:my-0.5 [&_ol]:my-2 [&_ul]:my-2 [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border/70 [&_pre]:bg-slate-950/90 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1"
+                              className="agentic-markdown"
                             >
                               {part.text}
                             </MessageResponse>
@@ -2900,68 +2839,41 @@ export function DemoWorkspace({
                 </div>
               ) : (
                 <>
-                  {queue.length > 0 || tasks.length > 0 ? (
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      {queue.length > 0 ? (
-                        <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
-                          <div className="mb-2 flex items-center justify-between">
-                            <p className="text-xs font-semibold">Queue</p>
-                            <Badge variant="outline" className="text-[10px]">
-                              {queueSummary.critical} critical / {queueSummary.warning} warning
-                            </Badge>
-                          </div>
-                          <QueuePanel className="border-none p-0 shadow-none">
-                            <QueueList className="mt-0 [&>div]:max-h-[160px]">
-                              {queue.slice(0, viewMode === "guided" ? 3 : 5).map((item) => (
-                                <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
-                                  <div className="flex items-center gap-2">
-                                    <QueueItemIndicator completed={item.severity === "info"} />
-                                    <QueueItemContent>{item.title}</QueueItemContent>
-                                  </div>
-                                  <QueueItemDescription>{item.description}</QueueItemDescription>
-                                </QueueEntry>
-                              ))}
-                            </QueueList>
-                          </QueuePanel>
-                        </div>
-                      ) : null}
-                      {tasks.length > 0 ? (
-                        <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
-                          <Task defaultOpen>
-                            <TaskTrigger
-                              title={`Task (${tasks.filter((task) => task.done).length}/${tasks.length})`}
-                            />
-                            <TaskContent>
-                              {tasks.slice(0, viewMode === "guided" ? 4 : 8).map((task) => (
-                                <TaskEntry key={task.id}>
-                                  <label className="flex items-center gap-2 text-xs">
-                                    <input
-                                      type="checkbox"
-                                      checked={task.done}
-                                      onChange={(event) => {
-                                        const done = event.target.checked;
-                                        setTasks((prev) =>
-                                          prev.map((current) =>
-                                            current.id === task.id ? { ...current, done } : current,
-                                          ),
-                                        );
-                                      }}
-                                    />
-                                    <span>{task.label}</span>
-                                  </label>
-                                </TaskEntry>
-                              ))}
-                            </TaskContent>
-                          </Task>
-                        </div>
-                      ) : null}
+                  {tasks.length > 0 ? (
+                    <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
+                      <Task defaultOpen>
+                        <TaskTrigger
+                          title={`Task (${tasks.filter((task) => task.done).length}/${tasks.length})`}
+                        />
+                        <TaskContent>
+                          {tasks.slice(0, viewMode === "guided" ? 4 : 8).map((task) => (
+                            <TaskEntry key={task.id}>
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={task.done}
+                                  onChange={(event) => {
+                                    const done = event.target.checked;
+                                    setTasks((prev) =>
+                                      prev.map((current) =>
+                                        current.id === task.id ? { ...current, done } : current,
+                                      ),
+                                    );
+                                  }}
+                                />
+                                <span>{task.label}</span>
+                              </label>
+                            </TaskEntry>
+                          ))}
+                        </TaskContent>
+                      </Task>
                     </div>
                   ) : null}
 
                   {citations.length > 0 ? (
                     <Sources className="mb-0 rounded-md border border-border/70 bg-muted/10 p-2.5 text-xs">
                       <SourcesTrigger count={citations.length} className="font-medium text-foreground">
-                        参照ソース {citations.length}件
+                        参照ソース
                       </SourcesTrigger>
                       <SourcesContent className="mt-2 w-full gap-1.5">
                         {citations.slice(0, 8).map((citation) => (
@@ -3101,8 +3013,80 @@ export function DemoWorkspace({
           </Card>
         </section>
 
-        {showDetailRail ? (
+        {showRightRail ? (
           <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+          {showSummaryRail ? (
+            <Card className="border-border/80 bg-card/96 py-0 backdrop-blur">
+              <CardContent className="space-y-2 px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-primary">最新サマリー（TL;DR）</p>
+                    <p className="mt-1 line-clamp-2 text-sm font-medium">
+                      {latestAssistantSummary?.summary ??
+                        "最初の回答後に、ここへ最新サマリーを固定表示します。"}
+                    </p>
+                    {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
+                    {isStreaming ? "updating" : "latest"}
+                  </Badge>
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-0 text-left text-xs text-primary hover:text-primary/80"
+                  onClick={() => setThinkingSidebarOpen(true)}
+                >
+                  <Shimmer>{streamingStatusLabel}</Shimmer>
+                  <ChevronRightIcon className="size-3.5" />
+                </button>
+                {streamingStatusDetail ? (
+                  <p className="text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
+                ) : null}
+                {structuredReflectionStatus ? (
+                  <div
+                    className={cn(
+                      "rounded-md px-2.5 py-1.5 text-[11px]",
+                      structuredReflectionStatus.tone === "processing"
+                        ? "border border-primary/20 bg-primary/5 text-primary"
+                        : "border border-emerald-200 bg-emerald-50/80 text-emerald-900",
+                    )}
+                  >
+                    {structuredReflectionStatus.text}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showDetailRail ? (
+            <>
+          {queue.length > 0 ? (
+            <Card className="gap-3 border-border/70 py-4">
+              <CardHeader className="px-4">
+                <CardTitle className="text-sm">Queue</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4">
+                <QueuePanel className="border-none p-0 shadow-none">
+                  <QueueList className="mt-0 [&>div]:max-h-[200px]">
+                    {queue.slice(0, 6).map((item) => (
+                      <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
+                        <div className="flex items-center gap-2">
+                          <QueueItemIndicator completed={item.severity === "info"} />
+                          <QueueItemContent>{item.title}</QueueItemContent>
+                        </div>
+                        <QueueItemDescription>{item.description}</QueueItemDescription>
+                      </QueueEntry>
+                    ))}
+                  </QueueList>
+                </QueuePanel>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card className="gap-3 border-border/70 py-4">
             <CardHeader className="px-4">
               <CardTitle className="text-sm">Model & Context</CardTitle>
@@ -3421,6 +3405,8 @@ export function DemoWorkspace({
               </CardContent>
             </Card>
           )}
+            </>
+          ) : null}
           </aside>
         ) : null}
       </div>
@@ -3432,7 +3418,6 @@ export function DemoWorkspace({
               <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
                 <div className="flex items-center gap-2">
                   <span>成果物</span>
-                  <Badge variant="outline">{artifacts.length}</Badge>
                   {selectedArtifact ? (
                     <span className="max-w-[300px] truncate text-xs text-muted-foreground">
                       {selectedArtifact.name}
@@ -3511,7 +3496,7 @@ export function DemoWorkspace({
                             />
                           ) : artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
                             <div className="max-h-80 overflow-auto rounded-lg border border-border/70 bg-background p-3">
-                              <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1">
+                              <MessageResponse className="agentic-markdown">
                                 {selectedArtifact.content}
                               </MessageResponse>
                             </div>
@@ -3571,7 +3556,7 @@ export function DemoWorkspace({
                         {selectedArtifact ? (
                           artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
                             <div className="max-h-72 overflow-auto rounded-lg border border-border/70 bg-background p-3">
-                              <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100">
+                              <MessageResponse className="agentic-markdown">
                                 {selectedArtifact.content}
                               </MessageResponse>
                             </div>
@@ -3611,7 +3596,7 @@ export function DemoWorkspace({
           <DialogHeader className="gap-1 border-b border-border/70 px-4 py-3 text-left">
             <DialogTitle className="flex items-center gap-2 text-sm">
               <PanelsRightBottomIcon className="size-4 text-primary" />
-              Thinking Log
+              思考ログ
             </DialogTitle>
             <DialogDescription className="text-xs">
               実行中のステップ・ツール・推論ログをここで確認できます。
@@ -3633,7 +3618,7 @@ export function DemoWorkspace({
                 isStreaming={isStreaming}
                 className="rounded-md border border-border/70 bg-card px-3 py-2"
               >
-                <ReasoningTrigger className="text-xs">現在の推論要約</ReasoningTrigger>
+                <ReasoningTrigger className="text-xs">この回答の思考ステップ</ReasoningTrigger>
                 <ReasoningContent className="mt-1 text-xs leading-6">
                   {reasoningTraceMarkdown}
                 </ReasoningContent>
