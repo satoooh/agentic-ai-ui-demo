@@ -4,9 +4,6 @@ import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
-  sampleResearchConnectorProject,
-  sampleResearchEvidence,
-  sampleResearchSignals,
   sampleResearchWorkflow,
 } from "@/lib/samples/research";
 
@@ -82,53 +79,8 @@ export default function ResearchDemoPage() {
         { id: "research-task-3", label: "ニュース由来リスクの一次評価", done: false },
         { id: "research-task-4", label: "次探索クエリの設計", done: false },
       ]}
-      initialArtifacts={[
-        {
-          id: "ir-filings-initial",
-          name: "ir-filings.json",
-          kind: "json",
-          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "ir_filing"), null, 2),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "public-signals-initial",
-          name: "public-signals.json",
-          kind: "json",
-          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "public_news"), null, 2),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "company-profile-initial",
-          name: "company-profile.json",
-          kind: "json",
-          content: JSON.stringify(sampleResearchSignals.filter((signal) => signal.kind === "regulatory_note"), null, 2),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "company-brief",
-          name: "company-brief.md",
-          kind: "markdown",
-          content:
-            "# 企業調査ブリーフ（初期）\n\n" +
-            "- 対象: Microsoft\n" +
-            "- 収集対象: SEC / GDELT / Wikidata\n" +
-            "- 次アクション: 重要提出書類の差分と公開ニュースの整合を確認",
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "connector-project",
-          name: "connector-project.json",
-          kind: "json",
-          content: JSON.stringify(sampleResearchConnectorProject, null, 2),
-          updatedAt: new Date().toISOString(),
-        },
-      ]}
-      initialCitations={sampleResearchEvidence.map((evidence, index) => ({
-        id: `research-citation-${index}`,
-        title: evidence.sourceTitle,
-        url: evidence.url,
-        quote: evidence.quote,
-      }))}
+      initialArtifacts={[]}
+      initialCitations={[]}
       topPanel={
         <div className="space-y-4">
           <DemoScriptPanel

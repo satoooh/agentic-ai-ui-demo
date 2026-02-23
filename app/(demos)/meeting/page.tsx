@@ -1,9 +1,4 @@
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
-import {
-  sampleMeetingReview,
-  meetingTranscriptSamples,
-  sampleMeetingTranscript,
-} from "@/lib/samples/meeting";
 
 export default function MeetingDemoPage() {
   return (
@@ -24,41 +19,7 @@ export default function MeetingDemoPage() {
         ]}
         initialPlan={[]}
         initialTasks={[]}
-        initialArtifacts={[
-          {
-            id: "meeting-transcript-initial",
-            name: "meeting-transcript.md",
-            kind: "markdown",
-            content:
-              `# ${sampleMeetingTranscript.title}\n\n` +
-              `- 参加者: ${sampleMeetingTranscript.participants.join(", ")}\n` +
-              `- 抜粋: ${sampleMeetingTranscript.excerpt}\n`,
-            updatedAt: new Date().toISOString(),
-          },
-          {
-            id: "meeting-review-initial",
-            name: "meeting-review.json",
-            kind: "json",
-            content: JSON.stringify(sampleMeetingReview, null, 2),
-            updatedAt: new Date().toISOString(),
-          },
-          {
-            id: "meeting-transcript-samples",
-            name: "meeting-transcript-samples.md",
-            kind: "markdown",
-            content:
-              "# サンプル発言録（ダミー）\n\n" +
-              meetingTranscriptSamples
-                .map(
-                  (sample, index) =>
-                    `## ${index + 1}. ${sample.title}\n` +
-                    `- メモ: ${sample.note}\n` +
-                    `- 冒頭抜粋: ${sample.dirtyTranscript.split("\n")[0]}`,
-                )
-                .join("\n\n"),
-            updatedAt: new Date().toISOString(),
-          },
-        ]}
+        initialArtifacts={[]}
         enableVoice
       />
     </div>
