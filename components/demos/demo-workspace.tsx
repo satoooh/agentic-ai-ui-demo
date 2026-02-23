@@ -2165,7 +2165,7 @@ export function DemoWorkspace({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">
                 {transcriptHeadlinePending ? (
-                  <Shimmer>会議タイトルを生成中...</Shimmer>
+                  <Shimmer as="span">会議タイトルを生成中...</Shimmer>
                 ) : (
                   transcriptHeadline
                 )}
@@ -2709,7 +2709,7 @@ export function DemoWorkspace({
                   <Message from="assistant">
                     <MessageContent>
                       <p className="text-xs text-muted-foreground">
-                        <Shimmer>{streamingStatusLabel}</Shimmer>
+                        <Shimmer as="span">{streamingStatusLabel}</Shimmer>
                       </p>
                       {streamingStatusDetail ? (
                         <p className="mt-1 text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
@@ -2909,7 +2909,7 @@ export function DemoWorkspace({
                   <ReasoningTrigger
                     className="h-auto justify-start px-0 text-xs text-primary hover:text-primary/80"
                     getThinkingMessage={(active) =>
-                      active ? <Shimmer>{streamingStatusLabel}</Shimmer> : "思考ログを表示"
+                      active ? <Shimmer as="span">{streamingStatusLabel}</Shimmer> : "思考ログを表示"
                     }
                   />
                   <ReasoningContent className="mt-2 text-xs leading-6">
