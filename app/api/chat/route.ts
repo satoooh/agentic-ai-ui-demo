@@ -913,9 +913,9 @@ export async function POST(request: Request) {
           id: connectorDoneId,
           data: {
             id: connectorDoneId,
-            name: connectorContext.label,
+            name: "connector-fetch",
             status: "success",
-            detail: connectorContext.summary,
+            detail: `${connectorContext.label}: ${connectorContext.summary}`,
             timestamp: new Date().toISOString(),
           },
           transient: true,
