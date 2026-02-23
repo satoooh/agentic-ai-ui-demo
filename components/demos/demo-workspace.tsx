@@ -209,11 +209,11 @@ interface MeetingOutputTemplate {
 const MEETING_PROFILES: MeetingProfile[] = [
   {
     id: "auto-any",
-    label: "自動判定（任意）",
-    objective: "議事録内容から会議の性質を推定し、意思決定品質を上げる",
-    participants: "任意",
-    expectedOutput: "会議要約、反証レビュー、次アクション",
-    keyTopics: ["意思決定", "リスク", "次アクション", "未確定事項"],
+    label: "会議タイプ自動推定",
+    objective: "議事録から会議タイプを推定し、合意形成と実行準備を加速する",
+    participants: "議事録から推定",
+    expectedOutput: "決定事項、反証レビュー、実行アクション",
+    keyTopics: ["決定事項", "未決事項", "前提リスク", "次アクション"],
   },
   {
     id: "sales-weekly",
@@ -251,9 +251,9 @@ const MEETING_PROFILES: MeetingProfile[] = [
 
 const MEETING_OUTPUT_TEMPLATES: Record<MeetingProfile["id"], MeetingOutputTemplate> = {
   "auto-any": {
-    title: "会議レビュー",
-    sections: ["要点整理", "反証レビュー（悪魔の代弁者）", "修正アクション"],
-    actionColumns: ["タスク", "担当", "期限", "検証指標"],
+    title: "倍速会議レビュー",
+    sections: ["決定事項と未決事項", "反証レビュー（悪魔の代弁者）", "修正アクション"],
+    actionColumns: ["タスク", "担当", "期限", "成功条件"],
   },
   "sales-weekly": {
     title: "営業週次レビュー",
@@ -290,6 +290,16 @@ function buildMeetingOutputFormatInstruction(profile: MeetingProfile): string {
 
 function getMeetingSuggestions(profile: MeetingProfile): string[] {
   const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  if (profile.id === "auto-any") {
+    return [
+      "議事録から決定事項・未決事項・次アクションを抽出して",
+      "前提崩壊の失敗シナリオを2件だけ先に示して",
+      `${template.title}形式で会議後の実行計画（担当/期限/成功条件）を作って`,
+      "会議の論点を根拠付きで3つに圧縮して",
+      "次回会議までに必要な追加確認データを優先順で出して",
+    ];
+  }
+
   return [
     `${profile.label}として、この会議の決定事項と保留事項を整理して`,
     `${profile.keyTopics[0]}と${profile.keyTopics[1]}の観点で見落としを指摘して`,
@@ -301,27 +311,36 @@ function getMeetingSuggestions(profile: MeetingProfile): string[] {
 
 function buildMeetingScenario(profile: MeetingProfile): DemoScenario {
   const template = MEETING_OUTPUT_TEMPLATES[profile.id];
+  const profileContext =
+    profile.id === "auto-any"
+      ? "会議タイプを議事録から自動推定して"
+      : `${profile.label}として`;
+  const topicHint =
+    profile.id === "auto-any"
+      ? "意思決定 / リスク / 次アクション / 未確定事項"
+      : profile.keyTopics.join(" / ");
+
   return {
     id: `meeting-loop-${profile.id}`,
-    title: `${profile.label}シナリオ`,
-    description: `${profile.label}の主要論点に沿って、反証レビューから次アクション確定まで実行。`,
+    title: profile.id === "auto-any" ? "倍速会議シナリオ" : `${profile.label}シナリオ`,
+    description: "主要論点に沿って、反証レビューから次アクション確定まで実行。",
     outcome: `${profile.expectedOutput}を短時間で作成`,
     targetDurationSec: 62,
     steps: [
       {
         id: `meeting-${profile.id}-step-1`,
         label: "議事録要約",
-        prompt: `${profile.label}として、議事録から決定事項と保留事項を整理してください。`,
+        prompt: `${profileContext}、議事録から決定事項と保留事項を整理してください。`,
       },
       {
         id: `meeting-${profile.id}-step-2`,
         label: "主要論点抽出",
-        prompt: `主要論点（${profile.keyTopics.join(" / ")}）ごとに論点と不足データを整理してください。`,
+        prompt: `主要論点（${topicHint}）ごとに論点と不足データを整理してください。`,
       },
       {
         id: `meeting-${profile.id}-step-3`,
         label: "悪魔の代弁者",
-        prompt: `${profile.label}の前提に対して悪魔の代弁者レビューを実行し、反証を2件提示してください。`,
+        prompt: "前提に対して悪魔の代弁者レビューを実行し、失敗シナリオを2件提示してください。",
       },
       {
         id: `meeting-${profile.id}-step-4`,
@@ -480,6 +499,19 @@ function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
   return "bg-slate-200 text-slate-700";
 }
 
+function getStatusLabel(status: PlanStep["status"] | ToolEvent["status"]) {
+  if (status === "done" || status === "success") {
+    return "完了";
+  }
+  if (status === "doing" || status === "running") {
+    return "実行中";
+  }
+  if (status === "error") {
+    return "失敗";
+  }
+  return "待機";
+}
+
 function toToolUiState(status: ToolEvent["status"]) {
   if (status === "success") {
     return "output-available" as const;
@@ -575,13 +607,18 @@ function deriveTranscriptHeadline({
   transcript: string;
   profileLabel: string;
 }): string {
+  const normalizedProfileLabel =
+    profileLabel.includes("自動推定") || profileLabel.includes("自動判定")
+      ? "会議レビュー"
+      : profileLabel;
+
   const firstLine = transcript
     .split("\n")
     .map((line) => line.trim())
     .find((line) => line.length > 0);
 
   if (!firstLine) {
-    return `${profileLabel}レビュー`;
+    return `${normalizedProfileLabel}レビュー`;
   }
 
   const normalized = firstLine
@@ -591,11 +628,11 @@ function deriveTranscriptHeadline({
     .trim();
 
   if (!normalized) {
-    return `${profileLabel}レビュー`;
+    return `${normalizedProfileLabel}レビュー`;
   }
 
   const cropped = normalized.slice(0, 26);
-  return `${profileLabel}: ${cropped}${normalized.length > 26 ? "…" : ""}`;
+  return `${normalizedProfileLabel}: ${cropped}${normalized.length > 26 ? "…" : ""}`;
 }
 
 function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "error") {
@@ -642,15 +679,16 @@ function getAutonomousLoopPrompts(
   if (demo === "meeting") {
     const profile = meetingProfile ?? MEETING_PROFILES[0];
     const template = MEETING_OUTPUT_TEMPLATES[profile.id];
-    const baseGoal = normalizedGoal || `${profile.label}の結論妥当性を検証したい`;
+    const baseGoal =
+      normalizedGoal || "議事録から会議後の実行を最短で固めたい（倍速会議）";
+    const reviewSubject =
+      profile.id === "auto-any" ? "この会議の意思決定前提" : `${profile.label}の意思決定前提`;
     return [
-      `会議レビュー対象:\n${baseGoal}\n${profile.label}の主要論点（${profile.keyTopics.join(
+      `倍速会議ループ Step1:\n目的: ${baseGoal}\n議事録から「決定事項 / 未決事項 / 担当付きアクション候補」を抽出してください。`,
+      `倍速会議ループ Step2:\n${reviewSubject}に対して悪魔の代弁者レビューを実行し、失敗シナリオを2つ提示し、早期検知シグナルも添えてください。`,
+      `倍速会議ループ Step3:\n${template.title}形式で、次回会議までの実行計画（${template.actionColumns.join(
         " / ",
-      )}）で決定事項と保留事項を整理してください。`,
-      `${profile.label}の前提に対して悪魔の代弁者レビューを実行し、失敗シナリオを2つ提示してください。`,
-      `${template.title}の形式で、次回会議までのアクション（${template.actionColumns.join(
-        " / ",
-      )}）をMarkdown tableで出してください。`,
+      )}）と、会議後フォロー用の短い共有文を作成してください。`,
     ];
   }
 
@@ -946,9 +984,11 @@ export function DemoWorkspace({
   const showMeetingPrimaryRail = demo !== "meeting";
   const showMeetingSetupCard = demo === "meeting" && (!meetingTranscriptConfirmed || isTranscriptEditing);
   const showMeetingTranscriptSummaryBar = demo === "meeting" && meetingTranscriptConfirmed && !isTranscriptEditing;
+  const showMeetingRuntimeSummary = demo === "meeting" && meetingTranscriptConfirmed && hasConversationStarted;
   const showMeetingRuntimePanels =
-    demo !== "meeting" || (meetingTranscriptConfirmed && hasConversationStarted);
+    demo !== "meeting" || (showMeetingRuntimeSummary && viewMode === "full");
   const showPrimaryChatWorkspace = demo !== "meeting" || meetingTranscriptConfirmed;
+  const autonomousLoopLabel = demo === "meeting" ? "倍速会議ループ" : "自律ループ";
   const transcriptHeadline = useMemo(() => {
     if (structuredInsight?.headline?.trim()) {
       return structuredInsight.headline.trim();
@@ -1317,24 +1357,12 @@ export function DemoWorkspace({
 
     return liveAgentSteps.at(-1)?.label ?? "完了";
   }, [liveAgentSteps]);
-  const liveAgentStepsMarkdown = useMemo(() => {
-    if (liveAgentSteps.length === 0) {
-      return "ステップ情報はまだありません。";
-    }
-
-    return liveAgentSteps
-      .map(
-        (step, index) =>
-          `${index + 1}. **${step.label}** [${step.status}]  \n${compactUiText(step.detail, 160)}`,
-      )
-      .join("\n\n");
-  }, [liveAgentSteps]);
   const streamingStatusLabel = useMemo(() => {
-    if (demo === "meeting" && showMeetingRuntimePanels) {
+    if (demo === "meeting" && showMeetingRuntimeSummary) {
       return `回答を生成しています...（${liveAgentCurrentStepLabel}）`;
     }
     return "回答を生成しています...";
-  }, [demo, liveAgentCurrentStepLabel, showMeetingRuntimePanels]);
+  }, [demo, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
   const agenticLanes = useMemo<AgenticLane[]>(() => {
     const observeState: AgenticLane["state"] =
       demo === "meeting"
@@ -1425,12 +1453,13 @@ export function DemoWorkspace({
 
     const profileHint =
       selectedMeetingProfile.id === "auto-any"
-        ? "会議タイプ: 自動判定（議事録内容から推定）"
+        ? "会議タイプ: 議事録から自動推定"
         : `会議タイプ: ${selectedMeetingProfile.label}`;
 
     return (
       "会議設定:\n" +
       `- ${profileHint}\n` +
+      "- ガイド原則: 会議の速度ではなく、合意形成と実行確度を上げる\n" +
       `- 目的: ${selectedMeetingProfile.objective}\n` +
       `- 参加者: ${selectedMeetingProfile.participants}\n` +
       `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
@@ -1580,13 +1609,13 @@ export function DemoWorkspace({
       return;
     }
 
-    if (!ensureMeetingTranscript("自律ループ")) {
+    if (!ensureMeetingTranscript(autonomousLoopLabel)) {
       return;
     }
 
     autoLoopAbortRef.current = false;
     setIsAutoLoopRunning(true);
-    setLoopStatus("自律ループを開始しました。");
+    setLoopStatus(`${autonomousLoopLabel}を開始しました。`);
 
     try {
       const loopSeed =
@@ -1594,11 +1623,11 @@ export function DemoWorkspace({
       const prompts = getAutonomousLoopPrompts(demo, loopSeed, selectedMeetingProfile);
       for (const [index, prompt] of prompts.entries()) {
         if (autoLoopAbortRef.current) {
-          setLoopStatus("自律ループを停止しました。");
+          setLoopStatus(`${autonomousLoopLabel}を停止しました。`);
           break;
         }
 
-        setLoopStatus(`自律ループ実行中 (${index + 1}/${prompts.length})`);
+        setLoopStatus(`${autonomousLoopLabel}実行中 (${index + 1}/${prompts.length})`);
         await sendMessage(
           { text: withDemoContext(prompt) },
           {
@@ -1616,11 +1645,11 @@ export function DemoWorkspace({
       }
 
       if (!autoLoopAbortRef.current) {
-        setLoopStatus("自律ループが完了しました。次ループ候補をArtifactsで確認してください。");
+        setLoopStatus(`${autonomousLoopLabel}が完了しました。成果物を確認してください。`);
       }
     } catch (loopError) {
       setLoopStatus(
-        `自律ループでエラーが発生しました: ${
+        `${autonomousLoopLabel}でエラーが発生しました: ${
           loopError instanceof Error ? loopError.message : "unknown error"
         }`,
       );
@@ -1636,7 +1665,7 @@ export function DemoWorkspace({
     }
     autoLoopAbortRef.current = true;
     stop();
-    setLoopStatus("停止要求を受け付けました。");
+    setLoopStatus(`${autonomousLoopLabel}の停止要求を受け付けました。`);
   };
 
   const runScenario = async (scenario: DemoScenario) => {
@@ -2045,9 +2074,9 @@ export function DemoWorkspace({
             <div>
               {demo === "meeting" ? (
                 <>
-                  <p className="text-sm font-semibold tracking-tight">Meeting Agentic Chat</p>
+                  <p className="text-sm font-semibold tracking-tight">倍速会議レビュー</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Step 1 で議事録を確定したら、チャット中心でレビューを進めます。
+                    Step 1 で議事録を確定したら、合意形成を加速するレビューをチャット中心で進めます。
                   </p>
                 </>
               ) : (
@@ -2225,7 +2254,7 @@ export function DemoWorkspace({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{transcriptHeadline}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                自動推定レビュー / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
+                倍速会議レビュー / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
                 {transcriptStats.lines}行
               </p>
               <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
@@ -2408,7 +2437,7 @@ export function DemoWorkspace({
             <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-sm">
-                  {demo === "meeting" ? "Meeting Chat" : "Conversation"}
+                  {demo === "meeting" ? "倍速会議チャット" : "Conversation"}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant={isStreaming ? "default" : "secondary"}>
@@ -2433,6 +2462,23 @@ export function DemoWorkspace({
                   ? "議事録確定後、このチャット上で要約・反証・次アクションを反復します。"
                   : "左列で開始し、ここで編集・再送して出力を固めます。"}
               </p>
+              {showMeetingRuntimeSummary && viewMode !== "full" ? (
+                <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-primary">
+                      {latestAssistantSummary?.summary ?? "最初の回答後に結論（TL;DR）をここへ固定表示します。"}
+                    </p>
+                    <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
+                      {isStreaming ? `thinking: ${liveAgentCurrentStepLabel}` : "最新"}
+                    </Badge>
+                  </div>
+                  {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {showMeetingRuntimePanels ? (
                 <div className="grid gap-1.5 md:grid-cols-4">
                   {agenticLanes.map((lane) => (
@@ -2716,19 +2762,49 @@ export function DemoWorkspace({
                   <Message from="assistant">
                     <MessageContent>
                       <Shimmer>{streamingStatusLabel}</Shimmer>
-                      {demo === "meeting" && showMeetingRuntimePanels ? (
-                        <Reasoning
+                      {demo === "meeting" && showMeetingRuntimeSummary ? (
+                        <ChainOfThought
                           className="mb-0 mt-2 rounded-md border border-border/60 bg-background px-2.5 py-2"
                           defaultOpen
-                          isStreaming={isStreaming}
                         >
-                          <ReasoningTrigger className="text-[11px]">
+                          <ChainOfThoughtHeader className="text-[11px]">
                             Thinking（現在の実行ステップ）
-                          </ReasoningTrigger>
-                          <ReasoningContent className="text-[11px] leading-6">
-                            {liveAgentStepsMarkdown}
-                          </ReasoningContent>
-                        </Reasoning>
+                          </ChainOfThoughtHeader>
+                          <ChainOfThoughtContent className="space-y-2">
+                            {liveAgentSteps.map((step, index) => (
+                              <ChainOfThoughtStep
+                                key={`${step.id}-stream`}
+                                label={
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                    <span className="font-medium">
+                                      {index + 1}. {step.label}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn("h-4 px-1.5 text-[9px]", getStatusBadgeStyle(step.status))}
+                                    >
+                                      {getStatusLabel(step.status)}
+                                    </Badge>
+                                  </div>
+                                }
+                                description={compactUiText(step.detail, 140)}
+                                status={
+                                  step.status === "done"
+                                    ? "complete"
+                                    : step.status === "doing"
+                                      ? "active"
+                                      : "pending"
+                                }
+                              >
+                                <ChainOfThoughtSearchResults>
+                                  <ChainOfThoughtSearchResult>
+                                    {step.status}
+                                  </ChainOfThoughtSearchResult>
+                                </ChainOfThoughtSearchResults>
+                              </ChainOfThoughtStep>
+                            ))}
+                          </ChainOfThoughtContent>
+                        </ChainOfThought>
                       ) : null}
                     </MessageContent>
                   </Message>
@@ -2803,7 +2879,7 @@ export function DemoWorkspace({
                           onClick={() => void runAutonomousLoop()}
                           disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
                         >
-                          {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
+                          {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
                         </Button>
                         <Button
                           type="button"
@@ -2840,7 +2916,7 @@ export function DemoWorkspace({
                         onClick={() => void runAutonomousLoop()}
                         disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
                       >
-                        {isAutoLoopRunning ? "自律ループ実行中..." : "自律ループ実行"}
+                        {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
                       </Button>
                       {demo !== "meeting" ? (
                         <Button

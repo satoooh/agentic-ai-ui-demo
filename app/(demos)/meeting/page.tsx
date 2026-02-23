@@ -9,8 +9,8 @@ export default function MeetingDemoPage() {
   return (
     <DemoWorkspace
       demo="meeting"
-      title="Meeting Agentic Chat"
-      subtitle="議事録入力を起点に、要約・反証レビュー・次アクション化をチャットで反復する。"
+      title="会議レビュー: 倍速会議 Copilot"
+      subtitle="議事録入力を起点に、合意形成を速めるための要約・反証レビュー・次アクション化をチャットで反復する。"
       suggestions={[]}
       initialQueue={[
         {

@@ -14,10 +14,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const demos = [
   {
     href: "/meeting",
-    title: "会議レビュー: Devil's Advocate Copilot",
-    summary: "議事録入力 → 前提抽出 → 反証レビュー → 次アクション確定を自律ループ化。",
+    title: "会議レビュー: 倍速会議 Copilot",
+    summary: "議事録入力 → 決定事項抽出 → 反証レビュー → 実行アクション確定を1チャットで反復。",
     focus: ["Conversation", "Queue", "Plan", "Artifact", "Checkpoint", "Sources"],
-    value: "会議後の意思決定品質と実行速度を向上",
+    value: "会議後の合意形成と実行速度を向上",
   },
   {
     href: "/sales",
@@ -43,10 +43,10 @@ const demos = [
 ];
 
 const quickStartSteps = [
-  "まず「会議レビュー」デモを開き、Meeting Setupで会議タイプを選ぶ",
-  "会議ログを貼り付け、悪魔の代弁者を実行する",
-  "自律ループ実行で反証→修正→次アクション生成まで進める",
-  "Artifacts から会議サマリと次アクションをコピー/共有する",
+  "まず「会議レビュー」デモを開き、議事録を貼り付けて確定する",
+  "チャットに目的を1行で入力し、会議レビューを開始する",
+  "倍速会議ループ実行で反証→修正→次アクション生成まで進める",
+  "成果物から会議サマリと次アクションをコピー/共有する",
 ];
 
 export default function HomePage() {
@@ -69,7 +69,7 @@ export default function HomePage() {
                 Japan Vertical Agentic Demo Lab
               </h1>
               <p className="mt-2 max-w-4xl text-sm text-muted-foreground sm:text-base">
-                「会議ログ入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
+                「議事録入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
                 チャットは常に LLM 推論で実行され、環境変数設定後すぐに実運用に近い検証ができます。
               </p>
             </div>
