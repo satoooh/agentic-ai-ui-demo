@@ -79,6 +79,7 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from "@/components/ai-elements/sources";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import {
   Task,
   TaskContent,
@@ -175,6 +176,14 @@ interface WorklogStep {
   description: string;
   status: "complete" | "active" | "pending";
   tags: string[];
+}
+
+interface MeetingTimelineEntry {
+  id: string;
+  phase: string;
+  title: string;
+  detail: string;
+  status: WorklogStep["status"];
 }
 
 interface LiveAgentStep {
@@ -1103,6 +1112,75 @@ export function DemoWorkspace({
 
     return [...fromEvidence, ...fromRisks].slice(0, 3);
   }, [structuredInsight]);
+  const meetingFollowUpSuggestions = useMemo(() => {
+    if (demo !== "meeting" || !meetingTranscriptConfirmed) {
+      return [] as string[];
+    }
+
+    const generated: string[] = [];
+
+    if (structuredInsight) {
+      const firstRisk = structuredInsight.risks[0];
+      if (firstRisk) {
+        generated.push(`「${firstRisk.title}」の早期検知シグナルを3つに分解して`);
+      }
+
+      const firstAction = structuredInsight.actions[0];
+      if (firstAction) {
+        generated.push(
+          `${firstAction.owner}向けに、今日中に着手するチェックリストを5項目で作って`,
+        );
+      }
+
+      if (structuredInsight.evidence[0]) {
+        generated.push("不足データの回収順を、影響度順で並べ替えて");
+      }
+    }
+
+    if (latestAssistantSummary?.summary) {
+      generated.push("この会議レビューを、経営向け共有文（200字）に圧縮して");
+      generated.push("未決事項だけ抜き出して、次回会議アジェンダ案にして");
+    } else {
+      generated.push("この議事録の決定事項と未決事項を3行で整理して");
+      generated.push("失敗シナリオを2件に絞って先に提示して");
+      generated.push("次回会議までの担当付きアクションを表で作って");
+    }
+
+    return Array.from(new Set(generated)).slice(0, 5);
+  }, [demo, latestAssistantSummary?.summary, meetingTranscriptConfirmed, structuredInsight]);
+  const meetingDecisionTimeline = useMemo<MeetingTimelineEntry[]>(() => {
+    if (demo !== "meeting" || !structuredInsight) {
+      return [];
+    }
+
+    const items: MeetingTimelineEntry[] = [
+      ...structuredInsight.keyPoints.slice(0, 2).map((point, index) => ({
+        id: `decision-${index + 1}`,
+        phase: "会議中",
+        title: point,
+        detail: "議事録で確認された主要論点",
+        status: "complete" as const,
+      })),
+      ...structuredInsight.actions.slice(0, 4).map((action, index) => {
+        const matchedTask = tasks.find((task) => task.label.includes(action.task));
+        const status: MeetingTimelineEntry["status"] = matchedTask?.done
+          ? "complete"
+          : index === 0
+            ? "active"
+            : "pending";
+
+        return {
+          id: `action-${index + 1}`,
+          phase: action.due?.trim() || "次回まで",
+          title: action.task,
+          detail: `${action.owner} / 成功条件: ${action.metric}`,
+          status,
+        };
+      }),
+    ];
+
+    return items.slice(0, 6);
+  }, [demo, structuredInsight, tasks]);
   const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
   const planProgress = useMemo(() => {
@@ -1542,6 +1620,26 @@ export function DemoWorkspace({
 
     setDraft("");
     setAttachmentNames([]);
+  };
+
+  const sendFollowUpSuggestion = async (suggestion: string) => {
+    if (isStreaming || meetingPrerequisiteBlocked) {
+      return;
+    }
+
+    const prompt = withDemoContext(suggestion);
+    if (!prompt) {
+      return;
+    }
+
+    await sendMessage(
+      { text: prompt },
+      {
+        body: buildRequestBody({ approved: false, operation: "default" }),
+      },
+    );
+
+    setLoopStatus(`提案質問を送信しました: ${compactUiText(suggestion, 48)}`);
   };
 
   const runDevilsAdvocate = async (options?: {
@@ -2477,6 +2575,18 @@ export function DemoWorkspace({
                       {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
                     </p>
                   ) : null}
+                  {meetingDecisionTimeline.length > 0 ? (
+                    <div className="mt-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
+                      <p className="text-[11px] font-semibold">決定事項タイムライン</p>
+                      <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                        {meetingDecisionTimeline.slice(0, 3).map((item) => (
+                          <li key={`guided-${item.id}`}>
+                            • {item.phase}: {compactUiText(item.title, 52)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {showMeetingRuntimePanels ? (
@@ -2577,6 +2687,38 @@ export function DemoWorkspace({
                     </div>
                   ) : null}
                 </div>
+                {demo === "meeting" && meetingDecisionTimeline.length > 0 ? (
+                  <div className="mt-2 rounded-md border border-border/60 bg-background px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold">決定事項タイムライン</p>
+                      <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                        会議中 → 会議後
+                      </Badge>
+                    </div>
+                    <ChainOfThought className="mt-1" defaultOpen={false}>
+                      <ChainOfThoughtHeader className="text-[11px]">
+                        主要な決定と実行タスク
+                      </ChainOfThoughtHeader>
+                      <ChainOfThoughtContent className="space-y-2">
+                        {meetingDecisionTimeline.map((item) => (
+                          <ChainOfThoughtStep
+                            key={item.id}
+                            label={
+                              <div className="flex items-center gap-1.5 text-[11px]">
+                                <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                                  {item.phase}
+                                </Badge>
+                                <span className="font-medium">{item.title}</span>
+                              </div>
+                            }
+                            description={item.detail}
+                            status={item.status}
+                          />
+                        ))}
+                      </ChainOfThoughtContent>
+                    </ChainOfThought>
+                  </div>
+                ) : null}
 
                 <Accordion type="single" collapsible className="mt-2">
                   <AccordionItem value="details" className="border-b-0">
@@ -2763,28 +2905,28 @@ export function DemoWorkspace({
                     <MessageContent>
                       <Shimmer>{streamingStatusLabel}</Shimmer>
                       {demo === "meeting" && showMeetingRuntimeSummary ? (
-                        <ChainOfThought
-                          className="mb-0 mt-2 rounded-md border border-border/60 bg-background px-2.5 py-2"
+                        <Reasoning
+                          className="mb-0 mt-2 rounded-md border border-border/60 bg-background/90 px-2.5 py-2"
                           defaultOpen
+                          isStreaming={isStreaming}
                         >
-                          <ChainOfThoughtHeader className="text-[11px]">
+                          <ReasoningTrigger className="text-[11px]">
                             Thinking（現在の実行ステップ）
-                          </ChainOfThoughtHeader>
-                          <ChainOfThoughtContent className="space-y-2">
+                          </ReasoningTrigger>
+                          <ReasoningContent className="mt-2 text-[11px] leading-6">
+                            {`現在: ${liveAgentCurrentStepLabel}\n`}
+                          </ReasoningContent>
+                          <ChainOfThought className="mt-2" defaultOpen>
+                            <ChainOfThoughtContent className="space-y-2">
                             {liveAgentSteps.map((step, index) => (
                               <ChainOfThoughtStep
                                 key={`${step.id}-stream`}
                                 label={
-                                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                                    <span className="font-medium">
-                                      {index + 1}. {step.label}
-                                    </span>
-                                    <Badge
-                                      variant="outline"
-                                      className={cn("h-4 px-1.5 text-[9px]", getStatusBadgeStyle(step.status))}
-                                    >
+                                  <div className="flex items-center gap-1.5 text-[11px]">
+                                    <span className="font-medium">{index + 1}. {step.label}</span>
+                                    <span className="text-[10px] text-muted-foreground">
                                       {getStatusLabel(step.status)}
-                                    </Badge>
+                                    </span>
                                   </div>
                                 }
                                 description={compactUiText(step.detail, 140)}
@@ -2795,16 +2937,11 @@ export function DemoWorkspace({
                                       ? "active"
                                       : "pending"
                                 }
-                              >
-                                <ChainOfThoughtSearchResults>
-                                  <ChainOfThoughtSearchResult>
-                                    {step.status}
-                                  </ChainOfThoughtSearchResult>
-                                </ChainOfThoughtSearchResults>
-                              </ChainOfThoughtStep>
+                              />
                             ))}
-                          </ChainOfThoughtContent>
-                        </ChainOfThought>
+                            </ChainOfThoughtContent>
+                          </ChainOfThought>
+                        </Reasoning>
                       ) : null}
                     </MessageContent>
                   </Message>
@@ -2814,7 +2951,7 @@ export function DemoWorkspace({
             </Conversation>
 
             <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
-              {viewMode === "full" || demo !== "meeting" ? (
+              {(viewMode === "full" || demo !== "meeting") && demo !== "meeting" ? (
                 <div className="flex flex-wrap gap-2">
                   {displayedSuggestions.map((suggestion) => (
                     <Button
@@ -2837,6 +2974,26 @@ export function DemoWorkspace({
                 </div>
               ) : (
                 <>
+                  {demo === "meeting" && meetingFollowUpSuggestions.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        次の入力のおすすめ（クリックで送信）
+                      </p>
+                      <Suggestions>
+                        {meetingFollowUpSuggestions.map((suggestion) => (
+                          <Suggestion
+                            key={suggestion}
+                            suggestion={suggestion}
+                            onClick={(value) => {
+                              void sendFollowUpSuggestion(value);
+                            }}
+                            disabled={isStreaming || meetingPrerequisiteBlocked}
+                            className="h-8 rounded-full bg-background text-xs"
+                          />
+                        ))}
+                      </Suggestions>
+                    </div>
+                  ) : null}
                   <Textarea
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
@@ -2873,14 +3030,16 @@ export function DemoWorkspace({
                         >
                           送信
                         </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => void runAutonomousLoop()}
-                          disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
-                        >
-                          {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
-                        </Button>
+                        {demo !== "meeting" ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => void runAutonomousLoop()}
+                            disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
+                          >
+                            {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
@@ -2910,14 +3069,16 @@ export function DemoWorkspace({
                       >
                         送信
                       </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => void runAutonomousLoop()}
-                        disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
-                      >
-                        {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
-                      </Button>
+                      {demo !== "meeting" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void runAutonomousLoop()}
+                          disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
+                        >
+                          {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
+                        </Button>
+                      ) : null}
                       {demo !== "meeting" ? (
                         <Button
                           type="button"
