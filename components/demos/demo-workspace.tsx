@@ -2063,7 +2063,12 @@ export function DemoWorkspace({
   });
   return (
     <div className="space-y-4">
-      <header className="animate-soft-enter overflow-hidden rounded-3xl border border-border/80 bg-card/92 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_36px_rgb(15_23_42/0.08)]">
+      <header
+        className={cn(
+          "animate-soft-enter overflow-hidden rounded-3xl border border-border/80 bg-card/92 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_36px_rgb(15_23_42/0.08)]",
+          demo === "meeting" && "hidden",
+        )}
+      >
         <div className="border-b border-border/70 bg-gradient-to-r from-primary/20 via-chart-2/12 to-transparent px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
