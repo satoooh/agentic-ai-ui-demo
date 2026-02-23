@@ -10,7 +10,6 @@ import { google, type GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google"
 import { z } from "zod";
 import { getMeetingSignals } from "@/lib/connectors/meeting-signal";
 import { getRecruitingMarketJobs } from "@/lib/connectors/recruiting-market";
-import { getResearchSignals } from "@/lib/connectors/research-signal";
 import { getSalesAccountInsight } from "@/lib/connectors/sales-account";
 import { resolveLanguageModel } from "@/lib/models";
 import type { DemoId, DemoUIMessage, ModelProvider } from "@/types/chat";
@@ -179,29 +178,6 @@ function inferTickerOrQuery(latestText: string, fallback: string): string {
   }
 
   return fallback;
-}
-
-function inferResearchFallbackQuery(latestText: string): string {
-  const normalized = latestText.toLowerCase();
-  const aliases: Array<{ keywords: string[]; ticker: string }> = [
-    { keywords: ["トヨタ", "toyota"], ticker: "TM" },
-    { keywords: ["ソニー", "sony"], ticker: "SONY" },
-    { keywords: ["マイクロソフト", "microsoft", "msft"], ticker: "MSFT" },
-    { keywords: ["アップル", "apple", "aapl"], ticker: "AAPL" },
-    { keywords: ["エヌビディア", "nvidia", "nvda"], ticker: "NVDA" },
-    { keywords: ["グーグル", "google", "alphabet", "googl"], ticker: "GOOGL" },
-    { keywords: ["アマゾン", "amazon", "amzn"], ticker: "AMZN" },
-    { keywords: ["テスラ", "tesla", "tsla"], ticker: "TSLA" },
-    { keywords: ["メタ", "meta"], ticker: "META" },
-  ];
-
-  for (const alias of aliases) {
-    if (alias.keywords.some((keyword) => normalized.includes(keyword))) {
-      return alias.ticker;
-    }
-  }
-
-  return inferTickerOrQuery(latestText, "MSFT");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -379,6 +355,22 @@ async function resolveResearchConnectorWithGeminiSearch(
   }
 }
 
+function createResearchGeminiUnavailableContext(query: string): ConnectorContext {
+  const promptContext = [
+    `[Research Connector] query=${query}`,
+    "searchProvider=gemini-google-search",
+    "status=unavailable",
+    "note=Gemini Web検索を実行できませんでした。GOOGLE_GENERATIVE_AI_API_KEY と GEMINI_MODEL を確認してください。",
+  ].join("\n");
+
+  return {
+    label: "research-pdf-search-unavailable",
+    summary: "Gemini Web検索の実行に失敗しました。Settings の Gemini API Key / model を確認してください。",
+    promptContext,
+    citations: [],
+  };
+}
+
 async function resolveConnectorContext(input: {
   demo: DemoId;
   latestText: string;
@@ -471,32 +463,7 @@ async function resolveConnectorContext(input: {
     return geminiConnector;
   }
 
-  const query = inferResearchFallbackQuery(input.latestText);
-  const research = await getResearchSignals({ query });
-  const topSignals = research.signals.slice(0, 6);
-  const sourceNote = research.sourceStatuses
-    .map((status) => `${status.source}:${status.mode}/${status.count}`)
-    .join(" | ");
-  const promptContext = [
-    `[Research Connector] query=${query}`,
-    `sources=${sourceNote}`,
-    ...topSignals.map(
-      (signal, index) =>
-        `signal${index + 1}: ${signal.source} / ${signal.kind} / ${signal.title} / score=${signal.score}`,
-    ),
-    `note=${research.note}`,
-  ].join("\n");
-
-  return {
-    label: "research-signal-connector",
-    summary: research.note,
-    promptContext,
-    citations: topSignals.map((signal) => ({
-      title: `${signal.source.toUpperCase()} ${signal.title}`,
-      url: signal.url,
-      quote: signal.summary,
-    })),
-  };
+  return createResearchGeminiUnavailableContext(searchQuery);
 }
 
 function extractLatestText(messages: DemoUIMessage[]): string {
