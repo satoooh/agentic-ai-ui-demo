@@ -1344,13 +1344,68 @@ export function DemoWorkspace({
       return "ready";
     }
     if (demo === "meeting" && showMeetingRuntimeSummary) {
-      return `回答を生成しています...（${liveAgentCurrentStepLabel}）`;
+      if (liveAgentCurrentStepLabel === "構造化集約") {
+        return "構造化集約を反映しています...";
+      }
+      if (liveAgentCurrentStepLabel === "並列検証") {
+        return "並列レビューを実行しています...";
+      }
+      if (liveAgentCurrentStepLabel === "一次推論") {
+        return "回答を生成しています...";
+      }
+      return `${liveAgentCurrentStepLabel} を実行しています...`;
     }
     if (currentRunningTool) {
       return `${currentRunningTool.name}: ${compactUiText(currentRunningTool.detail, 56)}`;
     }
     return "回答を生成しています...";
   }, [currentRunningTool, demo, isStreaming, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
+  const streamingStatusDetail = useMemo(() => {
+    if (!isStreaming) {
+      return null;
+    }
+    if (demo !== "meeting" || !showMeetingRuntimeSummary) {
+      return currentRunningTool ? compactUiText(currentRunningTool.detail, 96) : null;
+    }
+    if (liveAgentCurrentStepLabel === "構造化集約") {
+      return "集約結果は「最新サマリ（TL;DR）」「詳細（論点/リスク/次アクション）」「成果物」に反映されます。";
+    }
+    if (liveAgentCurrentStepLabel === "並列検証") {
+      return "Observer / Skeptic / Operator の出力を統合して、最終出力の根拠を補強しています。";
+    }
+    if (liveAgentCurrentStepLabel === "一次推論") {
+      return "まず会話本文の一次回答を生成し、その後に構造化集約へ進みます。";
+    }
+    return null;
+  }, [
+    currentRunningTool,
+    demo,
+    isStreaming,
+    liveAgentCurrentStepLabel,
+    showMeetingRuntimeSummary,
+  ]);
+  const structuredReflectionStatus = useMemo(() => {
+    if (demo !== "meeting") {
+      return null;
+    }
+    const aggregateStep = liveAgentSteps.find((step) => step.id === "live-aggregate");
+    if (!aggregateStep) {
+      return null;
+    }
+    if (aggregateStep.status === "doing") {
+      return {
+        tone: "processing" as const,
+        text: "構造化集約中: 最新サマリ・詳細セクション・成果物を更新しています。",
+      };
+    }
+    if (aggregateStep.status === "done" && structuredInsight) {
+      return {
+        tone: "done" as const,
+        text: "構造化集約を反映済み: TL;DR、詳細、成果物（llm-structured-summary.md）を確認できます。",
+      };
+    }
+    return null;
+  }, [demo, liveAgentSteps, structuredInsight]);
   const agenticLanes = useMemo<AgenticLane[]>(() => {
     const observeState: AgenticLane["state"] =
       demo === "meeting"
@@ -2406,17 +2461,31 @@ export function DemoWorkspace({
                     </div>
                   </div>
                   {isStreaming ? (
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-left text-xs text-primary transition-colors hover:bg-primary/10"
-                      onClick={() => setThinkingSidebarOpen(true)}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <ChevronRightIcon className="size-3.5" />
+                    <div className="space-y-1.5">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 px-0 text-left text-xs text-primary hover:text-primary/80"
+                        onClick={() => setThinkingSidebarOpen(true)}
+                      >
                         <Shimmer>{streamingStatusLabel}</Shimmer>
-                      </span>
-                      <span className="text-[10px] text-primary/80">詳細</span>
-                    </button>
+                        <ChevronRightIcon className="size-3.5" />
+                      </button>
+                      {streamingStatusDetail ? (
+                        <p className="text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {structuredReflectionStatus ? (
+                    <div
+                      className={cn(
+                        "rounded-md px-2.5 py-1.5 text-[11px]",
+                        structuredReflectionStatus.tone === "processing"
+                          ? "border border-primary/20 bg-primary/5 text-primary"
+                          : "border border-emerald-200 bg-emerald-50/80 text-emerald-900",
+                      )}
+                    >
+                      {structuredReflectionStatus.text}
+                    </div>
                   ) : null}
                 </CardContent>
               </Card>
@@ -2767,12 +2836,15 @@ export function DemoWorkspace({
                     <MessageContent>
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/35 hover:text-primary"
+                        className="inline-flex items-center gap-1.5 px-0 text-xs text-muted-foreground transition-colors hover:text-primary"
                         onClick={() => setThinkingSidebarOpen(true)}
                       >
-                        <ChevronRightIcon className="size-3.5" />
                         <Shimmer>{streamingStatusLabel}</Shimmer>
+                        <ChevronRightIcon className="size-3.5" />
                       </button>
+                      {streamingStatusDetail ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
+                      ) : null}
                     </MessageContent>
                   </Message>
                 ) : null}
