@@ -168,7 +168,8 @@ function inferSalesOrg(latestText: string): string | undefined {
 
 function inferTickerOrQuery(latestText: string, fallback: string): string {
   const ticker = latestText.match(/\b[A-Z]{2,5}\b/)?.[0];
-  if (ticker) {
+  const ignoredTickerTokens = new Set(["IR", "PDF", "SEC", "API", "LLM", "POC"]);
+  if (ticker && !ignoredTickerTokens.has(ticker)) {
     return ticker;
   }
 
@@ -178,6 +179,29 @@ function inferTickerOrQuery(latestText: string, fallback: string): string {
   }
 
   return fallback;
+}
+
+function inferResearchFallbackQuery(latestText: string): string {
+  const normalized = latestText.toLowerCase();
+  const aliases: Array<{ keywords: string[]; ticker: string }> = [
+    { keywords: ["トヨタ", "toyota"], ticker: "TM" },
+    { keywords: ["ソニー", "sony"], ticker: "SONY" },
+    { keywords: ["マイクロソフト", "microsoft", "msft"], ticker: "MSFT" },
+    { keywords: ["アップル", "apple", "aapl"], ticker: "AAPL" },
+    { keywords: ["エヌビディア", "nvidia", "nvda"], ticker: "NVDA" },
+    { keywords: ["グーグル", "google", "alphabet", "googl"], ticker: "GOOGL" },
+    { keywords: ["アマゾン", "amazon", "amzn"], ticker: "AMZN" },
+    { keywords: ["テスラ", "tesla", "tsla"], ticker: "TSLA" },
+    { keywords: ["メタ", "meta"], ticker: "META" },
+  ];
+
+  for (const alias of aliases) {
+    if (alias.keywords.some((keyword) => normalized.includes(keyword))) {
+      return alias.ticker;
+    }
+  }
+
+  return inferTickerOrQuery(latestText, "MSFT");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -228,6 +252,64 @@ function extractSourceLinks(
     .filter((item): item is { title: string; url: string; quote?: string; isPdf: boolean } => item !== null);
 }
 
+function extractGroundingLinks(
+  metadata: GoogleGenerativeAIProviderMetadata | undefined,
+): Array<{ title: string; url: string; quote?: string; isPdf: boolean }> {
+  const chunks = metadata?.groundingMetadata?.groundingChunks;
+  if (!chunks || chunks.length === 0) {
+    return [];
+  }
+
+  return chunks
+    .map((chunk, index) => {
+      const webUri = chunk.web?.uri;
+      const retrievedUri = chunk.retrievedContext?.uri;
+      const mapsUri = chunk.maps?.uri;
+      const url = webUri ?? retrievedUri ?? mapsUri ?? null;
+      if (!url || !url.startsWith("http")) {
+        return null;
+      }
+
+      const title =
+        chunk.web?.title ??
+        chunk.retrievedContext?.title ??
+        chunk.maps?.title ??
+        `grounding-${index + 1}`;
+      const quote =
+        chunk.retrievedContext?.text ?? chunk.maps?.text ?? undefined;
+      const normalized = `${title} ${url}`.toLowerCase();
+      const isPdf = normalized.includes(".pdf") || normalized.includes("pdf");
+
+      const result: { title: string; url: string; quote?: string; isPdf: boolean } = {
+        title,
+        url,
+        isPdf,
+      };
+      if (quote && quote.trim().length > 0) {
+        result.quote = compactText(quote.trim(), 90);
+      }
+      return result;
+    })
+    .filter((item): item is { title: string; url: string; quote?: string; isPdf: boolean } => item !== null);
+}
+
+function dedupeLinksByUrl(
+  links: Array<{ title: string; url: string; quote?: string; isPdf: boolean }>,
+): Array<{ title: string; url: string; quote?: string; isPdf: boolean }> {
+  const seen = new Set<string>();
+  const deduped: Array<{ title: string; url: string; quote?: string; isPdf: boolean }> = [];
+
+  for (const link of links) {
+    if (seen.has(link.url)) {
+      continue;
+    }
+    seen.add(link.url);
+    deduped.push(link);
+  }
+
+  return deduped;
+}
+
 async function resolveResearchConnectorWithGeminiSearch(
   query: string,
 ): Promise<ConnectorContext | null> {
@@ -255,7 +337,11 @@ async function resolveResearchConnectorWithGeminiSearch(
       temperature: 0,
     });
 
-    const sourceItems = extractSourceLinks(sources as unknown[] | undefined);
+    const metadata = providerMetadata?.google as GoogleGenerativeAIProviderMetadata | undefined;
+    const sourceItems = dedupeLinksByUrl([
+      ...extractSourceLinks(sources as unknown[] | undefined),
+      ...extractGroundingLinks(metadata),
+    ]);
     if (sourceItems.length === 0) {
       return null;
     }
@@ -264,7 +350,6 @@ async function resolveResearchConnectorWithGeminiSearch(
     const citations = prioritizedSources.slice(0, 6);
     const pdfCount = citations.filter((source) => source.isPdf).length;
 
-    const metadata = providerMetadata?.google as GoogleGenerativeAIProviderMetadata | undefined;
     const groundingQueries = metadata?.groundingMetadata?.webSearchQueries?.slice(0, 3) ?? [];
 
     const promptContext = [
@@ -380,12 +465,13 @@ async function resolveConnectorContext(input: {
     };
   }
 
-  const query = inferTickerOrQuery(input.latestText, "Microsoft");
-  const geminiConnector = await resolveResearchConnectorWithGeminiSearch(query);
+  const searchQuery = compactText(input.latestText, 140);
+  const geminiConnector = await resolveResearchConnectorWithGeminiSearch(searchQuery);
   if (geminiConnector) {
     return geminiConnector;
   }
 
+  const query = inferResearchFallbackQuery(input.latestText);
   const research = await getResearchSignals({ query });
   const topSignals = research.signals.slice(0, 6);
   const sourceNote = research.sourceStatuses

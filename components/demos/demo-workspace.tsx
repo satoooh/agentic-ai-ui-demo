@@ -1236,22 +1236,30 @@ export function DemoWorkspace({
     }));
   }, [completedGateCount, plan, stageGates, structuredInsight, tools]);
   const isStreaming = status === "streaming" || status === "submitted";
-  const latestToolEvents = useMemo(() => tools.slice(0, 10), [tools]);
+  const latestToolEvents = useMemo(() => {
+    const byName = new Map<string, ToolEvent>();
+    for (const tool of tools) {
+      if (!byName.has(tool.name)) {
+        byName.set(tool.name, tool);
+      }
+    }
+    return Array.from(byName.values()).slice(0, 10);
+  }, [tools]);
   const runningToolCount = useMemo(
-    () => tools.filter((tool) => tool.status === "running").length,
-    [tools],
+    () => latestToolEvents.filter((tool) => tool.status === "running").length,
+    [latestToolEvents],
   );
   const connectorCompleted = useMemo(
     () =>
-      tools.some(
+      latestToolEvents.some(
         (tool) =>
           tool.status === "success" &&
           (tool.name.includes("connector") || tool.name === "connector-fetch"),
       ),
-    [tools],
+    [latestToolEvents],
   );
   const microAgentProgress = useMemo(() => {
-    const branchEvents = tools.filter((tool) => tool.name.startsWith("branch-"));
+    const branchEvents = latestToolEvents.filter((tool) => tool.name.startsWith("branch-"));
     const branchDone = branchEvents.filter((tool) => tool.status === "success").length;
     const branchRunning = branchEvents.filter((tool) => tool.status === "running").length;
     const branchError = branchEvents.filter((tool) => tool.status === "error").length;
@@ -1261,7 +1269,7 @@ export function DemoWorkspace({
       running: branchRunning,
       error: branchError,
     };
-  }, [tools]);
+  }, [latestToolEvents]);
   const reasoningTraceMarkdown = useMemo(() => {
     const lines: string[] = [
       "### 観測",
