@@ -3,8 +3,10 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   generateObject,
+  generateText,
   streamText,
 } from "ai";
+import { google, type GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google";
 import { z } from "zod";
 import { getMeetingSignals } from "@/lib/connectors/meeting-signal";
 import { getRecruitingMarketJobs } from "@/lib/connectors/recruiting-market";
@@ -18,7 +20,7 @@ export const maxDuration = 60;
 
 const requestSchema = z.object({
   messages: z.array(z.unknown()).optional(),
-  demo: z.enum(["sales", "recruiting", "meeting", "research"]).default("sales"),
+  demo: z.enum(["sales", "recruiting", "meeting", "research"]).default("meeting"),
   provider: z.enum(["openai", "gemini"]).default("openai"),
   model: z.string().optional(),
   approved: z.boolean().optional(),
@@ -178,6 +180,120 @@ function inferTickerOrQuery(latestText: string, fallback: string): string {
   return fallback;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractSourceLinks(
+  sources: unknown[] | undefined,
+): Array<{ title: string; url: string; quote?: string; isPdf: boolean }> {
+  if (!sources || sources.length === 0) {
+    return [];
+  }
+
+  return sources
+    .map((source, index) => {
+      if (!isRecord(source)) {
+        return null;
+      }
+
+      const url = typeof source.url === "string" ? source.url : null;
+      if (!url || !url.startsWith("http")) {
+        return null;
+      }
+
+      const title =
+        typeof source.title === "string" && source.title.trim().length > 0
+          ? source.title.trim()
+          : `source-${index + 1}`;
+      const snippet =
+        typeof source.text === "string" && source.text.trim().length > 0
+          ? source.text.trim()
+          : typeof source.snippet === "string" && source.snippet.trim().length > 0
+            ? source.snippet.trim()
+            : undefined;
+      const normalized = `${title} ${url}`.toLowerCase();
+      const isPdf = normalized.includes(".pdf") || normalized.includes("pdf");
+
+      const result: { title: string; url: string; quote?: string; isPdf: boolean } = {
+        title,
+        url,
+        isPdf,
+      };
+      if (snippet) {
+        result.quote = compactText(snippet, 90);
+      }
+      return result;
+    })
+    .filter((item): item is { title: string; url: string; quote?: string; isPdf: boolean } => item !== null);
+}
+
+async function resolveResearchConnectorWithGeminiSearch(
+  query: string,
+): Promise<ConnectorContext | null> {
+  const geminiModelResult = resolveLanguageModel({
+    provider: "gemini",
+    model: "gemini-2.5-flash",
+  });
+
+  if (!geminiModelResult.ok) {
+    return null;
+  }
+
+  try {
+    const { text, sources, providerMetadata } = await generateText({
+      model: geminiModelResult.model,
+      tools: {
+        google_search: google.tools.googleSearch({}),
+      },
+      prompt: [
+        `企業調査クエリ: ${query}`,
+        "Google検索で一次情報を収集してください。",
+        "IR/決算資料/10-K/10-Q/企業公式ドキュメントを優先し、PDFリンクを優先して回答してください。",
+        "最後に150文字以内で要約してください。",
+      ].join("\n"),
+      temperature: 0,
+    });
+
+    const sourceItems = extractSourceLinks(sources as unknown[] | undefined);
+    if (sourceItems.length === 0) {
+      return null;
+    }
+
+    const prioritizedSources = [...sourceItems].sort((a, b) => Number(b.isPdf) - Number(a.isPdf));
+    const citations = prioritizedSources.slice(0, 6);
+    const pdfCount = citations.filter((source) => source.isPdf).length;
+
+    const metadata = providerMetadata?.google as GoogleGenerativeAIProviderMetadata | undefined;
+    const groundingQueries = metadata?.groundingMetadata?.webSearchQueries?.slice(0, 3) ?? [];
+
+    const promptContext = [
+      `[Research Connector] query=${query}`,
+      `searchProvider=gemini-google-search`,
+      `groundingQueries=${groundingQueries.length > 0 ? groundingQueries.join(" | ") : query}`,
+      `pdfLinks=${pdfCount}/${citations.length}`,
+      ...citations.map(
+        (source, index) =>
+          `source${index + 1}: ${source.title} / ${source.url}${source.quote ? ` / ${source.quote}` : ""}`,
+      ),
+      `summary=${compactText(text, 180)}`,
+    ].join("\n");
+
+    return {
+      label: "research-pdf-search",
+      summary: `Gemini Web検索で根拠リンク ${citations.length} 件（PDF ${pdfCount} 件）を取得しました。`,
+      promptContext,
+      citations: citations.map((source) => ({
+        title: source.title,
+        url: source.url,
+        quote: source.quote,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function resolveConnectorContext(input: {
   demo: DemoId;
   latestText: string;
@@ -265,6 +381,11 @@ async function resolveConnectorContext(input: {
   }
 
   const query = inferTickerOrQuery(input.latestText, "Microsoft");
+  const geminiConnector = await resolveResearchConnectorWithGeminiSearch(query);
+  if (geminiConnector) {
+    return geminiConnector;
+  }
+
   const research = await getResearchSignals({ query });
   const topSignals = research.signals.slice(0, 6);
   const sourceNote = research.sourceStatuses
@@ -400,7 +521,7 @@ function buildStructuredExtractionPrompt(input: {
       ? "悪魔の代弁者として、前提の穴と失敗シナリオを強めに抽出してください。"
     : input.operation === "autonomous-loop"
         ? input.demo === "meeting"
-          ? "倍速会議ループ向けに、会議後の実行項目と優先順位を明確化してください。"
+          ? "会議レビューAI向けに、会議後の実行項目と優先順位を明確化してください。"
           : "自律ループ向けに、次ループの実行項目を明確化してください。"
         : input.operation === "scenario"
           ? "シナリオ実行中なので、ステップ進捗と次打ち手を優先してください。"
@@ -459,19 +580,26 @@ function buildSystemPrompt(input: {
         "## 反証レビュー（失敗シナリオ2件 + 早期検知シグナル）\n" +
         "## 次アクション（表形式。列: タスク / 担当 / 期限 / 成功条件）\n" +
         "## 次回会議までの確認項目"
-      : "出力はMarkdown形式で、必ず以下の順で:\n" +
-        "## 要点サマリー（3行以内）\n" +
-        "## 重要な論点（箇条書き）\n" +
-        "## 次アクション（表形式。列: タスク / 担当 / 期限 / 検証指標）\n" +
-        "## 反証・リスク（最低2件）\n" +
-        "## 不足データと次回確認";
+      : input.demo === "research"
+        ? "出力はMarkdown形式で、必ず以下の順で:\n" +
+          "## TL;DR（3行以内）\n" +
+          "## 重要示唆（事実ベース）\n" +
+          "## 反証レビュー（失敗シナリオ2件）\n" +
+          "## 次アクション（表形式。列: タスク / 担当 / 期限 / 検証指標）\n" +
+          "## 根拠リンク（最低3件、PDF優先）"
+        : "出力はMarkdown形式で、必ず以下の順で:\n" +
+          "## 要点サマリー（3行以内）\n" +
+          "## 重要な論点（箇条書き）\n" +
+          "## 次アクション（表形式。列: タスク / 担当 / 期限 / 検証指標）\n" +
+          "## 反証・リスク（最低2件）\n" +
+          "## 不足データと次回確認";
 
   const op =
     input.operation === "devils-advocate"
       ? "今回は悪魔の代弁者として、前提の穴・失敗シナリオ・追加検証を優先して示してください。"
-      : input.operation === "autonomous-loop"
+    : input.operation === "autonomous-loop"
         ? input.demo === "meeting"
-          ? "今回は倍速会議ループ中です。会議後の実行確度を上げるため、直前の結果を踏まえて次の一手を明確に更新してください。"
+          ? "今回は会議レビューAIの実行中です。会議後の実行確度を上げるため、直前の結果を踏まえて次の一手を明確に更新してください。"
           : "今回は自律ループ中です。直前の結果を踏まえて次の一手を明確に更新してください。"
         : input.operation === "scenario"
           ? "今回はシナリオ実行中です。現在ステップの目的に集中し、冗長な説明は避けてください。"
