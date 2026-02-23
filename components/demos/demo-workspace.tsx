@@ -2166,20 +2166,20 @@ export function DemoWorkspace({
 
   return (
     <div className="space-y-4">
-      <header className="overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-sm">
-        <div className="border-b border-border/70 bg-gradient-to-r from-primary/18 via-chart-2/12 to-transparent px-5 py-5">
+      <header className="animate-soft-enter overflow-hidden rounded-3xl border border-border/80 bg-card/92 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_36px_rgb(15_23_42/0.08)]">
+        <div className="border-b border-border/70 bg-gradient-to-r from-primary/20 via-chart-2/12 to-transparent px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               {demo === "meeting" ? (
                 <>
-                  <p className="text-sm font-semibold tracking-tight">倍速会議レビュー</p>
+                  <p className="font-display text-base font-extrabold tracking-tight">倍速会議レビュー</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Step 1 で議事録を確定したら、合意形成を加速するレビューをチャット中心で進めます。
                   </p>
                 </>
               ) : (
                 <>
-                  <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+                  <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
                   <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
                 </>
               )}
@@ -2531,10 +2531,10 @@ export function DemoWorkspace({
         </aside> : null}
 
         <section className="space-y-4">
-          <Card className="gap-0 overflow-hidden border-border/70 py-0">
-            <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-sm">
+            <Card className="gap-0 overflow-hidden border-border/80 py-0">
+              <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                <CardTitle className="font-display text-sm font-bold">
                   {demo === "meeting" ? "倍速会議チャット" : "Conversation"}
                 </CardTitle>
                 <div className="flex items-center gap-2">

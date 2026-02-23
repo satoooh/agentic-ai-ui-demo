@@ -45,44 +45,44 @@ const demos = [
 const quickStartSteps = [
   "まず「会議レビュー」デモを開き、議事録を貼り付けて確定する",
   "チャットに目的を1行で入力し、会議レビューを開始する",
-  "倍速会議ループ実行で反証→修正→次アクション生成まで進める",
+  "提案される次入力チップを押して、反証→修正→次アクション生成を回す",
   "成果物から会議サマリと次アクションをコピー/共有する",
 ];
 
 export default function HomePage() {
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-border/70 bg-card/95 p-6 shadow-sm sm:p-7">
-        <div className="absolute -right-8 -top-10 size-44 rounded-full bg-chart-2/18 blur-2xl" aria-hidden />
-        <div className="absolute -left-14 -bottom-20 size-60 rounded-full bg-chart-1/16 blur-3xl" aria-hidden />
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-transparent to-chart-2/[0.08]" aria-hidden />
+    <div className="space-y-7">
+      <section className="relative overflow-hidden rounded-3xl border border-border/80 bg-card/92 p-6 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_42px_rgb(15_23_42/0.08)] sm:p-8">
+        <div className="absolute -right-10 -top-14 size-56 rounded-full bg-primary/16 blur-3xl" aria-hidden />
+        <div className="absolute -left-16 -bottom-24 size-72 rounded-full bg-chart-2/14 blur-3xl" aria-hidden />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.08] via-transparent to-chart-2/[0.08]" aria-hidden />
 
-        <div className="relative grid gap-5 xl:grid-cols-[1.25fr_1fr]">
-          <div className="space-y-4">
+        <div className="relative grid gap-6 xl:grid-cols-[1.25fr_1fr]">
+          <div className="space-y-5">
             <Badge className="w-fit" variant="secondary">
               <SparklesIcon className="size-3.5" />
               Agentic UI Demo Pack
             </Badge>
 
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
                 Japan Vertical Agentic Demo Lab
               </h1>
-              <p className="mt-2 max-w-4xl text-sm text-muted-foreground sm:text-base">
+              <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
                 「議事録入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
                 チャットは常に LLM 推論で実行され、環境変数設定後すぐに実運用に近い検証ができます。
               </p>
             </div>
 
             <div className="grid gap-3 text-sm md:grid-cols-2">
-              <div className="rounded-xl border border-border/70 bg-background/84 p-3 shadow-[0_1px_0_0_rgb(255_255_255/0.5)_inset]">
-                <p className="font-medium">画面設計の方針</p>
+              <div className="rounded-2xl border border-border/80 bg-background/88 p-4 shadow-[0_1px_0_0_rgb(255_255_255/0.56)_inset]">
+                <p className="font-display font-bold">画面設計の方針</p>
                 <p className="mt-1 text-muted-foreground">
                   説明より操作優先。低優先情報は後段へ寄せ、主要導線を常に見える位置に固定。
                 </p>
               </div>
-              <div className="rounded-xl border border-border/70 bg-background/84 p-3 shadow-[0_1px_0_0_rgb(255_255_255/0.5)_inset]">
-                <p className="font-medium">実装ベース</p>
+              <div className="rounded-2xl border border-border/80 bg-background/88 p-4 shadow-[0_1px_0_0_rgb(255_255_255/0.56)_inset]">
+                <p className="font-display font-bold">実装ベース</p>
                 <p className="mt-1 text-muted-foreground">
                   shadcn/ui + AI Elements を統一採用。各デモで Chat / Workflow / Voice / Code を主役化。
                 </p>
@@ -105,9 +105,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Card className="h-fit border-border/70 bg-background/82 shadow-sm">
+          <Card className="h-fit border-border/80 bg-background/84 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_16px_32px_rgb(15_23_42/0.08)]">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
+              <CardTitle className="font-display flex items-center gap-2 text-lg font-bold">
                 <PlayCircleIcon className="size-4 text-primary" />
                 3分デモの進め方
               </CardTitle>
@@ -146,7 +146,7 @@ export default function HomePage() {
       <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
         {demos.map((demo) => (
           <SectionCard key={demo.href} title={demo.title} description={demo.summary}>
-            <div className="rounded-lg border border-border/70 bg-muted/20 p-2 text-xs">
+            <div className="rounded-xl border border-border/80 bg-muted/22 p-3 text-xs">
               <p className="flex items-center gap-1.5 font-medium text-foreground">
                 <WorkflowIcon className="size-3.5 text-primary" />
                 想定インパクト
