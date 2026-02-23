@@ -47,6 +47,15 @@ import {
 } from "@/components/ai-elements/context";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import {
+  InlineCitation,
+  InlineCitationCard,
+  InlineCitationCardBody,
+  InlineCitationCardTrigger,
+  InlineCitationQuote,
+  InlineCitationSource,
+  InlineCitationText,
+} from "@/components/ai-elements/inline-citation";
+import {
   OpenIn,
   OpenInChatGPT,
   OpenInClaude,
@@ -94,6 +103,19 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import {
+  PromptInput,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
+  PromptInputActionAddAttachments,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -623,7 +645,6 @@ export function DemoWorkspace({
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
   const [isTranscriptEditing, setIsTranscriptEditing] = useState(true);
-  const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>(initialQueue);
   const [plan, setPlan] = useState<PlanStep[]>(initialPlan);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
@@ -1555,18 +1576,20 @@ export function DemoWorkspace({
     [demo, meetingTranscriptConfirmed],
   );
 
-  const send = async () => {
+  const send = async (options?: { text?: string; fileNames?: string[] }) => {
     if (!ensureMeetingTranscript("送信")) {
       return;
     }
 
-    const trimmed = draft.trim();
+    const baseText = options?.text ?? draft;
+    const trimmed = baseText.trim();
     if (!trimmed) {
       return;
     }
 
-    const finalText = attachmentNames.length
-      ? `${trimmed}\n\n添付ファイル: ${attachmentNames.join(", ")}`
+    const attachmentFileNames = (options?.fileNames ?? []).filter((name) => name.trim().length > 0);
+    const finalText = attachmentFileNames.length
+      ? `${trimmed}\n\n添付ファイル: ${attachmentFileNames.join(", ")}`
       : trimmed;
     const contextualText = withDemoContext(finalText);
     if (!contextualText) {
@@ -1581,7 +1604,15 @@ export function DemoWorkspace({
     );
 
     setDraft("");
-    setAttachmentNames([]);
+  };
+
+  const handlePromptSubmit = async (message: PromptInputMessage) => {
+    await send({
+      text: message.text,
+      fileNames: message.files
+        .map((file) => file.filename)
+        .filter((name): name is string => typeof name === "string"),
+    });
   };
 
   const sendFollowUpSuggestion = async (suggestion: string) => {
@@ -1842,15 +1873,9 @@ export function DemoWorkspace({
     setStructuredInsight(checkpoint.structuredInsight ?? null);
   };
 
-  const handleDraftKeyDown = (
+  const handlePromptInputKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      void send();
-      return;
-    }
-
     if (event.key === "Escape" && isStreaming) {
       event.preventDefault();
       stop();
@@ -1921,15 +1946,6 @@ export function DemoWorkspace({
       utterance.lang = "ja-JP";
       window.speechSynthesis.speak(utterance);
     }
-  };
-
-  const handleFileSelection = (files: FileList | null) => {
-    if (!files) {
-      setAttachmentNames([]);
-      return;
-    }
-
-    setAttachmentNames(Array.from(files).map((file) => file.name));
   };
 
   const copyArtifact = async () => {
@@ -2825,9 +2841,29 @@ export function DemoWorkspace({
 
                         if (part.type === "data-citation") {
                           return (
-                            <p key={`${message.id}-${index}`} className="text-xs text-muted-foreground">
-                              根拠: {part.data.title}
-                            </p>
+                            <InlineCitation key={`${message.id}-${index}`} className="mt-1">
+                              <InlineCitationText className="text-xs text-muted-foreground">
+                                根拠
+                              </InlineCitationText>
+                              <InlineCitationCard>
+                                <InlineCitationCardTrigger
+                                  sources={[part.data.url]}
+                                  className="h-5 px-2 text-[10px]"
+                                />
+                                <InlineCitationCardBody>
+                                  <div className="space-y-2 p-3">
+                                    <InlineCitationSource
+                                      title={part.data.title}
+                                      url={part.data.url}
+                                      description="回答生成時に参照した公開ソース"
+                                    />
+                                    {part.data.quote ? (
+                                      <InlineCitationQuote>{part.data.quote}</InlineCitationQuote>
+                                    ) : null}
+                                  </div>
+                                </InlineCitationCardBody>
+                              </InlineCitationCard>
+                            </InlineCitation>
                           );
                         }
 
@@ -2864,6 +2900,82 @@ export function DemoWorkspace({
                 </div>
               ) : (
                 <>
+                  {queue.length > 0 || tasks.length > 0 ? (
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      {queue.length > 0 ? (
+                        <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-xs font-semibold">Queue</p>
+                            <Badge variant="outline" className="text-[10px]">
+                              {queueSummary.critical} critical / {queueSummary.warning} warning
+                            </Badge>
+                          </div>
+                          <QueuePanel className="border-none p-0 shadow-none">
+                            <QueueList className="mt-0 [&>div]:max-h-[160px]">
+                              {queue.slice(0, viewMode === "guided" ? 3 : 5).map((item) => (
+                                <QueueEntry key={item.id} className={getSeverityStyle(item.severity)}>
+                                  <div className="flex items-center gap-2">
+                                    <QueueItemIndicator completed={item.severity === "info"} />
+                                    <QueueItemContent>{item.title}</QueueItemContent>
+                                  </div>
+                                  <QueueItemDescription>{item.description}</QueueItemDescription>
+                                </QueueEntry>
+                              ))}
+                            </QueueList>
+                          </QueuePanel>
+                        </div>
+                      ) : null}
+                      {tasks.length > 0 ? (
+                        <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
+                          <Task defaultOpen>
+                            <TaskTrigger
+                              title={`Task (${tasks.filter((task) => task.done).length}/${tasks.length})`}
+                            />
+                            <TaskContent>
+                              {tasks.slice(0, viewMode === "guided" ? 4 : 8).map((task) => (
+                                <TaskEntry key={task.id}>
+                                  <label className="flex items-center gap-2 text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={task.done}
+                                      onChange={(event) => {
+                                        const done = event.target.checked;
+                                        setTasks((prev) =>
+                                          prev.map((current) =>
+                                            current.id === task.id ? { ...current, done } : current,
+                                          ),
+                                        );
+                                      }}
+                                    />
+                                    <span>{task.label}</span>
+                                  </label>
+                                </TaskEntry>
+                              ))}
+                            </TaskContent>
+                          </Task>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {citations.length > 0 ? (
+                    <Sources className="mb-0 rounded-md border border-border/70 bg-muted/10 p-2.5 text-xs">
+                      <SourcesTrigger count={citations.length} className="font-medium text-foreground">
+                        参照ソース {citations.length}件
+                      </SourcesTrigger>
+                      <SourcesContent className="mt-2 w-full gap-1.5">
+                        {citations.slice(0, 8).map((citation) => (
+                          <Source key={citation.id} href={citation.url} title={citation.title}>
+                            <span className="text-xs">
+                              {citation.title}
+                              {citation.quote ? ` - ${citation.quote}` : ""}
+                            </span>
+                          </Source>
+                        ))}
+                      </SourcesContent>
+                    </Sources>
+                  ) : null}
+
                   {inputSuggestions.length > 0 ? (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
@@ -2884,90 +2996,64 @@ export function DemoWorkspace({
                       </Suggestions>
                     </div>
                   ) : null}
-                  <Textarea
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={handleDraftKeyDown}
-                    placeholder={
-                      demo === "meeting"
-                        ? "会議の論点や確認したい内容を入力（Cmd/Ctrl + Enter で送信）"
-                        : "メッセージを入力（Cmd/Ctrl + Enter で送信 / Esc で停止）"
-                    }
-                    className="min-h-24 resize-y"
-                  />
-
-                  {viewMode === "full" ? (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <label className="inline-flex cursor-pointer items-center">
-                          <input
-                            type="file"
-                            multiple
-                            className="hidden"
-                            onChange={(event) => handleFileSelection(event.target.files)}
+                  <PromptInput
+                    className="w-full"
+                    onSubmit={(message) => {
+                      void handlePromptSubmit(message);
+                    }}
+                  >
+                    <PromptInputBody>
+                      <PromptInputTextarea
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        onKeyDown={handlePromptInputKeyDown}
+                        placeholder={
+                          demo === "meeting"
+                            ? "会議の論点や確認したい内容を入力（Enter 送信 / Shift+Enter 改行）"
+                            : "メッセージを入力（Enter 送信 / Shift+Enter 改行）"
+                        }
+                        className="min-h-24 resize-y bg-background"
+                        disabled={meetingPrerequisiteBlocked}
+                      />
+                    </PromptInputBody>
+                    <PromptInputFooter className="pt-2">
+                      <PromptInputTools>
+                        <PromptInputActionMenu>
+                          <PromptInputActionMenuTrigger
+                            disabled={isStreaming || meetingPrerequisiteBlocked}
                           />
-                          <Button type="button" size="sm" variant="outline" asChild>
-                            <span>添付</span>
-                          </Button>
-                        </label>
-                        <span>{attachmentNames.length > 0 ? attachmentNames.join(", ") : "添付なし"}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
+                          <PromptInputActionMenuContent>
+                            <PromptInputActionAddAttachments label="ファイルを添付" />
+                          </PromptInputActionMenuContent>
+                        </PromptInputActionMenu>
                         <Button
                           type="button"
-                          onClick={() => void send()}
-                          disabled={isStreaming || meetingPrerequisiteBlocked}
-                        >
-                          送信
-                        </Button>
-                        <Button
-                          type="button"
+                          size="sm"
                           variant="outline"
                           onClick={() => void runDevilsAdvocate()}
                           disabled={isStreaming || meetingPrerequisiteBlocked}
                         >
                           反証レビュー
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={stop}
+                        {viewMode === "full" ? (
+                          <Button type="button" size="sm" variant="outline" onClick={createCheckpoint}>
+                            Checkpoint保存
+                          </Button>
+                        ) : null}
+                      </PromptInputTools>
+                      <PromptInputTools>
+                        <PromptInputSubmit
+                          status={status}
+                          onStop={stop}
+                          size="sm"
+                          className="h-9 px-3"
+                          disabled={!isStreaming && draft.trim().length === 0}
                         >
-                          停止
-                        </Button>
-                        <Button type="button" variant="outline" onClick={createCheckpoint}>
-                          Checkpoint保存
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => void send()}
-                        disabled={isStreaming || meetingPrerequisiteBlocked}
-                      >
-                        送信
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void runDevilsAdvocate()}
-                        disabled={isStreaming || meetingPrerequisiteBlocked}
-                      >
-                        反証レビュー
-                      </Button>
-                      {isStreaming ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={stop}
-                        >
-                          停止
-                        </Button>
-                      ) : null}
-                    </div>
-                  )}
+                          {isStreaming ? "停止" : "送信"}
+                        </PromptInputSubmit>
+                      </PromptInputTools>
+                    </PromptInputFooter>
+                  </PromptInput>
                 </>
               )}
               {loopStatus ? <p className="text-xs text-muted-foreground">{loopStatus}</p> : null}
@@ -3511,22 +3597,6 @@ export function DemoWorkspace({
             回答生成後に成果物（コピー/ダウンロード）が表示されます。
           </CardContent>
         </Card>
-      ) : null}
-
-      {viewMode === "full" && citations.length > 0 ? (
-        <Sources>
-          <SourcesTrigger count={citations.length} />
-          <SourcesContent>
-            {citations.map((citation) => (
-              <Source key={citation.id} href={citation.url} title={citation.title}>
-                <span className="text-xs">
-                  {citation.title}
-                  {citation.quote ? ` - ${citation.quote}` : ""}
-                </span>
-              </Source>
-            ))}
-          </SourcesContent>
-        </Sources>
       ) : null}
 
       {viewMode === "full" ? bottomPanel : null}
