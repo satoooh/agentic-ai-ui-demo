@@ -112,8 +112,8 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
       setLogs([
         "$ npm run test",
         "Running connector tests...",
-        "✗ connectors/research-signal.test.ts",
-        "TypeError: Failed to parse Wikidata response payload",
+        "✗ connectors/gemini-research-search.test.ts",
+        "TypeError: Failed to parse Gemini grounding response payload",
       ]);
       return;
     }
@@ -121,7 +121,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
     setLogs([
       "$ npm run test",
       "Running connector tests...",
-      "✓ connectors/research-signal.test.ts",
+      "✓ connectors/gemini-research-search.test.ts",
       "✓ pipelines/company-brief.test.ts",
       "All tests passed.",
     ]);
@@ -149,16 +149,16 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
       <CardContent className="grid gap-4 xl:grid-cols-[280px_1fr]">
         <div className="space-y-3">
           <SchemaDisplay
-            method="GET"
-            path="/api/connectors/research-signal?query={query}"
-            description="Corporate research connector schema (MVP)."
+            method="POST"
+            path="/api/chat (demo=research)"
+            description="Gemini Web検索ベースの企業調査チャット実行スキーマ。"
             parameters={[
               {
-                name: "query",
+                name: "demo",
                 type: "string",
                 required: true,
                 location: "query",
-                description: "企業名またはティッカー",
+                description: "research を指定して企業調査モードで実行",
               },
             ]}
           />
@@ -247,8 +247,8 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
 
           {failed ? (
             <StackTrace
-              trace={`TypeError: Failed to parse Wikidata response payload
-  at fetchWikidataSignals (connectors/research-signal.ts:286:15)
+              trace={`TypeError: Failed to parse Gemini grounding response payload
+  at resolveResearchConnectorWithGeminiSearch (connectors/gemini-research-search.ts:96:15)
   at runCompanyBriefPipeline (pipelines/company-brief.ts:14:9)`}
               defaultOpen
             >
@@ -274,7 +274,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
             <CommitHeader>
               <CommitInfo>
                 <CommitHash>b6a12e9</CommitHash>
-                <CommitMessage>feat(research): switch to keyless SEC/GDELT/Wikidata sources</CommitMessage>
+                <CommitMessage>refactor(research): route connector through Gemini web search only</CommitMessage>
                 <CommitMetadata>
                   <span>ai-agent</span>
                   <CommitSeparator />
@@ -291,7 +291,7 @@ export function CodeLabPanel({ title, snippets, envVars }: CodeLabPanelProps) {
                   <CommitFileInfo>
                     <CommitFileStatus status="modified" />
                     <CommitFileIcon />
-                    <CommitFilePath>connectors/research-signal.ts</CommitFilePath>
+                    <CommitFilePath>connectors/gemini-research-search.ts</CommitFilePath>
                   </CommitFileInfo>
                   <CommitFileChanges>
                     <CommitFileAdditions count={8} />

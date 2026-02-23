@@ -2,7 +2,6 @@ import { AgenticHighlightsPanel } from "@/components/demos/agentic-highlights-pa
 import { CodeLabPanel } from "@/components/demos/code-lab-panel";
 import { DemoScriptPanel } from "@/components/demos/demo-script-panel";
 import { DemoWorkspace } from "@/components/demos/demo-workspace";
-import { ResearchSourcePanel } from "@/components/demos/research-source-panel";
 import { WorkflowEditor } from "@/components/demos/workflow-editor";
 import {
   sampleResearchConnectorProject,
@@ -170,7 +169,6 @@ export default function ResearchDemoPage() {
             ]}
           />
           <AgenticHighlightsPanel />
-          <ResearchSourcePanel />
         </div>
       }
         bottomPanel={

@@ -7,7 +7,7 @@ import type { WorkflowGraph } from "@/types/demo";
 export const runtime = "nodejs";
 
 const postSchema = z.object({
-  demo: z.enum(["sales", "recruiting", "meeting", "research"]),
+  demo: z.enum(["meeting", "research"]),
   title: z.string().min(1),
   modelProvider: z.enum(["openai", "gemini"]),
   modelId: z.string().min(1),
@@ -21,7 +21,7 @@ const postSchema = z.object({
 });
 
 const getQuerySchema = z.object({
-  demo: z.enum(["sales", "recruiting", "meeting", "research"]),
+  demo: z.enum(["meeting", "research"]),
   limit: z.coerce.number().int().positive().max(30).optional(),
 });
 

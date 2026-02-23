@@ -9,8 +9,6 @@ import {
 import { google, type GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google";
 import { z } from "zod";
 import { getMeetingSignals } from "@/lib/connectors/meeting-signal";
-import { getRecruitingMarketJobs } from "@/lib/connectors/recruiting-market";
-import { getSalesAccountInsight } from "@/lib/connectors/sales-account";
 import { resolveLanguageModel } from "@/lib/models";
 import type { DemoId, DemoUIMessage, ModelProvider } from "@/types/chat";
 
@@ -19,7 +17,7 @@ export const maxDuration = 60;
 
 const requestSchema = z.object({
   messages: z.array(z.unknown()).optional(),
-  demo: z.enum(["sales", "recruiting", "meeting", "research"]).default("meeting"),
+  demo: z.enum(["meeting", "research"]).default("meeting"),
   provider: z.enum(["openai", "gemini"]).default("openai"),
   model: z.string().optional(),
   approved: z.boolean().optional(),
@@ -147,37 +145,6 @@ function truncateForPrompt(value: string, maxLength = 2000): string {
   }
 
   return `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`;
-}
-
-function inferSalesOrg(latestText: string): string | undefined {
-  const githubMatch = latestText.match(/github\.com\/([A-Za-z0-9-]+)/i);
-  if (githubMatch?.[1]) {
-    return githubMatch[1];
-  }
-
-  const labelMatch = latestText.match(
-    /(?:org|organization|company|企業|会社)\s*[:：=]\s*([A-Za-z0-9-]{2,40})/i,
-  );
-  if (labelMatch?.[1]) {
-    return labelMatch[1];
-  }
-
-  return undefined;
-}
-
-function inferTickerOrQuery(latestText: string, fallback: string): string {
-  const ticker = latestText.match(/\b[A-Z]{2,5}\b/)?.[0];
-  const ignoredTickerTokens = new Set(["IR", "PDF", "SEC", "API", "LLM", "POC"]);
-  if (ticker && !ignoredTickerTokens.has(ticker)) {
-    return ticker;
-  }
-
-  const compact = compactText(latestText, 60);
-  if (compact.length >= 2) {
-    return compact;
-  }
-
-  return fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -376,60 +343,6 @@ async function resolveConnectorContext(input: {
   latestText: string;
   meetingProfileId?: string;
 }): Promise<ConnectorContext> {
-  if (input.demo === "sales") {
-    const insight = await getSalesAccountInsight({
-      org: inferSalesOrg(input.latestText),
-    });
-
-    const topRepos = insight.insight.topRepositories.slice(0, 3);
-    const promptContext = [
-      `[Sales Connector] org=${insight.insight.orgLogin}`,
-      `displayName=${insight.insight.displayName}`,
-      `followers=${insight.insight.followers}, publicRepos=${insight.insight.publicRepos}`,
-      ...topRepos.map(
-        (repo, index) =>
-          `repo${index + 1}: ${repo.name} / stars=${repo.stars} / lang=${repo.language} / updated=${repo.updatedAt}`,
-      ),
-      `note=${insight.note}`,
-    ].join("\n");
-
-    return {
-      label: "sales-account-connector",
-      summary: insight.note,
-      promptContext,
-      citations: topRepos.map((repo) => ({
-        title: `${insight.insight.displayName}: ${repo.name}`,
-        url: repo.url,
-        quote: `stars ${repo.stars} / ${repo.language}`,
-      })),
-    };
-  }
-
-  if (input.demo === "recruiting") {
-    const query = inferTickerOrQuery(input.latestText, "engineer");
-    const jobs = await getRecruitingMarketJobs({ query });
-    const topJobs = jobs.jobs.slice(0, 5);
-    const promptContext = [
-      `[Recruiting Connector] query=${query}`,
-      ...topJobs.map(
-        (job, index) =>
-          `job${index + 1}: ${job.title} / ${job.company} / ${job.location} / remote=${job.remote}`,
-      ),
-      `note=${jobs.note}`,
-    ].join("\n");
-
-    return {
-      label: "recruiting-market-connector",
-      summary: jobs.note,
-      promptContext,
-      citations: topJobs.map((job) => ({
-        title: `${job.company}: ${job.title}`,
-        url: job.url,
-        quote: `${job.location}${job.remote ? " / remote" : ""}`,
-      })),
-    };
-  }
-
   if (input.demo === "meeting") {
     const profileHint =
       input.meetingProfileId?.replaceAll("-", " ") ?? "meeting review";
