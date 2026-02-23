@@ -2,50 +2,43 @@
 
 ## 1. マイルストーン
 
-### M0: 共通基盤
+### M1: UI簡素化（完了基準: 主要導線のみ表示）
 
-- Next.js App Router + TypeScript
-- Tailwind v4 + shadcn/ui + AI Elements
-- live データ連携前提の API 雛形
-- OpenAI / Gemini モデル切替
-- Sessions 保存（Drizzle + libsql）
+- ヘッダーの右メニュー撤去
+- 会議レビュー/企業調査の共通チャットレイアウト整理
+- 詳細モードUI（IDE/Workflow/Audit）の非表示化
 
-### M1: 営業デモ
+### M2: 会議レビューAI最適化
 
-- GitHubアカウント情報連携（live）
-- 提案骨子生成と送付承認フロー
-- Workflow可視化（提案作成→レビュー→承認）
+- Step 1 議事録入力を必須化
+- 議事録確定後にチャットを開始
+- `Reasoning` / `Sources` / `InlineCitation` / `Suggestion` の導線最適化
 
-### M2: 採用デモ
+### M3: 企業調査AI最適化
 
-- 採用市況ジョブシグナル連携（live）
-- 候補者要約・面接調整・オファー承認
-- Voice入力を用いた面接メモ導線
-
-### M3: リサーチデモ
-
-- SEC + GDELT + Wikidata 連携（live）
-- 企業IR根拠付きブリーフ生成
-- Connector IDE（Terminal/Test/StackTrace）で検証導線を提供
+- タイトル表示を簡素化（台座カードを撤去）
+- 根拠リンクを箇条書き表示
+- 右カラム TL;DR 固定で、チャット幅変動を抑制
 
 ## 2. 実装順序
 
-1. 新ユースケースの型・サンプルデータ・ルーティングを置換
-2. 外部API連携を connector 層に実装
-3. 進捗/承認/成果物の操作導線を調整
-4. ドキュメントと運用手順を更新
+1. ナビゲーションとレイアウト幅の統一
+2. `DemoWorkspace` の入力/送信/右カラム制御
+3. `meeting` / `research` ページの不要機能削除
+4. ドキュメント更新と動作検証
 
 ## 3. リスクと対策
 
-- 外部APIのレート制限や一時障害
-  - 対策: connectorで例外捕捉し、失敗理由と再試行導線をUIに返す
-- ユースケースが抽象化されすぎる
-  - 対策: 1-click Scenarioで具体的な業務手順を再現
-- 情報過多で導線が埋もれる
-  - 対策: Progressive Disclosure（高頻度操作を前面、監査情報はAuditへ集約）
+- UI削減により既存導線が失われる
+  - 対策: Home から `/meeting` `/research` への導線を維持
+- 送信キー仕様変更で入力体験が混乱する
+  - 対策: プレースホルダーに `Cmd/Ctrl+Enter` を明記
+- 推論ログ表示が冗長になる
+  - 対策: `Reasoning` を折りたたみデフォルトで運用
 
 ## 4. 完了定義（DoD）
 
-- `npm run dev` で起動し、`/sales` `/recruiting` `/research` を操作可能
-- `npm run lint` / `npm run typecheck` が成功
-- 5ドキュメント（SPEC/PLAN/ARCHITECTURE/TECHNICAL_DESIGN/RUNBOOK）が新ユースケースへ整合
+- `/meeting` `/research` がシンプルUIで動作
+- `Cmd/Ctrl+Enter` 送信仕様が有効
+- 右カラムTL;DRが固定表示される
+- `npm run lint` / `npm run typecheck` 成功

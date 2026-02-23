@@ -1,7 +1,7 @@
-# Japan Vertical Agentic Demo Lab
+# Agentic UI Demo
 
-会議レビュー（悪魔の代弁者）を中心に、営業・採用・企業調査へ展開できるAI Elementsベースのデモプロジェクトです。  
-狙いは「モデル性能の誇示」ではなく、`会議ログ入力 → 反証 → 修正 → 次アクション` の自律ループを短時間で伝えることです。
+会議レビューAIと企業調査AIに特化した、AI Elementsベースのデモプロジェクトです。  
+狙いは「モデル性能の誇示」ではなく、`入力 → 収集 → 要約/反証 → 次アクション` の実務導線を短時間で伝えることです。
 
 ## セットアップ
 
@@ -25,29 +25,19 @@ npm run dev
 ## 主要ルート
 
 - `/` : デモ一覧とQuick Start
-- `/meeting` : 会議レビュー特化デモ（会議タイプ設定・反証・次アクション）
-- `/sales` : 営業デモ（提案生成・反証・次ループ）
-- `/recruiting` : 採用デモ（候補者評価・懸念検証・再探索）
-- `/research` : 企業調査デモ（IR収集・公開情報分析・次探索）
+- `/meeting` : 会議レビューAI（議事録入力・反証レビュー・次アクション）
+- `/research` : 企業調査AI（Gemini Web検索・根拠付き分析・次探索）
 - `/settings` : 環境変数状態
 
 ## デモの見どころ
 
-- 会議レビュー: 会議タイプ設定→議事録入力→悪魔の代弁者→次アクション
-- 営業: アカウント調査→提案骨子→反証探索→次アクション
-- 採用: 候補者要約→面接設計→懸念シミュレーション→次探索
-- 企業調査: SEC/GDELT/Wikidata収集→根拠付き分析→次探索
-
-会議レビューデモでは、会議タイプ（営業週次/採用進捗/プロダクト計画/経営レビュー）ごとに  
-主要論点・出力テンプレート・Run Scenario が自動で切り替わります。
-
-全デモで `Run Scenario` を起点に、`自律ループ実行` と `悪魔の代弁者` を1クリックで再現できます。
+- 会議レビューAI: 議事録を確定後、チャット上で要約・反証レビュー・実行アクションを反復
+- 企業調査AI: 目的入力から、公開情報/PDF根拠を使って分析と次探索提案を反復
+- 共通: `Reasoning` / `Sources` / `InlineCitation` / `Suggestion` / `PromptInput` を中心に実装
 
 ## APIエンドポイント
 
 - `POST /api/chat` : LLM推論会話エンドポイント
-- `GET /api/connectors/sales-account` : GitHub組織情報（`org`）
-- `GET /api/connectors/recruiting-market` : 採用市況ジョブシグナル（`query`）
 - `GET /api/connectors/meeting-signal` : 会議レビュー向け公開シグナル（HN, `query`）
 - `GET /api/connectors/research-signal` : SEC + GDELT + Wikidataの企業調査シグナル（`query`）
 - `POST /api/voice/tts` : 音声プレビュー用エンドポイント

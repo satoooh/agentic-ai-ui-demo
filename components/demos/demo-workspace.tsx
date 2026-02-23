@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useStickToBottomContext } from "use-stick-to-bottom";
-import { ChevronRightIcon, PanelsRightBottomIcon } from "lucide-react";
 import {
   Artifact as ArtifactPanel,
   ArtifactAction,
@@ -63,7 +62,6 @@ import {
   OpenInLabel,
   OpenInSeparator,
   OpenInTrigger,
-  OpenInv0,
 } from "@/components/ai-elements/open-in-chat";
 import {
   Plan,
@@ -120,13 +118,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -325,7 +316,6 @@ function buildMeetingScenario(profile: MeetingProfile): DemoScenario {
 interface DemoWorkspaceProps {
   demo: DemoId;
   title: string;
-  subtitle: string;
   suggestions: string[];
   scenarios?: DemoScenario[];
   initialQueue: QueueItem[];
@@ -470,19 +460,6 @@ function getStatusBadgeStyle(status: PlanStep["status"] | ToolEvent["status"]) {
   return "bg-slate-200 text-slate-700";
 }
 
-function getStatusLabel(status: PlanStep["status"] | ToolEvent["status"]) {
-  if (status === "done" || status === "success") {
-    return "完了";
-  }
-  if (status === "doing" || status === "running") {
-    return "実行中";
-  }
-  if (status === "error") {
-    return "失敗";
-  }
-  return "待機";
-}
-
 function toToolUiState(status: ToolEvent["status"]) {
   if (status === "success") {
     return "output-available" as const;
@@ -625,7 +602,6 @@ function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "err
 export function DemoWorkspace({
   demo,
   title,
-  subtitle,
   suggestions,
   scenarios = [],
   initialQueue,
@@ -678,7 +654,6 @@ export function DemoWorkspace({
   const [loopStatus, setLoopStatus] = useState<string | null>(null);
   const [meetingDetailRailOpen, setMeetingDetailRailOpen] = useState(false);
   const [structuredInsight, setStructuredInsight] = useState<StructuredInsight | null>(null);
-  const [thinkingSidebarOpen, setThinkingSidebarOpen] = useState(false);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
@@ -906,7 +881,7 @@ export function DemoWorkspace({
   const showMeetingRuntimePanels =
     viewMode === "full" && (demo !== "meeting" || showMeetingRuntimeSummary);
   const showPrimaryChatWorkspace = demo !== "meeting" || meetingTranscriptConfirmed;
-  const showStickySummary = isChatFocusedDemo && hasConversationStarted;
+  const showStickySummary = isChatFocusedDemo && showPrimaryChatWorkspace;
   const showSummaryRail = showStickySummary;
   const transcriptHeadline = useMemo(() => {
     if (structuredInsight?.headline?.trim()) {
@@ -918,6 +893,14 @@ export function DemoWorkspace({
       profileLabel: selectedMeetingProfile.label,
     });
   }, [meetingTranscript, selectedMeetingProfile.label, structuredInsight?.headline]);
+  const transcriptHeadlinePending = useMemo(
+    () =>
+      demo === "meeting" &&
+      meetingTranscriptConfirmed &&
+      (status === "streaming" || status === "submitted") &&
+      !structuredInsight?.headline?.trim(),
+    [demo, meetingTranscriptConfirmed, status, structuredInsight?.headline],
+  );
   const transcriptStats = useMemo(
     () => ({
       chars: meetingTranscript.length,
@@ -1097,24 +1080,6 @@ export function DemoWorkspace({
   }, [demo, structuredInsight, tasks]);
   const primaryScenario = useMemo(() => activeScenarios[0] ?? null, [activeScenarios]);
 
-  const planProgress = useMemo(() => {
-    if (plan.length === 0) {
-      return 0;
-    }
-
-    const doneCount = plan.filter((step) => step.status === "done").length;
-    return Math.round((doneCount / plan.length) * 100);
-  }, [plan]);
-
-  const taskProgress = useMemo(() => {
-    if (tasks.length === 0) {
-      return 0;
-    }
-
-    const doneCount = tasks.filter((task) => task.done).length;
-    return Math.round((doneCount / tasks.length) * 100);
-  }, [tasks]);
-
   const stageGates = useMemo(
     () => [
       {
@@ -1144,7 +1109,6 @@ export function DemoWorkspace({
     [messages, plan.length, tasks.length, tools.length, artifacts.length, checkpoints.length],
   );
   const completedGateCount = stageGates.filter((stage) => stage.done).length;
-  const gateProgress = Math.round((completedGateCount / stageGates.length) * 100);
   const worklogSteps = useMemo<WorklogStep[]>(() => {
     if (structuredInsight && structuredInsight.worklog.length > 0) {
       return structuredInsight.worklog.slice(0, 6).map((step) => ({
@@ -1880,6 +1844,20 @@ export function DemoWorkspace({
     if (event.key === "Escape" && isStreaming) {
       event.preventDefault();
       stop();
+      return;
+    }
+
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.metaKey || event.ctrlKey) {
+      event.currentTarget.form?.requestSubmit();
     }
   };
 
@@ -2076,100 +2054,15 @@ export function DemoWorkspace({
       showMeetingPrimaryRail && viewMode === "full",
     "xl:grid-cols-[minmax(0,1fr)]":
       !showMeetingPrimaryRail && !showRightRail,
-    "xl:grid-cols-[minmax(0,1fr)_360px]":
+    "xl:grid-cols-[minmax(0,1fr)_420px]":
       !showMeetingPrimaryRail && showRightRail,
   });
   return (
     <div className="space-y-4">
-      <header
-        className={cn(
-          "animate-soft-enter overflow-hidden rounded-3xl border border-border/80 bg-card/92 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_36px_rgb(15_23_42/0.08)]",
-          demo === "meeting" && "hidden",
-        )}
-      >
-        <div className="border-b border-border/70 bg-gradient-to-r from-primary/20 via-chart-2/12 to-transparent px-5 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              {demo === "meeting" ? (
-                <>
-                  <p className="font-display text-base font-extrabold tracking-tight">会議レビューAI</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Step 1 で議事録を確定したら、合意形成を加速するレビューをチャット中心で進めます。
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
-                  <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
-                </>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {demo === "meeting" && viewMode === "full" && meetingTranscriptConfirmed ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-xs"
-                  onClick={() => setMeetingDetailRailOpen((current) => !current)}
-                >
-                  {meetingDetailRailOpen ? "ログを隠す" : "ログを表示"}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 px-3 text-xs"
-                onClick={() => setViewMode((current) => (current === "guided" ? "full" : "guided"))}
-              >
-                {viewMode === "guided" ? "詳細モード" : "シンプル表示"}
-              </Button>
-              <Badge variant={isStreaming ? "default" : "secondary"}>
-                {isStreaming ? "streaming" : "ready"}
-              </Badge>
-            </div>
-          </div>
-
-          {viewMode === "full" && demo !== "meeting" ? (
-            <div className="mt-4 grid gap-2 sm:grid-cols-4">
-              {stageGates.map((stage) => (
-                <div
-                  key={stage.id}
-                  className={cn(
-                    "rounded-lg border px-3 py-2 text-xs",
-                    stage.done
-                      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
-                      : "border-border/70 bg-background/84 text-muted-foreground",
-                  )}
-                >
-                  <p className="text-[11px] uppercase tracking-wide">{stage.label}</p>
-                  <p className="mt-1 font-semibold">{stage.done ? "done" : "waiting"}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="space-y-2.5 px-5 py-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {viewMode === "full"
-                ? `Stage completion: ${completedGateCount}/${stageGates.length}`
-                : "現在の進捗"}
-            </span>
-            <span>{gateProgress}%</span>
-          </div>
-          <Progress value={gateProgress} />
-          {viewMode === "full" && demo !== "meeting" ? (
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">plan {planProgress}%</Badge>
-              <Badge variant="outline">task {taskProgress}%</Badge>
-              <Badge variant="outline">interventions {approvalLogs.length}</Badge>
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
+        {isStreaming ? <Badge>streaming...</Badge> : null}
+      </div>
 
       {topPanel && viewMode === "full" && demo !== "meeting" ? (
         <Card className="border-border/70 py-0">
@@ -2270,7 +2163,13 @@ export function DemoWorkspace({
         <Card className="border-border/70 bg-muted/15">
           <CardContent className="flex flex-wrap items-start justify-between gap-3 p-4">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{transcriptHeadline}</p>
+              <p className="truncate text-sm font-semibold">
+                {transcriptHeadlinePending ? (
+                  <Shimmer>会議タイトルを生成中...</Shimmer>
+                ) : (
+                  transcriptHeadline
+                )}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 会議レビューAI / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
                 {transcriptStats.lines}行
@@ -2458,27 +2357,22 @@ export function DemoWorkspace({
                   {demo === "meeting" ? "会議レビューAIチャット" : "Conversation"}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant={isStreaming ? "default" : "secondary"}>
-                    {isStreaming ? "streaming..." : "ready"}
-                  </Badge>
-                  {viewMode === "full" ? (
-                    <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
-                      <OpenInTrigger />
-                      <OpenInContent>
-                        <OpenInLabel>Open in</OpenInLabel>
-                        <OpenInSeparator />
-                        <OpenInChatGPT />
-                        <OpenInClaude />
-                        <OpenInv0 />
-                      </OpenInContent>
-                    </OpenIn>
-                  ) : null}
+                  {isStreaming ? <Badge>streaming...</Badge> : null}
+                  <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
+                    <OpenInTrigger />
+                    <OpenInContent>
+                      <OpenInLabel>Open in</OpenInLabel>
+                      <OpenInSeparator />
+                      <OpenInChatGPT />
+                      <OpenInClaude />
+                    </OpenInContent>
+                  </OpenIn>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 {demo === "meeting"
                   ? "議事録確定後、このチャット上で要約・反証・次アクションを反復します。"
-                  : "左列で開始し、ここで編集・再送して出力を固めます。"}
+                  : "目的を分解し、収集戦略を立て、根拠付きで要点化します。"}
               </p>
               {showMeetingRuntimePanels ? (
                 <div className="grid gap-1.5 md:grid-cols-4">
@@ -2745,7 +2639,7 @@ export function DemoWorkspace({
                     description={
                       demo === "meeting"
                         ? "Step 1 を確定後、下の入力欄から開始してください。"
-                        : "左のシナリオを実行するか、下の入力欄から開始してください。"
+                        : "下の入力欄から開始してください。"
                     }
                   />
                 ) : null}
@@ -2814,14 +2708,9 @@ export function DemoWorkspace({
                 {isStreaming ? (
                   <Message from="assistant">
                     <MessageContent>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 px-0 text-xs text-muted-foreground transition-colors hover:text-primary"
-                        onClick={() => setThinkingSidebarOpen(true)}
-                      >
+                      <p className="text-xs text-muted-foreground">
                         <Shimmer>{streamingStatusLabel}</Shimmer>
-                        <ChevronRightIcon className="size-3.5" />
-                      </button>
+                      </p>
                       {streamingStatusDetail ? (
                         <p className="mt-1 text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
                       ) : null}
@@ -2839,51 +2728,28 @@ export function DemoWorkspace({
                 </div>
               ) : (
                 <>
-                  {tasks.length > 0 ? (
-                    <div className="rounded-md border border-border/70 bg-muted/10 p-2.5">
-                      <Task defaultOpen>
-                        <TaskTrigger
-                          title={`Task (${tasks.filter((task) => task.done).length}/${tasks.length})`}
-                        />
-                        <TaskContent>
-                          {tasks.slice(0, viewMode === "guided" ? 4 : 8).map((task) => (
-                            <TaskEntry key={task.id}>
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={task.done}
-                                  onChange={(event) => {
-                                    const done = event.target.checked;
-                                    setTasks((prev) =>
-                                      prev.map((current) =>
-                                        current.id === task.id ? { ...current, done } : current,
-                                      ),
-                                    );
-                                  }}
-                                />
-                                <span>{task.label}</span>
-                              </label>
-                            </TaskEntry>
-                          ))}
-                        </TaskContent>
-                      </Task>
-                    </div>
-                  ) : null}
-
                   {citations.length > 0 ? (
                     <Sources className="mb-0 rounded-md border border-border/70 bg-muted/10 p-2.5 text-xs">
                       <SourcesTrigger count={citations.length} className="font-medium text-foreground">
                         参照ソース
                       </SourcesTrigger>
                       <SourcesContent className="mt-2 w-full gap-1.5">
-                        {citations.slice(0, 8).map((citation) => (
-                          <Source key={citation.id} href={citation.url} title={citation.title}>
-                            <span className="text-xs">
-                              {citation.title}
-                              {citation.quote ? ` - ${citation.quote}` : ""}
-                            </span>
-                          </Source>
-                        ))}
+                        <ul className="list-disc space-y-1 pl-4">
+                          {citations.slice(0, 8).map((citation) => (
+                            <li key={citation.id}>
+                              <Source
+                                href={citation.url}
+                                title={citation.title}
+                                className="items-start gap-1.5 text-xs text-foreground hover:text-primary"
+                              >
+                                <span>
+                                  {citation.title}
+                                  {citation.quote ? ` - ${citation.quote}` : ""}
+                                </span>
+                              </Source>
+                            </li>
+                          ))}
+                        </ul>
                       </SourcesContent>
                     </Sources>
                   ) : null}
@@ -2921,8 +2787,8 @@ export function DemoWorkspace({
                         onKeyDown={handlePromptInputKeyDown}
                         placeholder={
                           demo === "meeting"
-                            ? "会議の論点や確認したい内容を入力（Enter 送信 / Shift+Enter 改行）"
-                            : "メッセージを入力（Enter 送信 / Shift+Enter 改行）"
+                            ? "会議の論点や確認したい内容を入力（Cmd/Ctrl+Enter 送信 / Shift+Enter 改行）"
+                            : "メッセージを入力（Cmd/Ctrl+Enter 送信 / Shift+Enter 改行）"
                         }
                         className="min-h-24 resize-y bg-background"
                         disabled={meetingPrerequisiteBlocked}
@@ -3031,18 +2897,25 @@ export function DemoWorkspace({
                       </p>
                     ) : null}
                   </div>
-                  <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
-                    {isStreaming ? "updating" : "latest"}
-                  </Badge>
+                  {isStreaming ? (
+                    <Badge className="text-[10px]">updating</Badge>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-0 text-left text-xs text-primary hover:text-primary/80"
-                  onClick={() => setThinkingSidebarOpen(true)}
+                <Reasoning
+                  defaultOpen={false}
+                  isStreaming={isStreaming}
+                  className="rounded-md border-0 bg-transparent p-0 shadow-none"
                 >
-                  <Shimmer>{streamingStatusLabel}</Shimmer>
-                  <ChevronRightIcon className="size-3.5" />
-                </button>
+                  <ReasoningTrigger
+                    className="h-auto justify-start px-0 text-xs text-primary hover:text-primary/80"
+                    getThinkingMessage={(active) =>
+                      active ? <Shimmer>{streamingStatusLabel}</Shimmer> : "思考ログを表示"
+                    }
+                  />
+                  <ReasoningContent className="mt-2 text-xs leading-6">
+                    {reasoningTraceMarkdown}
+                  </ReasoningContent>
+                </Reasoning>
                 {streamingStatusDetail ? (
                   <p className="text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
                 ) : null}
@@ -3576,138 +3449,11 @@ export function DemoWorkspace({
             </AccordionItem>
           </Accordion>
         </Card>
-      ) : hasConversationStarted ? (
-        <Card className="border-border/70 py-3">
-          <CardContent className="px-4 py-0 text-xs text-muted-foreground">
-            回答生成後に成果物（コピー/ダウンロード）が表示されます。
-          </CardContent>
-        </Card>
       ) : null}
 
       {viewMode === "full" ? bottomPanel : null}
         </>
       ) : null}
-
-      <Dialog open={thinkingSidebarOpen} onOpenChange={setThinkingSidebarOpen}>
-        <DialogContent
-          showCloseButton
-          className="left-auto right-0 top-0 h-dvh w-full max-w-[480px] translate-x-0 translate-y-0 rounded-none border-l border-border/80 bg-background p-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-[480px]"
-        >
-          <DialogHeader className="gap-1 border-b border-border/70 px-4 py-3 text-left">
-            <DialogTitle className="flex items-center gap-2 text-sm">
-              <PanelsRightBottomIcon className="size-4 text-primary" />
-              思考ログ
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              実行中のステップ・ツール・推論ログをここで確認できます。
-            </DialogDescription>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
-                {isStreaming ? "streaming" : "ready"}
-              </Badge>
-              <Badge variant="outline" className="text-[10px]">
-                {streamingStatusLabel}
-              </Badge>
-            </div>
-          </DialogHeader>
-
-          <ScrollArea className="h-[calc(100dvh-112px)] px-4 py-3">
-            <div className="space-y-3 pb-4">
-              <Reasoning
-                defaultOpen
-                isStreaming={isStreaming}
-                className="rounded-md border border-border/70 bg-card px-3 py-2"
-              >
-                <ReasoningTrigger className="text-xs">この回答の思考ステップ</ReasoningTrigger>
-                <ReasoningContent className="mt-1 text-xs leading-6">
-                  {reasoningTraceMarkdown}
-                </ReasoningContent>
-              </Reasoning>
-
-              <Card className="border-border/70 py-0">
-                <CardHeader className="border-b border-border/70 px-3 py-2">
-                  <CardTitle className="text-xs">ステップ進行</CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 py-2">
-                  <ChainOfThought defaultOpen>
-                    <ChainOfThoughtContent className="space-y-2">
-                      {(demo === "meeting" && liveAgentSteps.length > 0
-                        ? liveAgentSteps.map((step) => ({
-                            id: step.id,
-                            label: step.label,
-                            description: compactUiText(step.detail, 120),
-                            status: step.status === "done"
-                              ? "complete"
-                              : step.status === "doing"
-                                ? "active"
-                                : "pending",
-                            tags: [getStatusLabel(step.status)],
-                          }))
-                        : worklogSteps.map((step) => ({
-                            id: step.id,
-                            label: step.label,
-                            description: compactUiText(step.description, 120),
-                            status: step.status,
-                            tags: step.tags,
-                          }))).map((step) => (
-                        <ChainOfThoughtStep
-                          key={`thinking-sidebar-${step.id}`}
-                          label={step.label}
-                          description={step.description}
-                          status={step.status as "complete" | "active" | "pending"}
-                        >
-                          <ChainOfThoughtSearchResults>
-                            {step.tags.slice(0, 2).map((tag) => (
-                              <ChainOfThoughtSearchResult key={`${step.id}-${tag}`}>
-                                {tag}
-                              </ChainOfThoughtSearchResult>
-                            ))}
-                          </ChainOfThoughtSearchResults>
-                        </ChainOfThoughtStep>
-                      ))}
-                    </ChainOfThoughtContent>
-                  </ChainOfThought>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/70 py-0">
-                <CardHeader className="border-b border-border/70 px-3 py-2">
-                  <CardTitle className="text-xs">Tool Runtime</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1.5 px-3 py-2">
-                  {latestToolEvents.length > 0 ? (
-                    latestToolEvents.slice(0, 8).map((tool) => (
-                      <Tool key={`thinking-tool-${tool.id}`} defaultOpen={tool.status === "running"}>
-                        <ToolHeader
-                          type="dynamic-tool"
-                          state={toToolUiState(tool.status)}
-                          toolName={tool.name}
-                          title={tool.name}
-                        />
-                        <ToolContent className="px-3 pb-3">
-                          <ToolOutput
-                            output={
-                              tool.status === "error"
-                                ? undefined
-                                : {
-                                    detail: tool.detail,
-                                    timestamp: tool.timestamp,
-                                  }
-                            }
-                            errorText={tool.status === "error" ? tool.detail : undefined}
-                          />
-                        </ToolContent>
-                      </Tool>
-                    ))
-                  ) : (
-                    <p className="text-xs text-muted-foreground">送信するとツールログが表示されます。</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {approval?.required ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">

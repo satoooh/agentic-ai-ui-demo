@@ -18,9 +18,9 @@ const fontMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Japan Vertical Agentic Demo Lab",
+  title: "Agentic UI Demo",
   description:
-    "会議レビューAIと企業調査AIの2デモで、エージェンティックUIと根拠付き推論ワークフローを検証するプロジェクト",
+    "会議レビューAIと企業調査AIで、エージェンティックUIと根拠付き推論ワークフローを検証するデモ",
 };
 
 export default function RootLayout({
@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className={`${fontSans.variable} ${fontMono.variable} antialiased`}>
         <TooltipProvider>
           <SiteNav />
-          <main className="mx-auto w-full max-w-[2160px] px-4 pb-14 pt-6 md:px-8">{children}</main>
+          <main className="mx-auto w-full max-w-[1480px] px-4 pb-14 pt-6 md:px-8">{children}</main>
         </TooltipProvider>
       </body>
     </html>

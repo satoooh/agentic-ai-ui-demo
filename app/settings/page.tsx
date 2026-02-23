@@ -8,7 +8,7 @@ const rows = [
     key: "GITHUB_TOKEN",
     required: false,
     value: env.GITHUB_TOKEN ? "*** configured ***" : "(unset)",
-    description: "営業デモのGitHub APIレート上限緩和に利用",
+    description: "GitHub API利用時のレート上限緩和に利用",
   },
   {
     key: "SEC_USER_AGENT",

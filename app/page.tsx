@@ -16,14 +16,14 @@ const demos = [
     href: "/meeting",
     title: "会議レビューAI",
     summary: "議事録入力 → 決定事項抽出 → 反証レビュー（悪魔の代弁者）→ 実行アクション確定を1チャットで反復。",
-    focus: ["Conversation", "Queue", "Plan", "Artifact", "Checkpoint", "Sources"],
+    focus: ["Conversation", "Reasoning", "PromptInput", "Suggestion", "Sources", "Artifact"],
     value: "会議後の合意形成と実行速度を向上",
   },
   {
     href: "/research",
     title: "企業調査AI",
     summary: "調査目的入力 → Gemini Web検索（PDF優先）→ 根拠付き分析 → 次アクション提案を1チャットで反復。",
-    focus: ["Sources", "InlineCitation", "Conversation", "Tool", "Artifact", "Reasoning"],
+    focus: ["Conversation", "Reasoning", "Sources", "InlineCitation", "PromptInput", "Artifact"],
     value: "初回企業調査を根拠付きアウトプットへ即変換（IR/PDFリンク付き）",
   },
 ];
@@ -52,11 +52,11 @@ export default function HomePage() {
 
             <div>
               <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-                Japan Vertical Agentic Demo Lab
+                Agentic UI Demo
               </h1>
               <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
-                「議事録入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
-                チャットは常に LLM 推論で実行され、会議レビューAI / 企業調査AIの2ユースケースに特化しています。
+                「会議レビュー」と「企業調査」を、チャット中心のエージェントUIで検証するデモです。
+                目的を分解し、収集戦略を立て、根拠付きで要点化する流れをシンプルに体験できます。
               </p>
             </div>
 
