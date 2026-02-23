@@ -55,8 +55,8 @@ const stepIcons = [FileSearchIcon, RadarIcon, GitCompareIcon];
 
 export function AgenticHighlightsPanel({
   title = "Agentic Highlights",
-  badge = "autonomous loop",
-  summary = "このデモは「承認」ではなく、目的入力から次探索生成までの自律ループを主役にしています。",
+  badge = "agent runtime",
+  summary = "このデモは目的入力から根拠収集・反証・次アクション提案までを、チャット内の実行ログとして可視化します。",
   steps = defaultSteps,
 }: AgenticHighlightsPanelProps) {
   return (

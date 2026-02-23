@@ -8,8 +8,6 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Home" },
-  { href: "/sales", label: "営業" },
-  { href: "/recruiting", label: "採用" },
   { href: "/meeting", label: "会議レビュー" },
   { href: "/research", label: "企業調査" },
   { href: "/settings", label: "Settings" },

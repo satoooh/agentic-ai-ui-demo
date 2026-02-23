@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useStickToBottomContext } from "use-stick-to-bottom";
+import { ChevronRightIcon, PanelsRightBottomIcon } from "lucide-react";
 import {
   Artifact as ArtifactPanel,
   ArtifactAction,
@@ -97,6 +98,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -260,7 +268,7 @@ const MEETING_PROFILES: MeetingProfile[] = [
 
 const MEETING_OUTPUT_TEMPLATES: Record<MeetingProfile["id"], MeetingOutputTemplate> = {
   "auto-any": {
-    title: "倍速会議レビュー",
+    title: "会議レビューAI",
     sections: ["決定事項と未決事項", "反証レビュー（悪魔の代弁者）", "修正アクション"],
     actionColumns: ["タスク", "担当", "期限", "成功条件"],
   },
@@ -331,7 +339,7 @@ function buildMeetingScenario(profile: MeetingProfile): DemoScenario {
 
   return {
     id: `meeting-loop-${profile.id}`,
-    title: profile.id === "auto-any" ? "倍速会議シナリオ" : `${profile.label}シナリオ`,
+    title: profile.id === "auto-any" ? "会議レビューAIシナリオ" : `${profile.label}シナリオ`,
     description: "主要論点に沿って、反証レビューから次アクション確定まで実行。",
     outcome: `${profile.expectedOutput}を短時間で作成`,
     targetDurationSec: 62,
@@ -660,55 +668,6 @@ function getScenarioStepBadgeStyle(status: "pending" | "running" | "done" | "err
   return "bg-slate-100 text-slate-700";
 }
 
-function getAutonomousLoopPrompts(
-  demo: DemoId,
-  goal: string,
-  meetingProfile?: MeetingProfile,
-): string[] {
-  const normalizedGoal = goal.trim();
-
-  if (demo === "sales") {
-    const baseGoal = normalizedGoal || "IT企業向けに提案骨子を作成したい";
-    return [
-      `営業ゴール: ${baseGoal}\n公開情報からアカウント要点を3点で要約してください。`,
-      "ここまでの提案案に対して悪魔の代弁者として反証ポイントを3つ出し、修正案を提示してください。",
-      "修正後の提案として、次回商談までの実行タスクと追加調査クエリを3つ出してください。",
-    ];
-  }
-
-  if (demo === "recruiting") {
-    const baseGoal = normalizedGoal || "採用のミスマッチを減らしたい";
-    return [
-      `採用ゴール: ${baseGoal}\n候補者評価の観点を強み/懸念で整理してください。`,
-      "悪魔の代弁者として、採用後ミスマッチのシナリオを2つ作り、面接質問へ反映してください。",
-      "次の探索条件と、面接官が確認すべきチェック項目を箇条書きで生成してください。",
-    ];
-  }
-
-  if (demo === "meeting") {
-    const profile = meetingProfile ?? MEETING_PROFILES[0];
-    const template = MEETING_OUTPUT_TEMPLATES[profile.id];
-    const baseGoal =
-      normalizedGoal || "議事録から会議後の実行を最短で固めたい（倍速会議）";
-    const reviewSubject =
-      profile.id === "auto-any" ? "この会議の意思決定前提" : `${profile.label}の意思決定前提`;
-    return [
-      `倍速会議ループ Step1:\n目的: ${baseGoal}\n議事録から「決定事項 / 未決事項 / 担当付きアクション候補」を抽出してください。`,
-      `倍速会議ループ Step2:\n${reviewSubject}に対して悪魔の代弁者レビューを実行し、失敗シナリオを2つ提示し、早期検知シグナルも添えてください。`,
-      `倍速会議ループ Step3:\n${template.title}形式で、次回会議までの実行計画（${template.actionColumns.join(
-        " / ",
-      )}）と、会議後フォロー用の短い共有文を作成してください。`,
-    ];
-  }
-
-  const baseGoal = normalizedGoal || "企業の公開情報を使って意思決定に使える示唆を得たい";
-  return [
-    `調査ゴール: ${baseGoal}\n公開IR/ニュースから事実ベースの示唆を3点に要約してください。`,
-    "悪魔の代弁者として、示唆の前提が崩れるシナリオを2件と確認すべき根拠を挙げてください。",
-    "次の調査ループとして、競合比較や追加検証に使える探索クエリを3つ作ってください。",
-  ];
-}
-
 export function DemoWorkspace({
   demo,
   title,
@@ -764,13 +723,12 @@ export function DemoWorkspace({
   const [providerHint, setProviderHint] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [loopStatus, setLoopStatus] = useState<string | null>(null);
-  const [isAutoLoopRunning, setIsAutoLoopRunning] = useState(false);
   const [meetingDetailRailOpen, setMeetingDetailRailOpen] = useState(false);
   const [structuredInsight, setStructuredInsight] = useState<StructuredInsight | null>(null);
+  const [thinkingSidebarOpen, setThinkingSidebarOpen] = useState(false);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
-  const autoLoopAbortRef = useRef(false);
   const scenarioStartRef = useRef<number | null>(null);
 
   const {
@@ -990,14 +948,15 @@ export function DemoWorkspace({
   const meetingTranscriptConfirmed = meetingTranscriptReady && !isTranscriptEditing;
   const meetingPrerequisiteBlocked = demo === "meeting" && !meetingTranscriptConfirmed;
   const hasConversationStarted = messages.length > 0;
-  const showMeetingPrimaryRail = demo !== "meeting";
+  const isChatFocusedDemo = demo === "meeting" || demo === "research";
+  const showMeetingPrimaryRail = !isChatFocusedDemo;
   const showMeetingSetupCard = demo === "meeting" && (!meetingTranscriptConfirmed || isTranscriptEditing);
   const showMeetingTranscriptSummaryBar = demo === "meeting" && meetingTranscriptConfirmed && !isTranscriptEditing;
   const showMeetingRuntimeSummary = demo === "meeting" && meetingTranscriptConfirmed && hasConversationStarted;
   const showMeetingRuntimePanels =
-    demo !== "meeting" || (showMeetingRuntimeSummary && viewMode === "full");
+    viewMode === "full" && (demo !== "meeting" || showMeetingRuntimeSummary);
   const showPrimaryChatWorkspace = demo !== "meeting" || meetingTranscriptConfirmed;
-  const autonomousLoopLabel = demo === "meeting" ? "倍速会議ループ" : "自律ループ";
+  const showStickySummary = isChatFocusedDemo && hasConversationStarted;
   const transcriptHeadline = useMemo(() => {
     if (structuredInsight?.headline?.trim()) {
       return structuredInsight.headline.trim();
@@ -1148,6 +1107,10 @@ export function DemoWorkspace({
 
     return Array.from(new Set(generated)).slice(0, 5);
   }, [demo, latestAssistantSummary?.summary, meetingTranscriptConfirmed, structuredInsight]);
+  const inputSuggestions = useMemo(
+    () => (demo === "meeting" ? meetingFollowUpSuggestions : displayedSuggestions.slice(0, 5)),
+    [demo, displayedSuggestions, meetingFollowUpSuggestions],
+  );
   const meetingDecisionTimeline = useMemo<MeetingTimelineEntry[]>(() => {
     if (demo !== "meeting" || !structuredInsight) {
       return [];
@@ -1435,12 +1398,22 @@ export function DemoWorkspace({
 
     return liveAgentSteps.at(-1)?.label ?? "完了";
   }, [liveAgentSteps]);
+  const currentRunningTool = useMemo(
+    () => latestToolEvents.find((tool) => tool.status === "running") ?? null,
+    [latestToolEvents],
+  );
   const streamingStatusLabel = useMemo(() => {
+    if (!isStreaming) {
+      return "ready";
+    }
     if (demo === "meeting" && showMeetingRuntimeSummary) {
       return `回答を生成しています...（${liveAgentCurrentStepLabel}）`;
     }
+    if (currentRunningTool) {
+      return `${currentRunningTool.name}: ${compactUiText(currentRunningTool.detail, 56)}`;
+    }
     return "回答を生成しています...";
-  }, [demo, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
+  }, [currentRunningTool, demo, isStreaming, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
   const agenticLanes = useMemo<AgenticLane[]>(() => {
     const observeState: AgenticLane["state"] =
       demo === "meeting"
@@ -1702,70 +1675,6 @@ export function DemoWorkspace({
     setLoopStatus(`サンプル「${selectedMeetingSample.title}」を読み込みました。`);
   };
 
-  const runAutonomousLoop = async () => {
-    if (isStreaming || isAutoLoopRunning) {
-      return;
-    }
-
-    if (!ensureMeetingTranscript(autonomousLoopLabel)) {
-      return;
-    }
-
-    autoLoopAbortRef.current = false;
-    setIsAutoLoopRunning(true);
-    setLoopStatus(`${autonomousLoopLabel}を開始しました。`);
-
-    try {
-      const loopSeed =
-        demo === "meeting" && meetingTranscript.trim().length > 0 ? meetingTranscript : draft;
-      const prompts = getAutonomousLoopPrompts(demo, loopSeed, selectedMeetingProfile);
-      for (const [index, prompt] of prompts.entries()) {
-        if (autoLoopAbortRef.current) {
-          setLoopStatus(`${autonomousLoopLabel}を停止しました。`);
-          break;
-        }
-
-        setLoopStatus(`${autonomousLoopLabel}実行中 (${index + 1}/${prompts.length})`);
-        await sendMessage(
-          { text: withDemoContext(prompt) },
-          {
-            body: buildRequestBody({
-              approved: false,
-              operation: "autonomous-loop",
-              meetingLog:
-                demo === "meeting"
-                  ? meetingTranscript.trim() || buildConversationTranscript(messages) || undefined
-                  : undefined,
-            }),
-          },
-        );
-        await wait(220);
-      }
-
-      if (!autoLoopAbortRef.current) {
-        setLoopStatus(`${autonomousLoopLabel}が完了しました。成果物を確認してください。`);
-      }
-    } catch (loopError) {
-      setLoopStatus(
-        `${autonomousLoopLabel}でエラーが発生しました: ${
-          loopError instanceof Error ? loopError.message : "unknown error"
-        }`,
-      );
-    } finally {
-      autoLoopAbortRef.current = false;
-      setIsAutoLoopRunning(false);
-    }
-  };
-
-  const stopAutonomousLoop = () => {
-    if (!isAutoLoopRunning) {
-      return;
-    }
-    autoLoopAbortRef.current = true;
-    stop();
-    setLoopStatus(`${autonomousLoopLabel}の停止要求を受け付けました。`);
-  };
-
   const runScenario = async (scenario: DemoScenario) => {
     if (runningScenarioId) {
       return;
@@ -1914,10 +1823,6 @@ export function DemoWorkspace({
     }
 
     setApproval(null);
-  };
-
-  const applySuggestion = (suggestion: string) => {
-    setDraft(suggestion);
   };
 
   const createCheckpoint = () => {
@@ -2152,16 +2057,23 @@ export function DemoWorkspace({
   }, [loadSessions]);
 
   const showDetailRail =
-    viewMode === "full" && (demo !== "meeting" || meetingDetailRailOpen);
+    viewMode === "full" &&
+    (demo === "meeting"
+      ? meetingDetailRailOpen
+      : !isChatFocusedDemo);
 
   const workspaceGridClass = cn("grid gap-4", {
     "xl:grid-cols-[280px_minmax(0,1fr)]":
-      demo !== "meeting" && viewMode === "guided",
+      showMeetingPrimaryRail && viewMode === "guided",
     "xl:grid-cols-[280px_minmax(0,1fr)_360px]":
-      demo !== "meeting" && viewMode === "full",
-    "xl:grid-cols-[minmax(0,1fr)]": demo === "meeting" && !showDetailRail,
+      showMeetingPrimaryRail && viewMode === "full",
+    "xl:grid-cols-[minmax(0,1fr)]":
+      !showMeetingPrimaryRail && !showDetailRail,
     "xl:grid-cols-[minmax(0,1fr)_360px]":
-      demo === "meeting" && showDetailRail && viewMode === "full",
+      !showMeetingPrimaryRail && showDetailRail && viewMode === "full",
+  });
+  const chatSectionClass = cn("space-y-4", {
+    "mx-auto w-full max-w-[940px]": isChatFocusedDemo,
   });
 
   return (
@@ -2172,7 +2084,7 @@ export function DemoWorkspace({
             <div>
               {demo === "meeting" ? (
                 <>
-                  <p className="font-display text-base font-extrabold tracking-tight">倍速会議レビュー</p>
+                  <p className="font-display text-base font-extrabold tracking-tight">会議レビューAI</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Step 1 で議事録を確定したら、合意形成を加速するレビューをチャット中心で進めます。
                   </p>
@@ -2352,7 +2264,7 @@ export function DemoWorkspace({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{transcriptHeadline}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                倍速会議レビュー / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
+                会議レビューAI / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
                 {transcriptStats.lines}行
               </p>
               <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
@@ -2530,12 +2442,61 @@ export function DemoWorkspace({
           ) : null}
         </aside> : null}
 
-        <section className="space-y-4">
+        <section className={chatSectionClass}>
+            {showStickySummary ? (
+              <Card className="sticky top-20 z-30 border-border/80 bg-card/96 py-0 backdrop-blur">
+                <CardContent className="space-y-2 px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-primary">最新サマリ（TL;DR）</p>
+                      <p className="mt-1 line-clamp-2 text-sm font-medium">
+                        {latestAssistantSummary?.summary ??
+                          "最初の回答後に、ここへ最新サマリを固定表示します。"}
+                      </p>
+                      {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                          {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
+                        {isStreaming ? "updating" : "latest"}
+                      </Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 px-2 text-[11px]"
+                        onClick={() => setThinkingSidebarOpen(true)}
+                      >
+                        <ChevronRightIcon className="size-3.5" />
+                        Thinkingログ
+                      </Button>
+                    </div>
+                  </div>
+                  {isStreaming ? (
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-left text-xs text-primary transition-colors hover:bg-primary/10"
+                      onClick={() => setThinkingSidebarOpen(true)}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <ChevronRightIcon className="size-3.5" />
+                        <Shimmer>{streamingStatusLabel}</Shimmer>
+                      </span>
+                      <span className="text-[10px] text-primary/80">詳細</span>
+                    </button>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card className="gap-0 overflow-hidden border-border/80 py-0">
               <CardHeader className="space-y-2 border-b border-border/70 px-4 py-3">
                 <div className="flex items-center justify-between gap-2">
                 <CardTitle className="font-display text-sm font-bold">
-                  {demo === "meeting" ? "倍速会議チャット" : "Conversation"}
+                  {demo === "meeting" ? "会議レビューAIチャット" : "Conversation"}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant={isStreaming ? "default" : "secondary"}>
@@ -2560,35 +2521,6 @@ export function DemoWorkspace({
                   ? "議事録確定後、このチャット上で要約・反証・次アクションを反復します。"
                   : "左列で開始し、ここで編集・再送して出力を固めます。"}
               </p>
-              {showMeetingRuntimeSummary && viewMode !== "full" ? (
-                <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-primary">
-                      {latestAssistantSummary?.summary ?? "最初の回答後に結論（TL;DR）をここへ固定表示します。"}
-                    </p>
-                    <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
-                      {isStreaming ? `thinking: ${liveAgentCurrentStepLabel}` : "最新"}
-                    </Badge>
-                  </div>
-                  {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
-                    </p>
-                  ) : null}
-                  {meetingDecisionTimeline.length > 0 ? (
-                    <div className="mt-2 rounded-md border border-border/60 bg-background px-2 py-1.5">
-                      <p className="text-[11px] font-semibold">決定事項タイムライン</p>
-                      <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-                        {meetingDecisionTimeline.slice(0, 3).map((item) => (
-                          <li key={`guided-${item.id}`}>
-                            • {item.phase}: {compactUiText(item.title, 52)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
               {showMeetingRuntimePanels ? (
                 <div className="grid gap-1.5 md:grid-cols-4">
                   {agenticLanes.map((lane) => (
@@ -2903,46 +2835,14 @@ export function DemoWorkspace({
                 {isStreaming ? (
                   <Message from="assistant">
                     <MessageContent>
-                      <Shimmer>{streamingStatusLabel}</Shimmer>
-                      {demo === "meeting" && showMeetingRuntimeSummary ? (
-                        <Reasoning
-                          className="mb-0 mt-2 rounded-md border border-border/60 bg-background/90 px-2.5 py-2"
-                          defaultOpen
-                          isStreaming={isStreaming}
-                        >
-                          <ReasoningTrigger className="text-[11px]">
-                            Thinking（現在の実行ステップ）
-                          </ReasoningTrigger>
-                          <ReasoningContent className="mt-2 text-[11px] leading-6">
-                            {`現在: ${liveAgentCurrentStepLabel}\n`}
-                          </ReasoningContent>
-                          <ChainOfThought className="mt-2" defaultOpen>
-                            <ChainOfThoughtContent className="space-y-2">
-                            {liveAgentSteps.map((step, index) => (
-                              <ChainOfThoughtStep
-                                key={`${step.id}-stream`}
-                                label={
-                                  <div className="flex items-center gap-1.5 text-[11px]">
-                                    <span className="font-medium">{index + 1}. {step.label}</span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                      {getStatusLabel(step.status)}
-                                    </span>
-                                  </div>
-                                }
-                                description={compactUiText(step.detail, 140)}
-                                status={
-                                  step.status === "done"
-                                    ? "complete"
-                                    : step.status === "doing"
-                                      ? "active"
-                                      : "pending"
-                                }
-                              />
-                            ))}
-                            </ChainOfThoughtContent>
-                          </ChainOfThought>
-                        </Reasoning>
-                      ) : null}
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/35 hover:text-primary"
+                        onClick={() => setThinkingSidebarOpen(true)}
+                      >
+                        <ChevronRightIcon className="size-3.5" />
+                        <Shimmer>{streamingStatusLabel}</Shimmer>
+                      </button>
                     </MessageContent>
                   </Message>
                 ) : null}
@@ -2951,36 +2851,19 @@ export function DemoWorkspace({
             </Conversation>
 
             <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
-              {(viewMode === "full" || demo !== "meeting") && demo !== "meeting" ? (
-                <div className="flex flex-wrap gap-2">
-                  {displayedSuggestions.map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => applySuggestion(suggestion)}
-                      className="bg-background"
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-
               {meetingPrerequisiteBlocked ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Step 1 で議事録を確定すると、ここからチャット入力できます。
                 </div>
               ) : (
                 <>
-                  {demo === "meeting" && meetingFollowUpSuggestions.length > 0 ? (
+                  {inputSuggestions.length > 0 ? (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
                         次の入力のおすすめ（クリックで送信）
                       </p>
                       <Suggestions>
-                        {meetingFollowUpSuggestions.map((suggestion) => (
+                        {inputSuggestions.map((suggestion) => (
                           <Suggestion
                             key={suggestion}
                             suggestion={suggestion}
@@ -3030,28 +2913,18 @@ export function DemoWorkspace({
                         >
                           送信
                         </Button>
-                        {demo !== "meeting" ? (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => void runAutonomousLoop()}
-                            disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
-                          >
-                            {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
-                          </Button>
-                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
                           onClick={() => void runDevilsAdvocate()}
                           disabled={isStreaming || meetingPrerequisiteBlocked}
                         >
-                          悪魔の代弁者
+                          反証レビュー
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
+                          onClick={stop}
                         >
                           停止
                         </Button>
@@ -3069,31 +2942,19 @@ export function DemoWorkspace({
                       >
                         送信
                       </Button>
-                      {demo !== "meeting" ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => void runAutonomousLoop()}
-                          disabled={isStreaming || isAutoLoopRunning || meetingPrerequisiteBlocked}
-                        >
-                          {isAutoLoopRunning ? `${autonomousLoopLabel}実行中...` : `${autonomousLoopLabel}実行`}
-                        </Button>
-                      ) : null}
-                      {demo !== "meeting" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void runDevilsAdvocate()}
-                          disabled={isStreaming || meetingPrerequisiteBlocked}
-                        >
-                          悪魔の代弁者
-                        </Button>
-                      ) : null}
-                      {isStreaming || isAutoLoopRunning ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void runDevilsAdvocate()}
+                        disabled={isStreaming || meetingPrerequisiteBlocked}
+                      >
+                        反証レビュー
+                      </Button>
+                      {isStreaming ? (
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={isAutoLoopRunning ? stopAutonomousLoop : stop}
+                          onClick={stop}
                         >
                           停止
                         </Button>
@@ -3664,6 +3525,127 @@ export function DemoWorkspace({
       {viewMode === "full" ? bottomPanel : null}
         </>
       ) : null}
+
+      <Dialog open={thinkingSidebarOpen} onOpenChange={setThinkingSidebarOpen}>
+        <DialogContent
+          showCloseButton
+          className="left-auto right-0 top-0 h-dvh w-full max-w-[480px] translate-x-0 translate-y-0 rounded-none border-l border-border/80 bg-background p-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-[480px]"
+        >
+          <DialogHeader className="gap-1 border-b border-border/70 px-4 py-3 text-left">
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <PanelsRightBottomIcon className="size-4 text-primary" />
+              Thinking Log
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              実行中のステップ・ツール・推論ログをここで確認できます。
+            </DialogDescription>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge variant={isStreaming ? "default" : "outline"} className="text-[10px]">
+                {isStreaming ? "streaming" : "ready"}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {streamingStatusLabel}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="h-[calc(100dvh-112px)] px-4 py-3">
+            <div className="space-y-3 pb-4">
+              <Reasoning
+                defaultOpen
+                isStreaming={isStreaming}
+                className="rounded-md border border-border/70 bg-card px-3 py-2"
+              >
+                <ReasoningTrigger className="text-xs">現在の推論要約</ReasoningTrigger>
+                <ReasoningContent className="mt-1 text-xs leading-6">
+                  {reasoningTraceMarkdown}
+                </ReasoningContent>
+              </Reasoning>
+
+              <Card className="border-border/70 py-0">
+                <CardHeader className="border-b border-border/70 px-3 py-2">
+                  <CardTitle className="text-xs">ステップ進行</CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 py-2">
+                  <ChainOfThought defaultOpen>
+                    <ChainOfThoughtContent className="space-y-2">
+                      {(demo === "meeting" && liveAgentSteps.length > 0
+                        ? liveAgentSteps.map((step) => ({
+                            id: step.id,
+                            label: step.label,
+                            description: compactUiText(step.detail, 120),
+                            status: step.status === "done"
+                              ? "complete"
+                              : step.status === "doing"
+                                ? "active"
+                                : "pending",
+                            tags: [getStatusLabel(step.status)],
+                          }))
+                        : worklogSteps.map((step) => ({
+                            id: step.id,
+                            label: step.label,
+                            description: compactUiText(step.description, 120),
+                            status: step.status,
+                            tags: step.tags,
+                          }))).map((step) => (
+                        <ChainOfThoughtStep
+                          key={`thinking-sidebar-${step.id}`}
+                          label={step.label}
+                          description={step.description}
+                          status={step.status as "complete" | "active" | "pending"}
+                        >
+                          <ChainOfThoughtSearchResults>
+                            {step.tags.slice(0, 2).map((tag) => (
+                              <ChainOfThoughtSearchResult key={`${step.id}-${tag}`}>
+                                {tag}
+                              </ChainOfThoughtSearchResult>
+                            ))}
+                          </ChainOfThoughtSearchResults>
+                        </ChainOfThoughtStep>
+                      ))}
+                    </ChainOfThoughtContent>
+                  </ChainOfThought>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/70 py-0">
+                <CardHeader className="border-b border-border/70 px-3 py-2">
+                  <CardTitle className="text-xs">Tool Runtime</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5 px-3 py-2">
+                  {latestToolEvents.length > 0 ? (
+                    latestToolEvents.slice(0, 8).map((tool) => (
+                      <Tool key={`thinking-tool-${tool.id}`} defaultOpen={tool.status === "running"}>
+                        <ToolHeader
+                          type="dynamic-tool"
+                          state={toToolUiState(tool.status)}
+                          toolName={tool.name}
+                          title={tool.name}
+                        />
+                        <ToolContent className="px-3 pb-3">
+                          <ToolOutput
+                            output={
+                              tool.status === "error"
+                                ? undefined
+                                : {
+                                    detail: tool.detail,
+                                    timestamp: tool.timestamp,
+                                  }
+                            }
+                            errorText={tool.status === "error" ? tool.detail : undefined}
+                          />
+                        </ToolContent>
+                      </Tool>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">送信するとツールログが表示されます。</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {approval?.required ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">

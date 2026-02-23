@@ -13,49 +13,50 @@ import {
 
 export default function ResearchDemoPage() {
   return (
-    <DemoWorkspace
-      demo="research"
-      title="企業リサーチデモ: Public Intelligence Studio"
-      subtitle="目的入力 → 自律リサーチループ（収集/要約/再探索）→ 根拠付きアウトプット生成までを、Agentic UIとして実演する。"
-      suggestions={[
-        "トヨタ自動車のIRと公開ニュースから懸念点を要約して",
-        "MSFTの最新10-K/10-Qの示唆を営業提案向けに抽出して",
-        "SONYの企業プロフィールをWikidataで補完して",
-        "この結果を使って競合比較の探索クエリを自動提案して",
-        "ここまでの内容で悪魔の代弁者レビューを実行して",
-      ]}
-      scenarios={[
-        {
-          id: "research-agentic-loop",
-          title: "自律リサーチループ",
-          description: "目標入力→情報収集→根拠付き要約→次ループ提案までを再現。",
-          outcome: "初回調査の立ち上がりを30分以内に短縮",
-          targetDurationSec: 85,
-          steps: [
-            {
-              id: "research-step-1",
-              label: "目的入力",
-              prompt: "Microsoftを対象に、AI投資トレンド観点で企業調査を開始してください。",
-            },
-            {
-              id: "research-step-2",
-              label: "IR収集",
-              prompt: "SEC提出書類から、財務と戦略の変化点を3つ抽出してください。",
-            },
-            {
-              id: "research-step-3",
-              label: "外部シグナル統合",
-              prompt: "GDELTニュースとWikidata属性を統合し、リスクと機会を3点ずつ整理してください。",
-            },
-            {
-              id: "research-step-4",
-              label: "次ループ生成",
-              prompt: "この結果を使って、競合比較の次探索クエリを3案作ってください。",
-            },
-          ],
-        },
-      ]}
-      initialQueue={[
+    <div className="mx-auto w-full max-w-[1180px]">
+      <DemoWorkspace
+        demo="research"
+        title="企業調査AI"
+        subtitle="目的入力 → Gemini Web検索（PDF優先）→ 根拠付き分析 → 次アクション提案までをチャットで反復する。"
+        suggestions={[
+          "トヨタ自動車のIR PDFと公開ニュースから懸念点を要約して",
+          "MSFTの最新10-K/10-Qの示唆を営業提案向けに抽出して",
+          "SONYの企業プロフィールをWikidataで補完して",
+          "この結果を使って競合比較の探索クエリを提案して",
+          "ここまでの内容で悪魔の代弁者レビューを実行して",
+        ]}
+        scenarios={[
+          {
+            id: "research-agentic-loop",
+            title: "企業調査ワンショット",
+            description: "目的入力→情報収集→根拠付き要約→次探索提案までを再現。",
+            outcome: "初回調査の立ち上がりを30分以内に短縮",
+            targetDurationSec: 85,
+            steps: [
+              {
+                id: "research-step-1",
+                label: "目的入力",
+                prompt: "Microsoftを対象に、AI投資トレンド観点で企業調査を開始してください。",
+              },
+              {
+                id: "research-step-2",
+                label: "IR収集",
+                prompt: "SEC提出書類から、財務と戦略の変化点を3つ抽出してください。",
+              },
+              {
+                id: "research-step-3",
+                label: "外部シグナル統合",
+                prompt: "GDELTニュースとWikidata属性を統合し、リスクと機会を3点ずつ整理してください。",
+              },
+              {
+                id: "research-step-4",
+                label: "次ループ生成",
+                prompt: "この結果を使って、競合比較の次探索クエリを3案作ってください。",
+              },
+            ],
+          },
+        ]}
+        initialQueue={[
         {
           id: "research-queue-1",
           title: "根拠リンク確認",
@@ -132,8 +133,8 @@ export default function ResearchDemoPage() {
       topPanel={
         <div className="space-y-4">
           <DemoScriptPanel
-            title="企業リサーチ: 自律ループ実演"
-            summary="入力した目的に対し、エージェントが収集→統合→要約→次探索提案を反復。"
+            title="企業調査AI: ワンショット実演"
+            summary="入力した目的に対し、エージェントが収集→統合→要約→次探索提案までを連続実行。"
             durationSec={85}
             steps={[
               {
@@ -172,7 +173,7 @@ export default function ResearchDemoPage() {
           <ResearchSourcePanel />
         </div>
       }
-      bottomPanel={
+        bottomPanel={
         <div className="space-y-4">
           <CodeLabPanel
             title="Research Connector IDE"
@@ -225,7 +226,8 @@ export default function ResearchDemoPage() {
             title="Canvas Workflow: 企業調査反復オペレーション"
           />
         </div>
-      }
-    />
+        }
+      />
+    </div>
   );
 }

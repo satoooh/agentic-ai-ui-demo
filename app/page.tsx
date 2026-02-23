@@ -14,31 +14,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const demos = [
   {
     href: "/meeting",
-    title: "会議レビュー: 倍速会議 Copilot",
-    summary: "議事録入力 → 決定事項抽出 → 反証レビュー → 実行アクション確定を1チャットで反復。",
+    title: "会議レビューAI",
+    summary: "議事録入力 → 決定事項抽出 → 反証レビュー（悪魔の代弁者）→ 実行アクション確定を1チャットで反復。",
     focus: ["Conversation", "Queue", "Plan", "Artifact", "Checkpoint", "Sources"],
     value: "会議後の合意形成と実行速度を向上",
   },
   {
-    href: "/sales",
-    title: "営業: Sales Agentic Loop",
-    summary: "アカウント収集 → 提案生成 → 悪魔の代弁者レビュー → 次アクション生成を1画面で反復。",
-    focus: ["Queue", "Plan", "Tool", "Artifact", "Workflow", "OpenInChat"],
-    value: "提案の初稿作成と改善ループを短縮",
-  },
-  {
-    href: "/recruiting",
-    title: "採用: Recruiting Agentic Loop",
-    summary: "候補者要約 → 面接設計 → 懸念シミュレーション → 次探索生成を反復。",
-    focus: ["SpeechInput", "Conversation", "Task", "Artifact", "Tool", "Checkpoint"],
-    value: "採用進行の停滞と再探索コストを削減",
-  },
-  {
     href: "/research",
-    title: "企業調査: Public Intelligence Studio",
-    summary: "目的入力 → SEC/GDELT/Wikidata収集 → 根拠付き分析 → 次探索提案を実演。",
-    focus: ["Sources", "InlineCitation", "Terminal", "TestResults", "StackTrace", "Commit"],
-    value: "初回企業調査を根拠付きアウトプットへ即変換",
+    title: "企業調査AI",
+    summary: "調査目的入力 → Gemini Web検索（PDF優先）→ 根拠付き分析 → 次アクション提案を1チャットで反復。",
+    focus: ["Sources", "InlineCitation", "Conversation", "Tool", "Artifact", "Reasoning"],
+    value: "初回企業調査を根拠付きアウトプットへ即変換（IR/PDFリンク付き）",
   },
 ];
 
@@ -46,7 +32,7 @@ const quickStartSteps = [
   "まず「会議レビュー」デモを開き、議事録を貼り付けて確定する",
   "チャットに目的を1行で入力し、会議レビューを開始する",
   "提案される次入力チップを押して、反証→修正→次アクション生成を回す",
-  "成果物から会議サマリと次アクションをコピー/共有する",
+  "企業調査AIでPDF根拠リンク付きの比較メモを生成し、成果物からコピー/共有する",
 ];
 
 export default function HomePage() {
@@ -70,7 +56,7 @@ export default function HomePage() {
               </h1>
               <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
                 「議事録入力 → 反証レビュー → 次アクション確定」を最短導線で再現するデモ環境です。
-                チャットは常に LLM 推論で実行され、環境変数設定後すぐに実運用に近い検証ができます。
+                チャットは常に LLM 推論で実行され、会議レビューAI / 企業調査AIの2ユースケースに特化しています。
               </p>
             </div>
 
@@ -84,7 +70,7 @@ export default function HomePage() {
               <div className="rounded-2xl border border-border/80 bg-background/88 p-4 shadow-[0_1px_0_0_rgb(255_255_255/0.56)_inset]">
                 <p className="font-display font-bold">実装ベース</p>
                 <p className="mt-1 text-muted-foreground">
-                  shadcn/ui + AI Elements を統一採用。各デモで Chat / Workflow / Voice / Code を主役化。
+                  shadcn/ui + AI Elements を統一採用。チャット中心UIと根拠提示（Sources/InlineCitation）を主役化。
                 </p>
               </div>
             </div>
@@ -143,7 +129,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2">
         {demos.map((demo) => (
           <SectionCard key={demo.href} title={demo.title} description={demo.summary}>
             <div className="rounded-xl border border-border/80 bg-muted/22 p-3 text-xs">

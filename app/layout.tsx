@@ -25,7 +25,7 @@ const fontMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Japan Vertical Agentic Demo Lab",
   description:
-    "会議レビューを中心に、営業 / 採用 / ITリサーチへ展開できるエージェンティックUIデモを検証するプロジェクト",
+    "会議レビューAIと企業調査AIの2デモで、エージェンティックUIと根拠付き推論ワークフローを検証するプロジェクト",
 };
 
 export default function RootLayout({
