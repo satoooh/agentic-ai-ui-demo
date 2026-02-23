@@ -681,10 +681,7 @@ export function DemoWorkspace({
   const [viewMode, setViewMode] = useState<"guided" | "full">("guided");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
-  const [meetingProfileId, setMeetingProfileId] = useState(MEETING_PROFILES[0].id);
-  const [selectedMeetingSampleId, setSelectedMeetingSampleId] = useState(
-    meetingTranscriptSamples[0]?.id ?? "",
-  );
+  const [meetingProfileId] = useState("auto-any");
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
   const [isTranscriptEditing, setIsTranscriptEditing] = useState(true);
@@ -915,38 +912,13 @@ export function DemoWorkspace({
     () => MEETING_PROFILES.find((profile) => profile.id === meetingProfileId) ?? MEETING_PROFILES[0],
     [meetingProfileId],
   );
-  const meetingSamples = useMemo(
-    () =>
-      selectedMeetingProfile.id === "auto-any"
-        ? meetingTranscriptSamples
-        : meetingTranscriptSamples.filter(
-            (sample) => sample.meetingProfileId === selectedMeetingProfile.id,
-          ),
-    [selectedMeetingProfile.id],
-  );
   const selectedMeetingSample = useMemo(
     () =>
-      meetingSamples.find((sample) => sample.id === selectedMeetingSampleId) ??
-      meetingSamples[0] ??
+      meetingTranscriptSamples.find((sample) => sample.meetingProfileId === "sales-weekly") ??
+      meetingTranscriptSamples[0] ??
       null,
-    [meetingSamples, selectedMeetingSampleId],
-  );
-  const salesWeeklySample = useMemo(
-    () =>
-      meetingTranscriptSamples.find(
-        (sample) => sample.meetingProfileId === "sales-weekly",
-      ) ?? null,
     [],
   );
-  useEffect(() => {
-    if (meetingSamples.length === 0) {
-      return;
-    }
-
-    if (!meetingSamples.some((sample) => sample.id === selectedMeetingSampleId)) {
-      setSelectedMeetingSampleId(meetingSamples[0].id);
-    }
-  }, [meetingSamples, selectedMeetingSampleId]);
   const activeSuggestions = useMemo(
     () => (demo === "meeting" ? getMeetingSuggestions(selectedMeetingProfile) : suggestions),
     [demo, selectedMeetingProfile, suggestions],
@@ -969,21 +941,14 @@ export function DemoWorkspace({
     }
   }, [meetingTranscriptReady]);
   const meetingTranscriptConfirmed = meetingTranscriptReady && !isTranscriptEditing;
-  const meetingPrerequisiteBlocked =
-    demo === "meeting" && !meetingTranscriptConfirmed;
+  const meetingPrerequisiteBlocked = demo === "meeting" && !meetingTranscriptConfirmed;
   const hasConversationStarted = messages.length > 0;
-  const showMeetingStarterActions = demo === "meeting" && !hasConversationStarted;
   const showMeetingPrimaryRail = demo !== "meeting";
-  const showMeetingSetupCard =
-    demo === "meeting" &&
-    (!meetingTranscriptConfirmed || isTranscriptEditing || !hasConversationStarted);
-  const showMeetingTranscriptSummaryBar =
-    demo === "meeting" &&
-    meetingTranscriptConfirmed &&
-    hasConversationStarted &&
-    !isTranscriptEditing;
+  const showMeetingSetupCard = demo === "meeting" && (!meetingTranscriptConfirmed || isTranscriptEditing);
+  const showMeetingTranscriptSummaryBar = demo === "meeting" && meetingTranscriptConfirmed && !isTranscriptEditing;
   const showMeetingRuntimePanels =
     demo !== "meeting" || (meetingTranscriptConfirmed && hasConversationStarted);
+  const showPrimaryChatWorkspace = demo !== "meeting" || meetingTranscriptConfirmed;
   const transcriptHeadline = useMemo(() => {
     if (structuredInsight?.headline?.trim()) {
       return structuredInsight.headline.trim();
@@ -1029,6 +994,14 @@ export function DemoWorkspace({
       costUsd: estimateCostUsd({ provider, inputTokens, outputTokens }),
     };
   }, [messages, provider]);
+  const hasAssistantResponse = useMemo(
+    () =>
+      messages.some(
+        (message) => message.role === "assistant" && getMessageText(message).length > 0,
+      ),
+    [messages],
+  );
+  const shouldShowArtifacts = artifacts.length > 0 && hasAssistantResponse;
   const selectedProviderLabel = provider === "openai" ? "OpenAI" : "Gemini";
   const selectedProviderKeyLabel =
     provider === "openai" ? "OPENAI_API_KEY" : "GOOGLE_GENERATIVE_AI_API_KEY";
@@ -1590,32 +1563,16 @@ export function DemoWorkspace({
     setLoopStatus(options?.statusNote ?? "悪魔の代弁者レビューを実行しました。");
   };
 
-  const loadMeetingSample = (sampleId?: string) => {
-    const sample =
-      meetingSamples.find((item) => item.id === (sampleId ?? selectedMeetingSample?.id)) ??
-      selectedMeetingSample;
-    if (!sample) {
+  const loadMeetingSample = () => {
+    if (!selectedMeetingSample) {
+      setLoopStatus("サンプル議事録が見つかりませんでした。");
       return;
     }
 
-    setMeetingTranscript(sample.dirtyTranscript);
+    setMeetingTranscript(selectedMeetingSample.dirtyTranscript);
     setIsTranscriptEditing(false);
-    setDraft(sample.note);
-    setLoopStatus(`サンプル「${sample.title}」を読み込みました。`);
-  };
-
-  const loadSalesWeeklySample = () => {
-    if (!salesWeeklySample) {
-      setLoopStatus("営業週次サンプルが見つかりませんでした。");
-      return;
-    }
-
-    setMeetingProfileId("sales-weekly");
-    setSelectedMeetingSampleId(salesWeeklySample.id);
-    setMeetingTranscript(salesWeeklySample.dirtyTranscript);
-    setIsTranscriptEditing(false);
-    setDraft(salesWeeklySample.note);
-    setLoopStatus(`営業週次サンプル「${salesWeeklySample.title}」を読み込みました。`);
+    setDraft(selectedMeetingSample.note);
+    setLoopStatus(`サンプル「${selectedMeetingSample.title}」を読み込みました。`);
   };
 
   const runAutonomousLoop = async () => {
@@ -1671,39 +1628,6 @@ export function DemoWorkspace({
       autoLoopAbortRef.current = false;
       setIsAutoLoopRunning(false);
     }
-  };
-
-  const runMeetingOneShot = async () => {
-    if (demo !== "meeting" || isStreaming || isAutoLoopRunning) {
-      return;
-    }
-    if (!ensureMeetingTranscript("ワンショット実行")) {
-      return;
-    }
-
-    const template = MEETING_OUTPUT_TEMPLATES[selectedMeetingProfile.id];
-    const prompt = [
-      "設定済みの議事録と会議タイプを使って、1回の回答で会議レビューを完了してください。",
-      "以下の順序で出力してください:",
-      "1. 要点サマリー（3行以内）",
-      "2. 重要な論点（箇条書き）",
-      `3. ${template.sections[1]}`,
-      `4. 次アクション表（${template.actionColumns.join(" / ")}）`,
-      "5. 不足データと次回確認",
-    ].join("\n");
-
-    await sendMessage(
-      { text: withDemoContext(prompt) },
-      {
-        body: buildRequestBody({
-          approved: false,
-          operation: "scenario",
-          meetingLog: meetingTranscript.trim(),
-        }),
-      },
-    );
-
-    setLoopStatus("ワンショット実行を開始しました。Live Agent Steps で進捗を確認できます。");
   };
 
   const stopAutonomousLoop = () => {
@@ -2226,39 +2150,15 @@ export function DemoWorkspace({
           <CardContent className="space-y-3 pt-4">
             {!meetingTranscriptConfirmed ? (
               <>
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
-                  <Select
-                    value={selectedMeetingSample?.id ?? selectedMeetingSampleId}
-                    onValueChange={setSelectedMeetingSampleId}
-                  >
-                    <SelectTrigger className="h-8 bg-background">
-                      <SelectValue placeholder="サンプル発言録を選択" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {meetingSamples.map((sample) => (
-                        <SelectItem key={sample.id} value={sample.id}>
-                          {sample.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => loadMeetingSample()}
+                    onClick={loadMeetingSample}
                     disabled={!selectedMeetingSample || isStreaming}
                   >
-                    読み込み
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={loadSalesWeeklySample}
-                    disabled={!salesWeeklySample || isStreaming}
-                  >
-                    営業週次サンプル
+                    サンプル読み込み
                   </Button>
                 </div>
                 <Textarea
@@ -2315,35 +2215,6 @@ export function DemoWorkspace({
                 </div>
               </div>
             )}
-            <div className="grid gap-2 md:grid-cols-[220px_1fr]">
-              <Select value={meetingProfileId} onValueChange={setMeetingProfileId}>
-                <SelectTrigger className="h-8 bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MEETING_PROFILES.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="rounded-md border border-border/70 bg-background px-2.5 py-2 text-xs text-muted-foreground">
-                会議タイプは任意です。`自動判定` を選ぶと議事録内容から文脈を推定してレビューします。
-              </p>
-            </div>
-            {showMeetingStarterActions ? (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void runMeetingOneShot()}
-                  disabled={isStreaming || isAutoLoopRunning || !meetingTranscriptConfirmed}
-                >
-                  ワンショット実行
-                </Button>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -2354,7 +2225,7 @@ export function DemoWorkspace({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{transcriptHeadline}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {selectedMeetingProfile.label} / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
+                自動推定レビュー / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
                 {transcriptStats.lines}行
               </p>
               <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
@@ -2386,6 +2257,8 @@ export function DemoWorkspace({
         </Card>
       ) : null}
 
+      {showPrimaryChatWorkspace ? (
+        <>
       <div className={workspaceGridClass}>
         {showMeetingPrimaryRail ? <aside className="space-y-4">
           {viewMode === "full" ? (
@@ -2792,7 +2665,7 @@ export function DemoWorkspace({
                     title="まだ会話はありません"
                     description={
                       demo === "meeting"
-                        ? "Step 1 を確定後、ワンショット実行または下の入力欄から開始してください。"
+                        ? "Step 1 を確定後、下の入力欄から開始してください。"
                         : "左のシナリオを実行するか、下の入力欄から開始してください。"
                     }
                   />
@@ -3361,130 +3234,179 @@ export function DemoWorkspace({
         ) : null}
       </div>
 
-      {viewMode === "full" ? (
-        <section className="grid gap-4 xl:grid-cols-[240px_1fr]">
-          <Card className="gap-3 border-border/70 py-4">
-            <CardHeader className="px-4">
-              <CardTitle className="text-sm">Artifacts</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4">
-              <ScrollArea className="h-[220px]">
-                <div className="space-y-1 pr-2">
-                  {artifacts.map((artifact) => (
-                    <Button
-                      key={artifact.id}
-                      type="button"
-                      variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
-                      size="sm"
-                      className="w-full justify-start"
-                      onClick={() => setSelectedArtifactId(artifact.id)}
-                    >
-                      {artifact.name}
-                    </Button>
-                  ))}
+      {shouldShowArtifacts ? (
+        <Card className="border-border/70 py-0">
+          <Accordion type="single" collapsible>
+            <AccordionItem value="artifacts" className="border-b-0">
+              <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <span>成果物</span>
+                  <Badge variant="outline">{artifacts.length}</Badge>
+                  {selectedArtifact ? (
+                    <span className="max-w-[300px] truncate text-xs text-muted-foreground">
+                      {selectedArtifact.name}
+                    </span>
+                  ) : null}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                {viewMode === "full" ? (
+                  <div className="grid gap-4 xl:grid-cols-[240px_1fr]">
+                    <Card className="gap-3 border-border/70 py-4">
+                      <CardHeader className="px-4">
+                        <CardTitle className="text-sm">成果物一覧</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4">
+                        <ScrollArea className="h-[220px]">
+                          <div className="space-y-1 pr-2">
+                            {artifacts.map((artifact) => (
+                              <Button
+                                key={artifact.id}
+                                type="button"
+                                variant={selectedArtifact?.id === artifact.id ? "default" : "outline"}
+                                size="sm"
+                                className="w-full justify-start"
+                                onClick={() => setSelectedArtifactId(artifact.id)}
+                              >
+                                {artifact.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
 
-          <ArtifactPanel>
-            <ArtifactHeader>
-              <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
-              <ArtifactActions>
-                <ArtifactAction
-                  onClick={() => setArtifactViewMode("rendered")}
-                  tooltip="Preview"
-                  disabled={!selectedArtifact}
-                >
-                  preview
-                </ArtifactAction>
-                <ArtifactAction
-                  onClick={() => setArtifactViewMode("raw")}
-                  tooltip="Raw"
-                  disabled={!selectedArtifact}
-                >
-                  raw
-                </ArtifactAction>
-                <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
-                  {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
-                </ArtifactAction>
-                <ArtifactAction onClick={downloadArtifact} tooltip="Download" disabled={!selectedArtifact}>
-                  download
-                </ArtifactAction>
-              </ArtifactActions>
-            </ArtifactHeader>
-            <ArtifactContent>
-              {selectedArtifact ? (
-                artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
-                  <iframe
-                    title={selectedArtifact.name}
-                    srcDoc={selectedArtifact.content}
-                    className="h-72 w-full rounded-lg border"
-                  />
-                ) : artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
-                  <div className="max-h-80 overflow-auto rounded-lg border border-border/70 bg-background p-3">
-                    <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1">
-                      {selectedArtifact.content}
-                    </MessageResponse>
+                    <ArtifactPanel>
+                      <ArtifactHeader>
+                        <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
+                        <ArtifactActions>
+                          <ArtifactAction
+                            onClick={() => setArtifactViewMode("rendered")}
+                            tooltip="Preview"
+                            disabled={!selectedArtifact}
+                          >
+                            preview
+                          </ArtifactAction>
+                          <ArtifactAction
+                            onClick={() => setArtifactViewMode("raw")}
+                            tooltip="Raw"
+                            disabled={!selectedArtifact}
+                          >
+                            raw
+                          </ArtifactAction>
+                          <ArtifactAction
+                            onClick={() => void copyArtifact()}
+                            tooltip="Copy"
+                            disabled={!selectedArtifact}
+                          >
+                            {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+                          </ArtifactAction>
+                          <ArtifactAction
+                            onClick={downloadArtifact}
+                            tooltip="Download"
+                            disabled={!selectedArtifact}
+                          >
+                            download
+                          </ArtifactAction>
+                        </ArtifactActions>
+                      </ArtifactHeader>
+                      <ArtifactContent>
+                        {selectedArtifact ? (
+                          artifactViewMode === "rendered" && selectedArtifact.kind === "html" ? (
+                            <iframe
+                              title={selectedArtifact.name}
+                              srcDoc={selectedArtifact.content}
+                              className="h-72 w-full rounded-lg border"
+                            />
+                          ) : artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
+                            <div className="max-h-80 overflow-auto rounded-lg border border-border/70 bg-background p-3">
+                              <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100 [&_table]:my-2 [&_table]:w-full [&_td]:border [&_td]:border-border/70 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-border/70 [&_th]:bg-muted/50 [&_th]:px-2 [&_th]:py-1">
+                                {selectedArtifact.content}
+                              </MessageResponse>
+                            </div>
+                          ) : (
+                            <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                              {selectedArtifact.content}
+                            </pre>
+                          )
+                        ) : (
+                          <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
+                        )}
+                      </ArtifactContent>
+                    </ArtifactPanel>
                   </div>
                 ) : (
-                  <pre className="max-h-80 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-                    {selectedArtifact.content}
-                  </pre>
-                )
-              ) : (
-                <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
-              )}
-            </ArtifactContent>
-          </ArtifactPanel>
-        </section>
-      ) : (
-        <section className="space-y-2">
-          {artifacts.length > 0 ? (
-            <div className="max-w-xs">
-              <Select value={selectedArtifact?.id ?? artifacts[0]?.id ?? ""} onValueChange={setSelectedArtifactId}>
-                <SelectTrigger className="h-8 bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {artifacts.map((artifact) => (
-                    <SelectItem key={artifact.id} value={artifact.id}>
-                      {artifact.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-          <ArtifactPanel>
-            <ArtifactHeader>
-              <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
-              <ArtifactActions>
-                <ArtifactAction onClick={() => void copyArtifact()} tooltip="Copy" disabled={!selectedArtifact}>
-                  {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
-                </ArtifactAction>
-              </ArtifactActions>
-            </ArtifactHeader>
-            <ArtifactContent>
-              {selectedArtifact ? (
-                artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
-                  <div className="max-h-72 overflow-auto rounded-lg border border-border/70 bg-background p-3">
-                    <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100">
-                      {selectedArtifact.content}
-                    </MessageResponse>
+                  <div className="space-y-2">
+                    {artifacts.length > 0 ? (
+                      <div className="max-w-xs">
+                        <Select
+                          value={selectedArtifact?.id ?? artifacts[0]?.id ?? ""}
+                          onValueChange={setSelectedArtifactId}
+                        >
+                          <SelectTrigger className="h-8 bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {artifacts.map((artifact) => (
+                              <SelectItem key={artifact.id} value={artifact.id}>
+                                {artifact.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    <ArtifactPanel>
+                      <ArtifactHeader>
+                        <ArtifactTitle>{selectedArtifact?.name ?? "成果物未選択"}</ArtifactTitle>
+                        <ArtifactActions>
+                          <ArtifactAction
+                            onClick={() => void copyArtifact()}
+                            tooltip="Copy"
+                            disabled={!selectedArtifact}
+                          >
+                            {selectedArtifact && copiedArtifactId === selectedArtifact.id ? "copied" : "copy"}
+                          </ArtifactAction>
+                          <ArtifactAction
+                            onClick={downloadArtifact}
+                            tooltip="Download"
+                            disabled={!selectedArtifact}
+                          >
+                            download
+                          </ArtifactAction>
+                        </ArtifactActions>
+                      </ArtifactHeader>
+                      <ArtifactContent>
+                        {selectedArtifact ? (
+                          artifactViewMode === "rendered" && selectedArtifact.kind === "markdown" ? (
+                            <div className="max-h-72 overflow-auto rounded-lg border border-border/70 bg-background p-3">
+                              <MessageResponse className="leading-7 [&_h1]:text-base [&_h2]:text-sm [&_li]:my-0.5 [&_pre]:rounded-md [&_pre]:bg-slate-950 [&_pre]:p-3 [&_pre]:text-slate-100">
+                                {selectedArtifact.content}
+                              </MessageResponse>
+                            </div>
+                          ) : (
+                            <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+                              {selectedArtifact.content}
+                            </pre>
+                          )
+                        ) : (
+                          <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
+                        )}
+                      </ArtifactContent>
+                    </ArtifactPanel>
                   </div>
-                ) : (
-                  <pre className="max-h-72 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-                    {selectedArtifact.content}
-                  </pre>
-                )
-              ) : (
-                <p className="text-sm text-muted-foreground">成果物はまだありません。</p>
-              )}
-            </ArtifactContent>
-          </ArtifactPanel>
-        </section>
-      )}
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </Card>
+      ) : hasConversationStarted ? (
+        <Card className="border-border/70 py-3">
+          <CardContent className="px-4 py-0 text-xs text-muted-foreground">
+            回答生成後に成果物（コピー/ダウンロード）が表示されます。
+          </CardContent>
+        </Card>
+      ) : null}
 
       {viewMode === "full" && citations.length > 0 ? (
         <Sources>
@@ -3503,6 +3425,8 @@ export function DemoWorkspace({
       ) : null}
 
       {viewMode === "full" ? bottomPanel : null}
+        </>
+      ) : null}
 
       {approval?.required ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4">
