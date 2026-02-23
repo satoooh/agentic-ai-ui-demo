@@ -225,72 +225,20 @@ interface MeetingOutputTemplate {
 
 const MEETING_PROFILES: MeetingProfile[] = [
   {
-    id: "auto-any",
-    label: "会議タイプ自動推定",
+    id: "general-review",
+    label: "会議レビュー（自動推定）",
     objective: "議事録から会議タイプを推定し、合意形成と実行準備を加速する",
     participants: "議事録から推定",
     expectedOutput: "決定事項、反証レビュー、実行アクション",
     keyTopics: ["決定事項", "未決事項", "前提リスク", "次アクション"],
   },
-  {
-    id: "sales-weekly",
-    label: "営業週次",
-    objective: "案件の進捗、失注リスク、次回打ち手を確定する",
-    participants: "営業責任者, AE, CS",
-    expectedOutput: "優先案件リスト、リスク対策、次回アクション",
-    keyTopics: ["案件進捗", "失注リスク", "提案修正", "次回打ち手"],
-  },
-  {
-    id: "hiring-sync",
-    label: "採用進捗",
-    objective: "採用歩留まりを確認し、詰まりを解消する",
-    participants: "採用責任者, Recruiter, Hiring Manager",
-    expectedOutput: "ボトルネック分析、面接改善、次探索条件",
-    keyTopics: ["歩留まり", "面接品質", "辞退要因", "再探索条件"],
-  },
-  {
-    id: "product-planning",
-    label: "プロダクト計画",
-    objective: "次スプリントの優先順位とリスクを整理する",
-    participants: "PM, Tech Lead, Designer",
-    expectedOutput: "実行順序、依存関係、意思決定メモ",
-    keyTopics: ["優先順位", "依存関係", "リリースリスク", "スコープ調整"],
-  },
-  {
-    id: "exec-review",
-    label: "経営レビュー",
-    objective: "重要意思決定の前提を検証し、判断材料を固める",
-    participants: "CEO, 事業責任者, 経営企画",
-    expectedOutput: "判断前提、反証シナリオ、検証タスク",
-    keyTopics: ["意思決定前提", "下振れシナリオ", "投資配分", "検証タスク"],
-  },
 ];
 
 const MEETING_OUTPUT_TEMPLATES: Record<MeetingProfile["id"], MeetingOutputTemplate> = {
-  "auto-any": {
+  "general-review": {
     title: "会議レビューAI",
     sections: ["決定事項と未決事項", "反証レビュー（悪魔の代弁者）", "修正アクション"],
     actionColumns: ["タスク", "担当", "期限", "成功条件"],
-  },
-  "sales-weekly": {
-    title: "営業週次レビュー",
-    sections: ["案件進捗サマリ", "失注リスク（悪魔の代弁者）", "打ち手の修正案"],
-    actionColumns: ["案件", "担当", "期限", "検証指標"],
-  },
-  "hiring-sync": {
-    title: "採用進捗レビュー",
-    sections: ["採用歩留まりサマリ", "ミスマッチ仮説（悪魔の代弁者）", "選考改善案"],
-    actionColumns: ["候補者/施策", "担当", "期限", "検証指標"],
-  },
-  "product-planning": {
-    title: "プロダクト計画レビュー",
-    sections: ["優先順位サマリ", "計画破綻リスク（悪魔の代弁者）", "依存関係の修正案"],
-    actionColumns: ["タスク", "担当", "期限", "ブロッカー"],
-  },
-  "exec-review": {
-    title: "経営レビュー",
-    sections: ["意思決定サマリ", "前提崩壊シナリオ（悪魔の代弁者）", "判断条件の修正案"],
-    actionColumns: ["意思決定項目", "担当", "期限", "検証データ"],
   },
 };
 
@@ -307,39 +255,23 @@ function buildMeetingOutputFormatInstruction(profile: MeetingProfile): string {
 
 function getMeetingSuggestions(profile: MeetingProfile): string[] {
   const template = MEETING_OUTPUT_TEMPLATES[profile.id];
-  if (profile.id === "auto-any") {
-    return [
-      "議事録から決定事項・未決事項・次アクションを抽出して",
-      "前提崩壊の失敗シナリオを2件だけ先に示して",
-      `${template.title}形式で会議後の実行計画（担当/期限/成功条件）を作って`,
-      "会議の論点を根拠付きで3つに圧縮して",
-      "次回会議までに必要な追加確認データを優先順で出して",
-    ];
-  }
-
   return [
-    `${profile.label}として、この会議の決定事項と保留事項を整理して`,
-    `${profile.keyTopics[0]}と${profile.keyTopics[1]}の観点で見落としを指摘して`,
-    `${profile.label}向けに悪魔の代弁者レビューを実行して`,
+    "議事録から決定事項・未決事項・次アクションを抽出して",
+    "前提崩壊の失敗シナリオを2件だけ先に示して",
     `${template.title}の形式で次回までのアクション表を作成して`,
-    `${profile.label}で最優先に検証すべき前提を3つ挙げて`,
+    "会議の論点を根拠付きで3つに圧縮して",
+    "次回会議までに必要な追加確認データを優先順で出して",
   ];
 }
 
 function buildMeetingScenario(profile: MeetingProfile): DemoScenario {
   const template = MEETING_OUTPUT_TEMPLATES[profile.id];
-  const profileContext =
-    profile.id === "auto-any"
-      ? "会議タイプを議事録から自動推定して"
-      : `${profile.label}として`;
-  const topicHint =
-    profile.id === "auto-any"
-      ? "意思決定 / リスク / 次アクション / 未確定事項"
-      : profile.keyTopics.join(" / ");
+  const profileContext = "会議タイプを議事録から自動推定して";
+  const topicHint = "意思決定 / リスク / 次アクション / 未確定事項";
 
   return {
     id: `meeting-loop-${profile.id}`,
-    title: profile.id === "auto-any" ? "会議レビューAIシナリオ" : `${profile.label}シナリオ`,
+    title: "会議レビューAIシナリオ",
     description: "主要論点に沿って、反証レビューから次アクション確定まで実行。",
     outcome: `${profile.expectedOutput}を短時間で作成`,
     targetDurationSec: 62,
@@ -687,7 +619,7 @@ export function DemoWorkspace({
   const [viewMode, setViewMode] = useState<"guided" | "full">("guided");
   const [provider, setProvider] = useState<ModelProvider>("openai");
   const [model, setModel] = useState(getDefaultModel("openai"));
-  const [meetingProfileId] = useState("auto-any");
+  const [meetingProfileId] = useState("general-review");
   const [draft, setDraft] = useState("");
   const [meetingTranscript, setMeetingTranscript] = useState("");
   const [isTranscriptEditing, setIsTranscriptEditing] = useState(true);
@@ -918,10 +850,7 @@ export function DemoWorkspace({
     [meetingProfileId],
   );
   const selectedMeetingSample = useMemo(
-    () =>
-      meetingTranscriptSamples.find((sample) => sample.meetingProfileId === "sales-weekly") ??
-      meetingTranscriptSamples[0] ??
-      null,
+    () => meetingTranscriptSamples[0] ?? null,
     [],
   );
   const activeSuggestions = useMemo(
@@ -1510,10 +1439,7 @@ export function DemoWorkspace({
       return "";
     }
 
-    const profileHint =
-      selectedMeetingProfile.id === "auto-any"
-        ? "会議タイプ: 議事録から自動推定"
-        : `会議タイプ: ${selectedMeetingProfile.label}`;
+    const profileHint = "会議タイプ: 議事録から自動推定";
 
     return (
       "会議設定:\n" +

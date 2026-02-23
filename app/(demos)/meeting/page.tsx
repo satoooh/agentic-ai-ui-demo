@@ -52,7 +52,6 @@ export default function MeetingDemoPage() {
                 .map(
                   (sample, index) =>
                     `## ${index + 1}. ${sample.title}\n` +
-                    `- 会議タイプ: ${sample.meetingProfileId}\n` +
                     `- メモ: ${sample.note}\n` +
                     `- 冒頭抜粋: ${sample.dirtyTranscript.split("\n")[0]}`,
                 )

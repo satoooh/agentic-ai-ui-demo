@@ -1,10 +1,7 @@
 import type { MeetingSignal, WorkflowGraph } from "@/types/demo";
 
 export type MeetingProfileId =
-  | "sales-weekly"
-  | "hiring-sync"
-  | "product-planning"
-  | "exec-review";
+  | "general-review";
 
 export interface MeetingTranscriptSample {
   id: string;
@@ -14,7 +11,7 @@ export interface MeetingTranscriptSample {
   dirtyTranscript: string;
 }
 
-function buildLongSalesWeeklyTranscript(): string {
+function buildLongMeetingTranscript(): string {
   const speakers = [
     "佐藤(営業Mgr)",
     "高橋(AE)",
@@ -79,14 +76,14 @@ function buildLongSalesWeeklyTranscript(): string {
   return lines.join("\n");
 }
 
-const longSalesWeeklyTranscript = buildLongSalesWeeklyTranscript();
+const longMeetingTranscript = buildLongMeetingTranscript();
 
 export const sampleMeetingTranscript = {
-  title: "営業・採用横断の週次オペレーション会議",
-  participants: ["営業責任者", "採用責任者", "PM", "経営企画"],
+  title: "横断プロジェクト進捗レビュー会議",
+  participants: ["進行役", "実行担当A", "実行担当B", "企画"],
   excerpt:
-    "Q2は採用を優先しつつ、既存顧客の追加提案も増やす。現場の負荷が高いため、" +
-    "来月までは新規施策を増やしすぎない方針。",
+    "次四半期は重点施策を絞りつつ、既存施策の実行精度を上げる。" +
+    "現場負荷が高いため、未確定タスクの棚卸しと優先順位の再設計を先に進める。",
 };
 
 export const sampleMeetingReview = {
@@ -150,17 +147,17 @@ export const sampleMeetingWorkflow: WorkflowGraph = {
 
 export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
   {
-    id: "meeting-sample-sales-q2-long-10min",
-    meetingProfileId: "sales-weekly",
-    title: "営業週次: 10分ロング議事録（約3万字）",
-    note: `長尺ログ（約${longSalesWeeklyTranscript.length.toLocaleString("ja-JP")}文字）で、前提崩壊リスクと実行順序を整理したい。`,
-    dirtyTranscript: longSalesWeeklyTranscript,
+    id: "meeting-sample-general-long-10min",
+    meetingProfileId: "general-review",
+    title: "会議サンプル: 10分ロング議事録（約3万字）",
+    note: `長尺ログ（約${longMeetingTranscript.length.toLocaleString("ja-JP")}文字）で、前提崩壊リスクと実行順序を整理したい。`,
+    dirtyTranscript: longMeetingTranscript,
   },
   {
-    id: "meeting-sample-sales-q2",
-    meetingProfileId: "sales-weekly",
-    title: "営業週次: Q2大型案件フォロー",
-    note: "大型案件の失注リスクと、既存顧客提案の優先度を再検討する会議メモ",
+    id: "meeting-sample-general-priority",
+    meetingProfileId: "general-review",
+    title: "会議サンプル: 優先度調整ミーティング",
+    note: "未確定タスクと前提リスクを整理し、次回までの実行順序を再設計する会議メモ",
     dirtyTranscript: [
       "[10:02] 佐藤(営業Mgr): A社PoCは継続、でも見積まだ。先方、予算きびしいって話あり",
       "10:03 高橋(AE) いやIT部長は前向きです。ただ法務レビューが2週間止まってる…",
@@ -174,10 +171,10 @@ export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
     ].join("\n"),
   },
   {
-    id: "meeting-sample-hiring-funnel",
-    meetingProfileId: "hiring-sync",
-    title: "採用進捗: エンジニア採用ボトルネック",
-    note: "応募数不足か選考体験の問題かを切り分けたい採用会議メモ",
+    id: "meeting-sample-general-funnel",
+    meetingProfileId: "general-review",
+    title: "会議サンプル: 実行フローボトルネック確認",
+    note: "進行の詰まりが入力不足か実行設計かを切り分けたい会議メモ",
     dirtyTranscript: [
       "[16:01] 採用責任者: 先月応募42、書類通過19、1次面接9、最終3、内定1",
       "16:02 Recruiter: 数字だけ見ると上流より面接後辞退が多い。候補者コメント雑多です",
@@ -191,10 +188,10 @@ export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
     ].join("\n"),
   },
   {
-    id: "meeting-sample-product-scope",
-    meetingProfileId: "product-planning",
-    title: "プロダクト計画: リリース範囲調整",
-    note: "次スプリントのスコープ超過を前提に、落とす機能を合意したい会議メモ",
+    id: "meeting-sample-general-scope",
+    meetingProfileId: "general-review",
+    title: "会議サンプル: スコープ調整レビュー",
+    note: "スコープ超過を前提に、残す/落とす対象を合意する会議メモ",
     dirtyTranscript: [
       "[13:30] PM: 次Sprint、要望が多くて12pt超過。全部は無理です",
       "13:31 TechLead: 決済改修は必須、でも通知機能まで入れると品質落ちる",
@@ -208,10 +205,10 @@ export const meetingTranscriptSamples: MeetingTranscriptSample[] = [
     ].join("\n"),
   },
   {
-    id: "meeting-sample-exec-investment",
-    meetingProfileId: "exec-review",
-    title: "経営レビュー: 投資配分の見直し",
-    note: "採用・営業・開発の投資配分を再調整する経営会議メモ",
+    id: "meeting-sample-general-investment",
+    meetingProfileId: "general-review",
+    title: "会議サンプル: 投資配分の見直し",
+    note: "複数施策の投資配分と下振れ前提を再確認する会議メモ",
     dirtyTranscript: [
       "[09:00] CEO: Q3は成長投資を維持したい。ただ現金余力は楽観できない",
       "09:01 経営企画: 直近3か月の回収は計画比-8%。広告効率も落ち気味",
