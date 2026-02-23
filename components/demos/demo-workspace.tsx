@@ -2072,10 +2072,6 @@ export function DemoWorkspace({
     "xl:grid-cols-[minmax(0,1fr)_360px]":
       !showMeetingPrimaryRail && showDetailRail && viewMode === "full",
   });
-  const chatSectionClass = cn("space-y-4", {
-    "mx-auto w-full max-w-[940px]": isChatFocusedDemo,
-  });
-
   return (
     <div className="space-y-4">
       <header className="animate-soft-enter overflow-hidden rounded-3xl border border-border/80 bg-card/92 shadow-[0_1px_0_rgb(255_255_255/0.72)_inset,0_18px_36px_rgb(15_23_42/0.08)]">
@@ -2442,7 +2438,7 @@ export function DemoWorkspace({
           ) : null}
         </aside> : null}
 
-        <section className={chatSectionClass}>
+        <section className="space-y-4">
             {showStickySummary ? (
               <Card className="sticky top-20 z-30 border-border/80 bg-card/96 py-0 backdrop-blur">
                 <CardContent className="space-y-2 px-4 py-3">
