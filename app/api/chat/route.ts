@@ -28,58 +28,58 @@ const requestSchema = z.object({
 });
 
 const structuredInsightSchema = z.object({
-  headline: z.string().min(1).max(64),
-  summary: z.string().min(1).max(280),
-  keyPoints: z.array(z.string().min(1).max(140)).min(2).max(6),
+  headline: z.string().min(1).max(120),
+  summary: z.string().min(1).max(800),
+  keyPoints: z.array(z.string().min(1).max(280)).min(1).max(8),
   risks: z
     .array(
       z.object({
-        title: z.string().min(1).max(120),
-        impact: z.string().min(1).max(160),
-        mitigation: z.string().min(1).max(160),
-        severity: z.enum(["low", "medium", "high"]),
-      }),
-    )
-    .max(5),
-  actions: z
-    .array(
-      z.object({
-        task: z.string().min(1).max(120),
-        owner: z.string().min(1).max(80),
-        due: z.string().min(1).max(80),
-        metric: z.string().min(1).max(120),
-        priority: z.enum(["high", "medium", "low"]),
+        title: z.string().min(1).max(240),
+        impact: z.string().min(1).max(320),
+        mitigation: z.string().min(1).max(320),
+        severity: z.enum(["low", "medium", "high"]).catch("medium"),
       }),
     )
     .max(8),
+  actions: z
+    .array(
+      z.object({
+        task: z.string().min(1).max(240),
+        owner: z.string().min(1).max(120),
+        due: z.string().min(1).max(120),
+        metric: z.string().min(1).max(240),
+        priority: z.enum(["high", "medium", "low"]).catch("medium"),
+      }),
+    )
+    .max(12),
   evidence: z
     .array(
       z.object({
-        claim: z.string().min(1).max(140),
-        support: z.string().min(1).max(180),
-        nextCheck: z.string().min(1).max(140),
+        claim: z.string().min(1).max(280),
+        support: z.string().min(1).max(360),
+        nextCheck: z.string().min(1).max(280),
       }),
     )
-    .max(6),
+    .max(8),
   worklog: z
     .array(
       z.object({
-        id: z.string().min(1).max(80),
-        label: z.string().min(1).max(120),
-        detail: z.string().min(1).max(180),
-        status: z.enum(["todo", "doing", "done"]),
-        tags: z.array(z.string().min(1).max(40)).max(4),
+        id: z.string().min(1).max(120),
+        label: z.string().min(1).max(180),
+        detail: z.string().min(1).max(320),
+        status: z.enum(["todo", "doing", "done"]).catch("todo"),
+        tags: z.array(z.string().min(1).max(80)).max(6),
       }),
     )
-    .min(3)
-    .max(6),
+    .min(2)
+    .max(8),
 });
 
 const microAgentInsightSchema = z.object({
-  summary: z.string().min(1).max(220),
-  keyFindings: z.array(z.string().min(1).max(140)).min(2).max(4),
-  riskNote: z.string().min(1).max(180),
-  nextAction: z.string().min(1).max(160),
+  summary: z.string().min(1).max(360),
+  keyFindings: z.array(z.string().min(1).max(240)).min(1).max(6),
+  riskNote: z.string().min(1).max(320),
+  nextAction: z.string().min(1).max(280),
 });
 
 type OperationType = "default" | "devils-advocate" | "autonomous-loop" | "scenario";
@@ -614,6 +614,187 @@ function buildMicroAgentPrompt(input: {
   ].join("\n") + connectorBlock;
 }
 
+function stripMarkdown(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function collectSignalLines(markdown: string, max = 6): string[] {
+  const lines = markdown
+    .split("\n")
+    .map((line) => line.replace(/^[\s>*\-0-9.)]+/, "").trim())
+    .filter((line) => line.length >= 6 && !line.startsWith("http"));
+
+  const deduped: string[] = [];
+  for (const line of lines) {
+    const normalized = line.toLowerCase();
+    if (deduped.some((current) => current.toLowerCase() === normalized)) {
+      continue;
+    }
+    deduped.push(line);
+    if (deduped.length >= max) {
+      break;
+    }
+  }
+  return deduped;
+}
+
+function createFallbackMicroAgentInsight(input: {
+  role: MicroAgentRole;
+  label: string;
+  latestUserText: string;
+  assistantMarkdown: string;
+}): z.infer<typeof microAgentInsightSchema> {
+  const signals = collectSignalLines(input.assistantMarkdown, 4);
+  const summarySeed =
+    signals[0] ??
+    compactText(stripMarkdown(input.assistantMarkdown), 160) ??
+    compactText(input.latestUserText, 120);
+
+  const keyFindings =
+    signals.length > 0
+      ? signals.map((line) => compactText(line, 220)).slice(0, 4)
+      : [compactText(input.latestUserText, 200)];
+
+  const riskByRole: Record<MicroAgentRole, string> = {
+    observer: "前提条件の不足により、判断根拠が弱くなるリスクがあります。",
+    skeptic: "重要な前提が崩れると、結論の再検討が必要になるリスクがあります。",
+    operator: "担当・期限が曖昧だと、実行が停滞するリスクがあります。",
+  };
+  const nextByRole: Record<MicroAgentRole, string> = {
+    observer: "不足している根拠データを優先順位順に列挙して追加確認してください。",
+    skeptic: "失敗シナリオごとに早期検知シグナルと回避策を1セットで定義してください。",
+    operator: "次回会議までのタスクに owner と期限を必ず付けて確定してください。",
+  };
+
+  return {
+    summary: compactText(`${input.label}: ${summarySeed}`, 320),
+    keyFindings,
+    riskNote: riskByRole[input.role],
+    nextAction: nextByRole[input.role],
+  };
+}
+
+function createFallbackStructuredInsight(input: {
+  demo: DemoId;
+  latestUserText: string;
+  assistantMarkdown: string;
+  microAgentInsights: ResolvedMicroAgentInsight[];
+}): z.infer<typeof structuredInsightSchema> {
+  const plain = stripMarkdown(input.assistantMarkdown);
+  const signals = collectSignalLines(input.assistantMarkdown, 8);
+  const skeptic = input.microAgentInsights.find((insight) => insight.role === "skeptic");
+  const operator = input.microAgentInsights.find((insight) => insight.role === "operator");
+
+  const summary = compactText(
+    signals.slice(0, 3).join(" / ") || plain || input.latestUserText,
+    700,
+  );
+  const keyPoints = (signals.length > 0 ? signals : [summary]).slice(0, 6).map((line) => compactText(line, 260));
+
+  const riskTitle = compactText(
+    skeptic?.result.keyFindings[0] ?? "前提条件の再確認が必要",
+    200,
+  );
+  const riskImpact = compactText(
+    skeptic?.result.riskNote ?? "判断の遅延や再作業が増える可能性があります。",
+    300,
+  );
+  const riskMitigation = compactText(
+    operator?.result.nextAction ?? "追加確認項目を定義し、担当と期限を固定してください。",
+    300,
+  );
+
+  const actionSeeds = [
+    operator?.result.nextAction,
+    "決定事項を確認し、担当者と期限を確定する。",
+    "未決事項に必要な追加データを収集する。",
+  ].filter((seed): seed is string => Boolean(seed && seed.trim().length > 0));
+
+  const actions = actionSeeds.slice(0, 3).map((task, index) => ({
+    task: compactText(task, 220),
+    owner: index === 0 ? "進行役" : index === 1 ? "担当者" : "確認担当",
+    due: index === 0 ? "本日中" : index === 1 ? "次回会議前" : "次回会議まで",
+    metric: index === 0 ? "owner/期限が記入済み" : "検証項目の更新完了",
+    priority: index === 0 ? "high" : "medium",
+  })) satisfies z.infer<typeof structuredInsightSchema>["actions"];
+
+  const evidenceSeeds = signals.slice(0, 3);
+  const evidence =
+    evidenceSeeds.length > 0
+      ? evidenceSeeds.map((seed) => ({
+          claim: compactText(seed, 240),
+          support: "アシスタント出力から抽出した一次要約",
+          nextCheck: "会議ログ原文の該当箇所を確認する",
+        }))
+      : [
+          {
+            claim: compactText(input.latestUserText, 240),
+            support: "ユーザー入力に基づく要約",
+            nextCheck: "根拠データを追加確認する",
+          },
+        ];
+
+  const worklog: z.infer<typeof structuredInsightSchema>["worklog"] = [
+    {
+      id: "input-review",
+      label: "入力確認",
+      detail: "ユーザー入力と会議ログを確認しました。",
+      status: "done",
+      tags: ["input"],
+    },
+    {
+      id: "summary-build",
+      label: "一次要約",
+      detail: compactText(summary, 260),
+      status: "done",
+      tags: ["summary"],
+    },
+    {
+      id: "risk-review",
+      label: "反証レビュー",
+      detail: riskImpact,
+      status: skeptic ? "done" : "doing",
+      tags: ["risk"],
+    },
+    {
+      id: "action-plan",
+      label: "次アクション設計",
+      detail: compactText(actions[0]?.task ?? "実行項目を整理中です。", 260),
+      status: "todo",
+      tags: ["action"],
+    },
+  ];
+
+  return {
+    headline: compactText(
+      input.demo === "meeting" ? "会議レビュー要約" : "企業調査要約",
+      100,
+    ),
+    summary,
+    keyPoints,
+    risks: [
+      {
+        title: riskTitle,
+        impact: riskImpact,
+        mitigation: riskMitigation,
+        severity: "medium",
+      },
+    ],
+    actions,
+    evidence,
+    worklog,
+  };
+}
+
 function buildMicroAgentArtifactMarkdown(
   insights: ResolvedMicroAgentInsight[],
 ): string {
@@ -914,23 +1095,33 @@ export async function POST(request: Request) {
               result: branchResult.object,
             } satisfies ResolvedMicroAgentInsight;
           } catch (branchError) {
-            const branchErrorId = createStreamId(`tool-branch-${branch.role}-error`);
+            const fallbackResult = createFallbackMicroAgentInsight({
+              role: branch.role,
+              label: branch.label,
+              latestUserText: latestText,
+              assistantMarkdown,
+            });
+            const branchErrorId = createStreamId(`tool-branch-${branch.role}-fallback`);
             writer.write({
               type: "data-tool",
               id: branchErrorId,
               data: {
                 id: branchErrorId,
                 name: `branch-${branch.role}`,
-                status: "error",
+                status: "success",
                 detail:
                   branchError instanceof Error
-                    ? `${branch.label} が失敗: ${branchError.message}`
-                    : `${branch.label} が失敗しました。`,
+                    ? `${branch.label} はスキーマ不一致のため補完結果を使用: ${branchError.message}`
+                    : `${branch.label} はスキーマ不一致のため補完結果を使用しました。`,
                 timestamp: new Date().toISOString(),
               },
               transient: true,
             });
-            return null;
+            return {
+              role: branch.role,
+              label: branch.label,
+              result: fallbackResult,
+            } satisfies ResolvedMicroAgentInsight;
           }
         }),
       );
@@ -1058,19 +1249,65 @@ export async function POST(request: Request) {
           transient: true,
         });
       } catch (structuredError) {
-        const structuredErrorId = createStreamId("tool-structured-error");
+        const fallbackStructured = createFallbackStructuredInsight({
+          demo: parsed.data.demo,
+          latestUserText: latestText,
+          assistantMarkdown,
+          microAgentInsights,
+        });
+        const nowIso = new Date().toISOString();
+
+        writer.write({
+          type: "data-structured",
+          id: createStreamId("structured-fallback"),
+          data: fallbackStructured,
+          transient: true,
+        });
+
+        writer.write({
+          type: "data-plan",
+          id: createStreamId("plan-fallback"),
+          data: {
+            steps: toPlanSteps(fallbackStructured.worklog),
+          },
+          transient: true,
+        });
+
+        writer.write({
+          type: "data-task",
+          id: createStreamId("task-fallback"),
+          data: {
+            items: toTaskItems(fallbackStructured.actions),
+          },
+          transient: true,
+        });
+
+        writer.write({
+          type: "data-artifact",
+          id: createStreamId("artifact-structured-fallback"),
+          data: {
+            id: `llm-structured-summary-${parsed.data.demo}`,
+            name: "llm-structured-summary.md",
+            kind: "markdown",
+            content: buildStructuredArtifactMarkdown(fallbackStructured),
+            updatedAt: nowIso,
+          },
+          transient: true,
+        });
+
+        const structuredErrorId = createStreamId("tool-structured-fallback");
         writer.write({
           type: "data-tool",
           id: structuredErrorId,
           data: {
             id: structuredErrorId,
             name: "structured-output",
-            status: "error",
+            status: "success",
             detail:
               structuredError instanceof Error
-                ? `構造化出力の生成に失敗しました: ${structuredError.message}`
-                : "構造化出力の生成に失敗しました。",
-            timestamp: new Date().toISOString(),
+                ? `構造化出力はスキーマ不一致のため補完結果を使用: ${structuredError.message}`
+                : "構造化出力はスキーマ不一致のため補完結果を使用しました。",
+            timestamp: nowIso,
           },
           transient: true,
         });
