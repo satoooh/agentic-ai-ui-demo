@@ -6,25 +6,25 @@
 
 :root {
   --color-bg: #edf3f9;
-  --color-text: #0f172a;
+  --color-text: #0b1324;
   --radius: 0.72rem;
   --background: oklch(0.985 0.006 236.1);
-  --foreground: oklch(0.238 0.034 258.9);
+  --foreground: oklch(0.205 0.038 258.9);
   --card: oklch(0.997 0.003 238.2);
-  --card-foreground: oklch(0.238 0.034 258.9);
+  --card-foreground: oklch(0.205 0.038 258.9);
   --popover: oklch(0.998 0.002 238);
-  --popover-foreground: oklch(0.238 0.034 258.9);
-  --primary: oklch(0.56 0.166 252.5);
+  --popover-foreground: oklch(0.205 0.038 258.9);
+  --primary: oklch(0.51 0.188 254.2);
   --primary-foreground: oklch(0.988 0.004 240.1);
-  --secondary: oklch(0.947 0.021 206.8);
-  --secondary-foreground: oklch(0.302 0.052 239.7);
+  --secondary: oklch(0.936 0.024 206.8);
+  --secondary-foreground: oklch(0.264 0.058 239.7);
   --muted: oklch(0.958 0.011 235.4);
-  --muted-foreground: oklch(0.458 0.031 247.4);
+  --muted-foreground: oklch(0.372 0.032 247.4);
   --accent: oklch(0.876 0.043 191.6);
-  --accent-foreground: oklch(0.301 0.06 229.2);
+  --accent-foreground: oklch(0.248 0.062 229.2);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.886 0.015 236.4);
-  --input: oklch(0.902 0.014 236.4);
+  --border: oklch(0.824 0.018 236.4);
+  --input: oklch(0.842 0.016 236.4);
   --ring: oklch(0.64 0.126 249.2);
   --chart-1: oklch(0.58 0.161 252.1);
   --chart-2: oklch(0.72 0.119 202.4);
@@ -32,13 +32,23 @@
   --chart-4: oklch(0.66 0.153 157.8);
   --chart-5: oklch(0.62 0.189 28.1);
   --sidebar: oklch(0.989 0.005 236.5);
-  --sidebar-foreground: oklch(0.238 0.034 258.9);
-  --sidebar-primary: oklch(0.56 0.166 252.5);
+  --sidebar-foreground: oklch(0.205 0.038 258.9);
+  --sidebar-primary: oklch(0.51 0.188 254.2);
   --sidebar-primary-foreground: oklch(0.988 0.004 240.1);
   --sidebar-accent: oklch(0.942 0.018 208.2);
-  --sidebar-accent-foreground: oklch(0.238 0.034 258.9);
-  --sidebar-border: oklch(0.886 0.015 236.4);
+  --sidebar-accent-foreground: oklch(0.205 0.038 258.9);
+  --sidebar-border: oklch(0.824 0.018 236.4);
   --sidebar-ring: oklch(0.64 0.126 249.2);
+}
+
+html {
+  font-size: 17px;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+  }
 }
 
 body {
@@ -65,8 +75,9 @@ body {
     auto,
     auto;
   color: var(--color-text);
-  font-family: var(--font-zen-kaku), "Noto Sans JP", sans-serif;
+  font-family: var(--font-sans-jp), "Noto Sans JP", sans-serif;
   text-rendering: geometricPrecision;
+  line-height: 1.6;
 }
 
 code,
@@ -161,7 +172,7 @@ pre {
   h3,
   h4,
   .font-display {
-    font-family: var(--font-display), var(--font-zen-kaku), sans-serif;
+    font-family: var(--font-sans-jp), "Noto Sans JP", sans-serif;
     letter-spacing: -0.012em;
   }
   .font-mono {
@@ -181,6 +192,41 @@ pre {
   [data-slot="card"]:hover {
     border-color: color-mix(in oklab, var(--border) 65%, var(--primary) 35%);
     transform: translateY(-1px);
+  }
+
+  [data-slot="button"][data-variant="default"] {
+    @apply font-semibold;
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.2) inset,
+      0 8px 20px rgb(30 64 175 / 0.22);
+  }
+
+  [data-slot="button"][data-variant="default"]:hover {
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.26) inset,
+      0 10px 24px rgb(30 64 175 / 0.28);
+  }
+
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"] {
+    border-color: color-mix(in oklab, var(--input) 70%, var(--foreground) 30%);
+    background-color: color-mix(in oklab, var(--background) 90%, white 10%);
+    color: var(--foreground);
+  }
+
+  [data-slot="input"]::placeholder,
+  [data-slot="textarea"]::placeholder {
+    color: color-mix(in oklab, var(--muted-foreground) 82%, var(--foreground) 18%);
+  }
+
+  [data-slot="input"]:focus-visible,
+  [data-slot="textarea"]:focus-visible,
+  [data-slot="select-trigger"]:focus-visible {
+    border-color: color-mix(in oklab, var(--ring) 72%, var(--primary) 28%);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--primary) 50%, transparent),
+      0 0 0 4px color-mix(in oklab, var(--ring) 35%, transparent);
   }
 }
 
