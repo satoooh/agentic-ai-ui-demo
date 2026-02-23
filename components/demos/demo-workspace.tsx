@@ -2780,7 +2780,7 @@ export function DemoWorkspace({
               <ConversationScrollButton />
             </Conversation>
 
-            <CardContent className="space-y-3 border-t border-border/70 bg-background p-4">
+            <CardContent className="space-y-3 bg-background p-4">
               {meetingPrerequisiteBlocked ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   Step 1 で議事録を確定すると、ここからチャット入力できます。
