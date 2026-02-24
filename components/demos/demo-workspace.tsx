@@ -118,6 +118,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -552,6 +560,13 @@ function createTranscriptFingerprint(transcript: string): string {
   return `${normalized.length}:${head}:${tail}`;
 }
 
+function formatThinkingDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainSeconds = safeSeconds % 60;
+  return minutes > 0 ? `${minutes}分${remainSeconds}秒` : `${remainSeconds}秒`;
+}
+
 function deriveTranscriptHeadline({
   transcript,
   profileLabel,
@@ -661,13 +676,17 @@ export function DemoWorkspace({
   >("idle");
   const [meetingIntakeKey, setMeetingIntakeKey] = useState<string | null>(null);
   const [meetingIntakeNote, setMeetingIntakeNote] = useState<string | null>(null);
+  const [meetingTranscriptDialogOpen, setMeetingTranscriptDialogOpen] = useState(false);
   const [meetingDetailRailOpen, setMeetingDetailRailOpen] = useState(false);
   const [structuredInsight, setStructuredInsight] = useState<StructuredInsight | null>(null);
+  const [thinkingElapsedSec, setThinkingElapsedSec] = useState(0);
+  const [lastThinkingDurationSec, setLastThinkingDurationSec] = useState<number | null>(null);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
   const scenarioStartRef = useRef<number | null>(null);
   const meetingIntakeRequestRef = useRef(0);
+  const thinkingStartedAtRef = useRef<number | null>(null);
 
   const {
     messages,
@@ -713,9 +732,6 @@ export function DemoWorkspace({
       if (part.type === "data-tool") {
         const toolEvent = part.data as ToolEvent;
         setTools((prev) => upsertById(prev, toolEvent));
-        if (toolEvent.name === "model-call" && toolEvent.status === "running") {
-          setStructuredInsight(null);
-        }
         return;
       }
 
@@ -1191,6 +1207,38 @@ export function DemoWorkspace({
     }));
   }, [completedGateCount, plan, stageGates, structuredInsight, tools]);
   const isStreaming = status === "streaming" || status === "submitted";
+  useEffect(() => {
+    if (!isStreaming) {
+      if (thinkingStartedAtRef.current !== null) {
+        const finishedSeconds = Math.max(
+          1,
+          Math.floor((Date.now() - thinkingStartedAtRef.current) / 1000),
+        );
+        setLastThinkingDurationSec(finishedSeconds);
+        setThinkingElapsedSec(finishedSeconds);
+        thinkingStartedAtRef.current = null;
+      }
+      return;
+    }
+
+    if (thinkingStartedAtRef.current === null) {
+      thinkingStartedAtRef.current = Date.now();
+      setThinkingElapsedSec(0);
+    }
+
+    const timerId = window.setInterval(() => {
+      if (thinkingStartedAtRef.current === null) {
+        return;
+      }
+      const elapsed = Math.max(
+        1,
+        Math.floor((Date.now() - thinkingStartedAtRef.current) / 1000),
+      );
+      setThinkingElapsedSec(elapsed);
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [isStreaming]);
   const latestToolEvents = useMemo(() => {
     const byName = new Map<string, ToolEvent>();
     for (const tool of tools) {
@@ -1387,33 +1435,6 @@ export function DemoWorkspace({
     () => latestToolEvents.find((tool) => tool.status === "running") ?? null,
     [latestToolEvents],
   );
-  const streamingStatusLabel = useMemo(() => {
-    if (!isStreaming) {
-      return "ready";
-    }
-    if (demo === "meeting" && showMeetingRuntimeSummary) {
-      if (liveAgentCurrentStepLabel === "構造化集約") {
-        return "要点・リスク・アクションを整理中";
-      }
-      if (liveAgentCurrentStepLabel === "最終反映") {
-        return "最終回答を反映中";
-      }
-      if (liveAgentCurrentStepLabel === "並列検証") {
-        return "3視点レビューを実行中";
-      }
-      if (liveAgentCurrentStepLabel === "一次推論") {
-        return "議事録ベースで回答案を作成中";
-      }
-      if (liveAgentCurrentStepLabel === "外部収集") {
-        return "公開シグナルを収集中";
-      }
-      return `${liveAgentCurrentStepLabel} を処理中`;
-    }
-    if (currentRunningTool) {
-      return `${currentRunningTool.name}: ${compactUiText(currentRunningTool.detail, 56)}`;
-    }
-    return "回答を準備中";
-  }, [currentRunningTool, demo, isStreaming, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
   const streamingStatusDetail = useMemo(() => {
     if (!isStreaming) {
       return null;
@@ -1444,6 +1465,50 @@ export function DemoWorkspace({
     liveAgentCurrentStepLabel,
     showMeetingRuntimeSummary,
   ]);
+  const streamingDetailMarkdown = useMemo(() => {
+    if (!isStreaming) {
+      return "";
+    }
+
+    const currentStep =
+      liveAgentSteps.find((step) => step.status === "doing")?.label ??
+      liveAgentSteps.find((step) => step.status === "todo")?.label ??
+      "推論";
+    const nextStep =
+      liveAgentSteps.find((step) => step.status === "todo")?.label ?? "最終回答を表示";
+    const runningTools = latestToolEvents
+      .filter((tool) => tool.status === "running")
+      .slice(0, 3)
+      .map((tool) => `${tool.name}: ${compactUiText(tool.detail, 42)}`);
+
+    const lines = [
+      `- 現在のステップ: ${currentStep}`,
+      `- 実行中: ${runningTools.length > 0 ? runningTools.join(" / ") : "モデル推論を実行中"}`,
+      `- 次のステップ: ${nextStep}`,
+    ];
+    if (streamingStatusDetail) {
+      lines.push(`- 詳細: ${streamingStatusDetail}`);
+    }
+    return lines.join("\n");
+  }, [isStreaming, latestToolEvents, liveAgentSteps, streamingStatusDetail]);
+  const renderThinkingStatus = useCallback(
+    (active: boolean, duration?: number) => {
+      if (active) {
+        const elapsedLabel =
+          thinkingElapsedSec > 0
+            ? `回答を生成中（${formatThinkingDuration(thinkingElapsedSec)} 経過）`
+            : "回答を生成中…";
+        return <Shimmer as="span">{elapsedLabel}</Shimmer>;
+      }
+
+      const completedSeconds = duration ?? lastThinkingDurationSec;
+      if (typeof completedSeconds === "number" && completedSeconds > 0) {
+        return `回答完了（思考時間 ${formatThinkingDuration(completedSeconds)}）`;
+      }
+      return "思考ログを表示";
+    },
+    [lastThinkingDurationSec, thinkingElapsedSec],
+  );
   const structuredReflectionStatus = useMemo(() => {
     if (demo !== "meeting") {
       return null;
@@ -1828,9 +1893,13 @@ export function DemoWorkspace({
     }
 
     setMeetingTranscript(selectedMeetingSample.dirtyTranscript);
-    setIsTranscriptEditing(false);
-    setDraft(selectedMeetingSample.note);
-    setLoopStatus(`サンプル「${selectedMeetingSample.title}」を読み込みました。`);
+    setIsTranscriptEditing(true);
+    setMeetingIntakeStatus("idle");
+    setMeetingIntakeKey(null);
+    setMeetingIntakeNote(null);
+    setLoopStatus(
+      `サンプル「${selectedMeetingSample.title}」を入力欄に読み込みました。内容確認後に「議事録を確定してチャットを開始」を押してください。`,
+    );
   };
 
   const runScenario = async (scenario: DemoScenario) => {
@@ -2234,7 +2303,11 @@ export function DemoWorkspace({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 px-1">
         <h1 className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
-        {isStreaming ? <Badge>streaming...</Badge> : null}
+        {isStreaming ? (
+          <Badge>
+            <Shimmer as="span">streaming...</Shimmer>
+          </Badge>
+        ) : null}
       </div>
 
       {topPanel && viewMode === "full" && demo !== "meeting" ? (
@@ -2289,11 +2362,11 @@ export function DemoWorkspace({
                   >
                     議事録を確定してチャットを開始
                   </Button>
-                  <Badge variant="outline">
+                  <span className="text-xs text-muted-foreground">
                     {meetingTranscriptReady
                       ? `${transcriptStats.chars.toLocaleString("ja-JP")}文字`
                       : "20文字以上で確定可能"}
-                  </Badge>
+                  </span>
                 </div>
               </>
             ) : (
@@ -2302,7 +2375,7 @@ export function DemoWorkspace({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {transcriptStats.chars.toLocaleString("ja-JP")}文字 / {transcriptStats.lines}行
                 </p>
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {transcriptPreview || "議事録プレビューは入力後に表示されます。"}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -2336,18 +2409,24 @@ export function DemoWorkspace({
         <Card className="border-border/70 bg-muted/15">
           <CardContent className="flex flex-wrap items-start justify-between gap-3 p-4">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                {transcriptHeadlinePending ? (
-                  <Shimmer as="span">会議タイトルを生成中...</Shimmer>
-                ) : (
-                  transcriptHeadline
-                )}
-              </p>
+              <button
+                type="button"
+                onClick={() => setMeetingTranscriptDialogOpen(true)}
+                className="w-full text-left"
+              >
+                <p className="text-sm font-semibold underline-offset-4 hover:underline">
+                  {transcriptHeadlinePending ? (
+                    <Shimmer as="span">会議タイトルを生成中...</Shimmer>
+                  ) : (
+                    transcriptHeadline
+                  )}
+                </p>
+              </button>
               <p className="mt-1 text-xs text-muted-foreground">
                 会議レビューAI / {transcriptStats.chars.toLocaleString("ja-JP")}文字 /{" "}
                 {transcriptStats.lines}行
               </p>
-              <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {transcriptPreview || "議事録プレビューは入力後に表示されます。"}
               </p>
             </div>
@@ -2375,6 +2454,46 @@ export function DemoWorkspace({
           </CardContent>
         </Card>
       ) : null}
+      <Dialog open={meetingTranscriptDialogOpen} onOpenChange={setMeetingTranscriptDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>議事録全文</DialogTitle>
+            <DialogDescription>
+              {transcriptHeadline} / {transcriptStats.chars.toLocaleString("ja-JP")}文字 / {transcriptStats.lines}
+              行
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[52vh] rounded-md border border-border/70 bg-muted/10 p-3">
+            <pre className="whitespace-pre-wrap text-sm leading-7">{meetingTranscript}</pre>
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setMeetingTranscriptDialogOpen(false);
+                setIsTranscriptEditing(true);
+              }}
+            >
+              議事録を編集
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setMeetingTranscriptDialogOpen(false);
+                setMeetingTranscript("");
+                setIsTranscriptEditing(true);
+              }}
+            >
+              クリア
+            </Button>
+            <Button type="button" onClick={() => setMeetingTranscriptDialogOpen(false)}>
+              閉じる
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {showPrimaryChatWorkspace ? (
         <>
@@ -2530,7 +2649,11 @@ export function DemoWorkspace({
                   {demo === "meeting" ? "会議レビューAIチャット" : "Conversation"}
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {isStreaming ? <Badge>streaming...</Badge> : null}
+                  {isStreaming ? (
+                    <Badge>
+                      <Shimmer as="span">streaming...</Shimmer>
+                    </Badge>
+                  ) : null}
                   <OpenIn query={draft || "この案件の次アクションを整理してください。"}>
                     <OpenInTrigger />
                     <OpenInContent>
@@ -2623,9 +2746,11 @@ export function DemoWorkspace({
                           {latestAssistantSummary.summary}
                         </p>
                         {latestAssistantSummary.bullets.length > 0 ? (
-                          <p className="text-[11px] text-muted-foreground">
-                            {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
-                          </p>
+                          <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                            {latestAssistantSummary.bullets.slice(0, 6).map((bullet, index) => (
+                              <li key={`${bullet}-${index}`}>{bullet}</li>
+                            ))}
+                          </ul>
                         ) : null}
                       </div>
                     ) : (
@@ -2881,12 +3006,19 @@ export function DemoWorkspace({
                 {isStreaming ? (
                   <Message from="assistant">
                     <MessageContent>
-                      <p className="text-xs text-muted-foreground">
-                        <Shimmer as="span">{streamingStatusLabel}</Shimmer>
-                      </p>
-                      {streamingStatusDetail ? (
-                        <p className="mt-1 text-[11px] text-muted-foreground">{streamingStatusDetail}</p>
-                      ) : null}
+                      <Reasoning
+                        className="mb-0 rounded-md border border-border/60 bg-background/70 px-3 py-2"
+                        defaultOpen={false}
+                        isStreaming={isStreaming}
+                      >
+                        <ReasoningTrigger
+                          className="text-xs text-muted-foreground"
+                          getThinkingMessage={renderThinkingStatus}
+                        />
+                        <ReasoningContent className="mt-1 text-[11px] leading-6">
+                          {streamingDetailMarkdown}
+                        </ReasoningContent>
+                      </Reasoning>
                     </MessageContent>
                   </Message>
                 ) : null}
@@ -3060,7 +3192,7 @@ export function DemoWorkspace({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-primary">最新サマリー（TL;DR）</p>
-                    <p className="mt-1 line-clamp-2 text-sm font-medium">
+                    <p className="mt-1 text-sm font-medium">
                       {latestAssistantSummary?.summary ? (
                         latestAssistantSummary.summary
                       ) : summaryIsUpdating ? (
@@ -3070,18 +3202,29 @@ export function DemoWorkspace({
                       )}
                     </p>
                     {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
-                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                        {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
-                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+                        {latestAssistantSummary.bullets.slice(0, 8).map((bullet, index) => (
+                          <li key={`${bullet}-${index}`}>{bullet}</li>
+                        ))}
+                      </ul>
                     ) : null}
                     {meetingIntakeNote && !hasConversationStarted ? (
-                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                      <p className="mt-1 text-[11px] text-muted-foreground">
                         {meetingIntakeNote}
+                      </p>
+                    ) : null}
+                    {!isStreaming &&
+                    typeof lastThinkingDurationSec === "number" &&
+                    lastThinkingDurationSec > 0 ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        直近の思考時間: {formatThinkingDuration(lastThinkingDurationSec)}
                       </p>
                     ) : null}
                   </div>
                   {summaryIsUpdating ? (
-                    <Badge className="text-[10px]">updating</Badge>
+                    <Badge className="text-[10px]">
+                      <Shimmer as="span">updating</Shimmer>
+                    </Badge>
                   ) : null}
                 </div>
                 <Reasoning
@@ -3091,9 +3234,7 @@ export function DemoWorkspace({
                 >
                   <ReasoningTrigger
                     className="h-auto justify-start px-0 text-xs text-primary hover:text-primary/80"
-                    getThinkingMessage={(active) =>
-                      active ? <Shimmer as="span">{streamingStatusLabel}</Shimmer> : "思考ログを表示"
-                    }
+                    getThinkingMessage={renderThinkingStatus}
                   />
                   <ReasoningContent className="mt-2 text-xs leading-6">
                     {reasoningTraceMarkdown}
