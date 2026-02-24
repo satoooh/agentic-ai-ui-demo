@@ -191,6 +191,14 @@ interface RuntimeInfo {
   hasGeminiKey: boolean;
 }
 
+interface MeetingIntakeSummaryResponse {
+  headline: string;
+  summary: string;
+  keyPoints: string[];
+  fallback?: boolean;
+  note?: string;
+}
+
 interface WorklogStep {
   id: string;
   label: string;
@@ -537,6 +545,13 @@ function hasRequiredMeetingTranscript(text: string): boolean {
   return text.trim().length >= 20;
 }
 
+function createTranscriptFingerprint(transcript: string): string {
+  const normalized = transcript.trim();
+  const head = normalized.slice(0, 80);
+  const tail = normalized.slice(-80);
+  return `${normalized.length}:${head}:${tail}`;
+}
+
 function deriveTranscriptHeadline({
   transcript,
   profileLabel,
@@ -641,12 +656,18 @@ export function DemoWorkspace({
   const [providerHint, setProviderHint] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [loopStatus, setLoopStatus] = useState<string | null>(null);
+  const [meetingIntakeStatus, setMeetingIntakeStatus] = useState<
+    "idle" | "generating" | "ready" | "error"
+  >("idle");
+  const [meetingIntakeKey, setMeetingIntakeKey] = useState<string | null>(null);
+  const [meetingIntakeNote, setMeetingIntakeNote] = useState<string | null>(null);
   const [meetingDetailRailOpen, setMeetingDetailRailOpen] = useState(false);
   const [structuredInsight, setStructuredInsight] = useState<StructuredInsight | null>(null);
 
   const recognitionRef = useRef<{ start: () => void; stop: () => void } | null>(null);
   const scenarioAbortRef = useRef(false);
   const scenarioStartRef = useRef<number | null>(null);
+  const meetingIntakeRequestRef = useRef(0);
 
   const {
     messages,
@@ -860,6 +881,17 @@ export function DemoWorkspace({
     }
   }, [meetingTranscriptReady]);
   const meetingTranscriptConfirmed = meetingTranscriptReady && !isTranscriptEditing;
+  useEffect(() => {
+    if (demo !== "meeting") {
+      return;
+    }
+    if (meetingTranscriptConfirmed) {
+      return;
+    }
+    setMeetingIntakeStatus("idle");
+    setMeetingIntakeKey(null);
+    setMeetingIntakeNote(null);
+  }, [demo, meetingTranscriptConfirmed]);
   const meetingPrerequisiteBlocked = demo === "meeting" && !meetingTranscriptConfirmed;
   const hasConversationStarted = messages.length > 0;
   const isChatFocusedDemo = demo === "meeting" || demo === "research";
@@ -886,9 +918,9 @@ export function DemoWorkspace({
     () =>
       demo === "meeting" &&
       meetingTranscriptConfirmed &&
-      (status === "streaming" || status === "submitted") &&
-      !structuredInsight?.headline?.trim(),
-    [demo, meetingTranscriptConfirmed, status, structuredInsight?.headline],
+      !structuredInsight?.headline?.trim() &&
+      (meetingIntakeStatus === "generating" || status === "streaming" || status === "submitted"),
+    [demo, meetingIntakeStatus, meetingTranscriptConfirmed, status, structuredInsight?.headline],
   );
   const transcriptStats = useMemo(
     () => ({
@@ -975,6 +1007,25 @@ export function DemoWorkspace({
 
     return extractLatestAssistantSummary(messages);
   }, [messages, structuredInsight]);
+  const summaryIsUpdating = useMemo(
+    () =>
+      status === "streaming" ||
+      status === "submitted" ||
+      (demo === "meeting" && meetingTranscriptConfirmed && !hasConversationStarted && meetingIntakeStatus === "generating"),
+    [demo, hasConversationStarted, meetingIntakeStatus, meetingTranscriptConfirmed, status],
+  );
+  const summaryPlaceholderText = useMemo(() => {
+    if (demo === "meeting" && meetingTranscriptConfirmed && !hasConversationStarted) {
+      if (meetingIntakeStatus === "generating") {
+        return "議事録から会議タイトルと要点を作成しています。";
+      }
+      if (meetingIntakeStatus === "error") {
+        return "議事録サマリーの生成に失敗しました。議事録を再確定すると再試行できます。";
+      }
+      return "議事録の会議サマリーを表示します。";
+    }
+    return "最初の回答後に、ここへ最新サマリーを固定表示します。";
+  }, [demo, hasConversationStarted, meetingIntakeStatus, meetingTranscriptConfirmed]);
   const conversationFollowKey = useMemo(() => {
     const latestMessage = messages.at(-1);
     const latestTextLength = latestMessage ? getMessageText(latestMessage).length : 0;
@@ -1275,7 +1326,7 @@ export function DemoWorkspace({
           connectorSuccess?.detail ??
           connectorRunning?.detail ??
           connectorError?.detail ??
-          "公開データの収集を待機中。",
+          "公開情報と会議シグナルの収集を待機中。",
         status: connectorSuccess ? "done" : connectorRunning ? "doing" : "todo",
       },
       {
@@ -1284,7 +1335,7 @@ export function DemoWorkspace({
         detail:
           modelDone?.detail ??
           modelRunning?.detail ??
-          "会議レビュー回答を生成します。",
+          "議事録と質問から一次回答を生成します。",
         status: modelDone ? "done" : modelRunning ? "doing" : "todo",
       },
       {
@@ -1304,7 +1355,7 @@ export function DemoWorkspace({
           structuredDone?.detail ??
           structuredRunning?.detail ??
           structuredError?.detail ??
-          "TL;DR / 論点 / 次アクションを整形します。",
+          "TL;DR / 根拠 / 成果物を整形します。",
         status: structuredDone ? "done" : structuredRunning ? "doing" : "todo",
       },
       {
@@ -1342,23 +1393,26 @@ export function DemoWorkspace({
     }
     if (demo === "meeting" && showMeetingRuntimeSummary) {
       if (liveAgentCurrentStepLabel === "構造化集約") {
-        return "回答を整形中（構造化集約）";
+        return "要点・リスク・アクションを整理中";
       }
       if (liveAgentCurrentStepLabel === "最終反映") {
-        return "回答を反映中";
+        return "最終回答を反映中";
       }
       if (liveAgentCurrentStepLabel === "並列検証") {
-        return "回答を検証中（並列レビュー）";
+        return "3視点レビューを実行中";
       }
       if (liveAgentCurrentStepLabel === "一次推論") {
-        return "回答を作成中";
+        return "議事録ベースで回答案を作成中";
       }
-      return `${liveAgentCurrentStepLabel} を実行中`;
+      if (liveAgentCurrentStepLabel === "外部収集") {
+        return "公開シグナルを収集中";
+      }
+      return `${liveAgentCurrentStepLabel} を処理中`;
     }
     if (currentRunningTool) {
       return `${currentRunningTool.name}: ${compactUiText(currentRunningTool.detail, 56)}`;
     }
-    return "回答を作成中";
+    return "回答を準備中";
   }, [currentRunningTool, demo, isStreaming, liveAgentCurrentStepLabel, showMeetingRuntimeSummary]);
   const streamingStatusDetail = useMemo(() => {
     if (!isStreaming) {
@@ -1368,16 +1422,19 @@ export function DemoWorkspace({
       return currentRunningTool ? compactUiText(currentRunningTool.detail, 96) : null;
     }
     if (liveAgentCurrentStepLabel === "構造化集約") {
-      return "集約結果は「最新サマリ（TL;DR）」「詳細（論点/リスク/次アクション）」「成果物」に反映されます。";
+      return "一次回答とレビュー結果を統合して、TL;DR・根拠・成果物を更新しています。";
     }
     if (liveAgentCurrentStepLabel === "最終反映") {
-      return "集約済みの結果を最終回答としてチャット本文へ反映しています。";
+      return "統合済みの内容を、チャット本文の最終回答として表示しています。";
     }
     if (liveAgentCurrentStepLabel === "並列検証") {
-      return "Observer / Skeptic / Operator の出力を統合して、最終出力の根拠を補強しています。";
+      return "Observer / Skeptic / Operator が並列で点検し、見落としや矛盾を減らしています。";
     }
     if (liveAgentCurrentStepLabel === "一次推論") {
-      return "まず会話本文の一次回答を生成し、その後に構造化集約へ進みます。";
+      return "議事録と質問から一次回答を生成しています。完了後に並列点検へ進みます。";
+    }
+    if (liveAgentCurrentStepLabel === "外部収集") {
+      return "会議シグナルや公開情報を確認し、回答の前提をそろえています。";
     }
     return null;
   }, [
@@ -1537,6 +1594,108 @@ export function DemoWorkspace({
       selectedMeetingProfile.id,
     ],
   );
+
+  const generateMeetingIntakeSummary = useCallback(
+    async (transcript: string, intakeKey: string) => {
+      if (demo !== "meeting") {
+        return;
+      }
+
+      const runId = Date.now() + Math.floor(Math.random() * 1000);
+      meetingIntakeRequestRef.current = runId;
+      setMeetingIntakeStatus("generating");
+      setMeetingIntakeKey(intakeKey);
+      setMeetingIntakeNote("議事録を解析して、会議タイトルと要点を生成しています。");
+
+      try {
+        const response = await fetch("/api/meeting/intake", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider,
+            model,
+            transcript,
+            meetingContext: meetingSystemContext,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json()) as { message?: string };
+          throw new Error(payload.message ?? `status ${response.status}`);
+        }
+
+        const payload = (await response.json()) as MeetingIntakeSummaryResponse;
+        if (meetingIntakeRequestRef.current !== runId) {
+          return;
+        }
+
+        if (!hasConversationStarted) {
+          setStructuredInsight({
+            headline: payload.headline,
+            summary: payload.summary,
+            keyPoints: payload.keyPoints,
+            risks: [],
+            actions: [],
+            evidence: [],
+            worklog: [
+              {
+                id: "meeting-intake-summary",
+                label: "議事録の事前要約",
+                detail: "会議タイトルと要点を抽出しました。",
+                status: "done",
+                tags: ["intake", "summary"],
+              },
+            ],
+          });
+        }
+
+        setMeetingIntakeStatus("ready");
+        setMeetingIntakeNote(payload.note ?? null);
+      } catch (summaryError) {
+        if (meetingIntakeRequestRef.current !== runId) {
+          return;
+        }
+        setMeetingIntakeStatus("error");
+        setMeetingIntakeNote(
+          summaryError instanceof Error
+            ? `議事録サマリーの生成に失敗しました: ${summaryError.message}`
+            : "議事録サマリーの生成に失敗しました。",
+        );
+      }
+    },
+    [demo, hasConversationStarted, meetingSystemContext, model, provider],
+  );
+
+  useEffect(() => {
+    if (demo !== "meeting") {
+      return;
+    }
+    if (!meetingTranscriptConfirmed || hasConversationStarted) {
+      return;
+    }
+
+    const transcript = meetingTranscript.trim();
+    if (!hasRequiredMeetingTranscript(transcript)) {
+      return;
+    }
+
+    const intakeKey = `${provider}:${model}:${createTranscriptFingerprint(transcript)}`;
+    if (meetingIntakeKey === intakeKey && meetingIntakeStatus !== "error") {
+      return;
+    }
+
+    void generateMeetingIntakeSummary(transcript, intakeKey);
+  }, [
+    demo,
+    generateMeetingIntakeSummary,
+    hasConversationStarted,
+    meetingIntakeKey,
+    meetingIntakeStatus,
+    meetingTranscript,
+    meetingTranscriptConfirmed,
+    model,
+    provider,
+  ]);
 
   const ensureMeetingTranscript = useCallback(
     (actionLabel: string) => {
@@ -2902,16 +3061,26 @@ export function DemoWorkspace({
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-primary">最新サマリー（TL;DR）</p>
                     <p className="mt-1 line-clamp-2 text-sm font-medium">
-                      {latestAssistantSummary?.summary ??
-                        "最初の回答後に、ここへ最新サマリーを固定表示します。"}
+                      {latestAssistantSummary?.summary ? (
+                        latestAssistantSummary.summary
+                      ) : summaryIsUpdating ? (
+                        <Shimmer as="span">{summaryPlaceholderText}</Shimmer>
+                      ) : (
+                        summaryPlaceholderText
+                      )}
                     </p>
                     {latestAssistantSummary?.bullets && latestAssistantSummary.bullets.length > 0 ? (
                       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                         {latestAssistantSummary.bullets.slice(0, 2).join(" / ")}
                       </p>
                     ) : null}
+                    {meetingIntakeNote && !hasConversationStarted ? (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                        {meetingIntakeNote}
+                      </p>
+                    ) : null}
                   </div>
-                  {isStreaming ? (
+                  {summaryIsUpdating ? (
                     <Badge className="text-[10px]">updating</Badge>
                   ) : null}
                 </div>
