@@ -4,7 +4,6 @@ import {
   createUIMessageStreamResponse,
   generateObject,
   generateText,
-  streamText,
 } from "ai";
 import { google, type GoogleGenerativeAIProviderMetadata } from "@ai-sdk/google";
 import { z } from "zod";
@@ -540,12 +539,9 @@ function buildSystemPrompt(input: {
     "あなたは業務オペレーション向けのAIアシスタントです。日本語で簡潔に、読みやすい構造で回答してください。";
   const readableFormat =
     input.demo === "meeting"
-      ? "出力はMarkdown形式で、必ず以下の順で:\n" +
-        "## TL;DR（3行以内）\n" +
-        "## 決定事項 / 未決事項\n" +
-        "## 反証レビュー（失敗シナリオ2件 + 早期検知シグナル）\n" +
-        "## 次アクション（表形式。列: タスク / 担当 / 期限 / 成功条件）\n" +
-        "## 次回会議までの確認項目"
+      ? "出力はMarkdown形式。\n" +
+        "最優先: ユーザーが行数/項目/形式を明示した場合は、その指定に厳密に従う（追加セクションを勝手に足さない）。\n" +
+        "ユーザー指定が曖昧な場合のみ、必要最小限の見出しで簡潔に回答する。"
       : input.demo === "research"
         ? "出力はMarkdown形式で、必ず以下の順で:\n" +
           "## TL;DR（3行以内）\n" +
@@ -983,7 +979,7 @@ export async function POST(request: Request) {
         transient: true,
       });
 
-      const result = streamText({
+      const result = await generateText({
         model: modelResult.model,
         system: buildSystemPrompt({
           demo: parsed.data.demo,
@@ -993,11 +989,10 @@ export async function POST(request: Request) {
           connectorContext: connectorContext?.promptContext,
         }),
         messages: await convertToModelMessages(messages),
+        temperature: 0,
       });
 
-      writer.merge(result.toUIMessageStream());
-
-      const assistantMarkdown = (await result.text).trim();
+      const assistantMarkdown = result.text.trim();
       const modelFinishedIso = new Date().toISOString();
       const modelDoneId = createStreamId("tool-model-done");
       writer.write({
@@ -1007,7 +1002,7 @@ export async function POST(request: Request) {
           id: modelDoneId,
           name: "model-call",
           status: "success",
-          detail: "推論が完了しました。並列エージェントでレビューを実行します。",
+          detail: "推論下書きが完了しました。並列エージェントでレビューを実行します。",
           timestamp: modelFinishedIso,
         },
         transient: true,
@@ -1170,7 +1165,8 @@ export async function POST(request: Request) {
           id: structuredRunningId,
           name: "structured-output",
           status: "running",
-          detail: "並列レビューを集約して、要点/リスク/次アクションを抽出しています。",
+          detail:
+            "並列レビューを集約し、最新サマリー（TL;DR）と成果物へ反映する構造データを作成しています。",
           timestamp: new Date().toISOString(),
         },
         transient: true,
@@ -1243,7 +1239,7 @@ export async function POST(request: Request) {
             name: "structured-output",
             status: "success",
             detail:
-              "構造化サマリを更新しました。TL;DR / Agent Worklog / Artifacts を確認してください。",
+              "構造化サマリを更新しました（TL;DR / 詳細 / 成果物）。最終回答をチャットに反映します。",
             timestamp: nowIso,
           },
           transient: true,
@@ -1305,13 +1301,56 @@ export async function POST(request: Request) {
             status: "success",
             detail:
               structuredError instanceof Error
-                ? `構造化出力はスキーマ不一致のため補完結果を使用: ${structuredError.message}`
-                : "構造化出力はスキーマ不一致のため補完結果を使用しました。",
+                ? `構造化出力はスキーマ不一致のため補完結果を使用: ${structuredError.message}。最終回答をチャットに反映します。`
+                : "構造化出力はスキーマ不一致のため補完結果を使用しました。最終回答をチャットに反映します。",
             timestamp: nowIso,
           },
           transient: true,
         });
       }
+
+      const finalAnswerRunningId = createStreamId("tool-final-answer");
+      writer.write({
+        type: "data-tool",
+        id: finalAnswerRunningId,
+        data: {
+          id: finalAnswerRunningId,
+          name: "final-answer",
+          status: "running",
+          detail: "最終回答をチャットへ反映しています。",
+          timestamp: new Date().toISOString(),
+        },
+        transient: true,
+      });
+
+      const textPartId = createStreamId("assistant-final");
+      writer.write({
+        type: "text-start",
+        id: textPartId,
+      });
+      writer.write({
+        type: "text-delta",
+        id: textPartId,
+        delta: assistantMarkdown,
+      });
+      writer.write({
+        type: "text-end",
+        id: textPartId,
+      });
+
+      const finalAnswerDoneId = createStreamId("tool-final-answer-done");
+      writer.write({
+        type: "data-tool",
+        id: finalAnswerDoneId,
+        data: {
+          id: finalAnswerDoneId,
+          name: "final-answer",
+          status: "success",
+          detail: "最終回答をチャットへ反映しました。",
+          timestamp: new Date().toISOString(),
+        },
+        transient: true,
+      });
     },
   });
 

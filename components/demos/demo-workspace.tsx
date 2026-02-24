@@ -255,17 +255,6 @@ const MEETING_OUTPUT_TEMPLATES: Record<MeetingProfile["id"], MeetingOutputTempla
   },
 };
 
-function buildMeetingOutputFormatInstruction(profile: MeetingProfile): string {
-  const template = MEETING_OUTPUT_TEMPLATES[profile.id];
-  return [
-    `出力フォーマット（${template.title}）:`,
-    "1. 会議要約（3行以内）",
-    ...template.sections.map((section, index) => `${index + 2}. ${section}`),
-    `${template.sections.length + 2}. 次アクション表（列: ${template.actionColumns.join(" / ")}）`,
-    `${template.sections.length + 3}. 不足データと次回確認事項`,
-  ].join("\n");
-}
-
 function getMeetingSuggestions(profile: MeetingProfile): string[] {
   const template = MEETING_OUTPUT_TEMPLATES[profile.id];
   return [
@@ -1259,6 +1248,18 @@ export function DemoWorkspace({
       tools,
       (tool) => tool.name === "structured-output" && tool.status === "error",
     );
+    const finalAnswerDone = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "final-answer" && tool.status === "success",
+    );
+    const finalAnswerRunning = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "final-answer" && tool.status === "running",
+    );
+    const finalAnswerError = findLatestToolEvent(
+      tools,
+      (tool) => tool.name === "final-answer" && tool.status === "error",
+    );
 
     return [
       {
@@ -1306,6 +1307,16 @@ export function DemoWorkspace({
           "TL;DR / 論点 / 次アクションを整形します。",
         status: structuredDone ? "done" : structuredRunning ? "doing" : "todo",
       },
+      {
+        id: "live-finalize",
+        label: "最終反映",
+        detail:
+          finalAnswerDone?.detail ??
+          finalAnswerRunning?.detail ??
+          finalAnswerError?.detail ??
+          "最終回答をチャットへ反映します。",
+        status: finalAnswerDone ? "done" : finalAnswerRunning ? "doing" : "todo",
+      },
     ];
   }, [demo, meetingTranscriptConfirmed, tools]);
   const liveAgentCurrentStepLabel = useMemo(() => {
@@ -1333,6 +1344,9 @@ export function DemoWorkspace({
       if (liveAgentCurrentStepLabel === "構造化集約") {
         return "回答を整形中（構造化集約）";
       }
+      if (liveAgentCurrentStepLabel === "最終反映") {
+        return "回答を反映中";
+      }
       if (liveAgentCurrentStepLabel === "並列検証") {
         return "回答を検証中（並列レビュー）";
       }
@@ -1355,6 +1369,9 @@ export function DemoWorkspace({
     }
     if (liveAgentCurrentStepLabel === "構造化集約") {
       return "集約結果は「最新サマリ（TL;DR）」「詳細（論点/リスク/次アクション）」「成果物」に反映されます。";
+    }
+    if (liveAgentCurrentStepLabel === "最終反映") {
+      return "集約済みの結果を最終回答としてチャット本文へ反映しています。";
     }
     if (liveAgentCurrentStepLabel === "並列検証") {
       return "Observer / Skeptic / Operator の出力を統合して、最終出力の根拠を補強しています。";
@@ -1480,19 +1497,16 @@ export function DemoWorkspace({
       return "";
     }
 
-    const profileHint = "会議タイプ: 議事録から自動推定";
-
-    return (
-      "会議設定:\n" +
-      `- ${profileHint}\n` +
-      "- ガイド原則: 会議の速度ではなく、合意形成と実行確度を上げる\n" +
-      `- 目的: ${selectedMeetingProfile.objective}\n` +
-      `- 参加者: ${selectedMeetingProfile.participants}\n` +
-      `- 期待成果: ${selectedMeetingProfile.expectedOutput}\n` +
-      `- 主要論点: ${selectedMeetingProfile.keyTopics.join(" / ")}\n` +
-      `${buildMeetingOutputFormatInstruction(selectedMeetingProfile)}\n` +
-      "必ず見出し付きで出力し、次アクション表は Markdown table で記述してください。"
-    );
+    return [
+      "会議設定:",
+      "- 会議タイプ: 議事録から自動推定",
+      "- ガイド原則: 合意形成と実行確度を上げる",
+      `- 目的: ${selectedMeetingProfile.objective}`,
+      `- 参加者: ${selectedMeetingProfile.participants}`,
+      `- 主要論点: ${selectedMeetingProfile.keyTopics.join(" / ")}`,
+      "- 出力優先ルール: ユーザーが行数/項目/形式を指定した場合は厳密に従う",
+      "- 禁止: 依頼されていない追加セクション（反証レビュー/次アクション等）を勝手に付けない",
+    ].join("\n");
   }, [demo, selectedMeetingProfile]);
 
   const buildRequestBody = useCallback(
